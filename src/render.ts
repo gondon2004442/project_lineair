@@ -24,7 +24,7 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
   await app.init({
     background: PALETTE.black,
     antialias: false,
-    resizeTo: window,
+    resizeTo: host,
     roundPixels: true,
   });
   host.appendChild(app.canvas);
@@ -53,6 +53,8 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
     },
 
     layout() {
+      // Контейнер мог сузиться: панель крутилок отъедает правый край.
+      app.resize();
       const scale = Math.min(app.screen.width / ROOM_WIDTH, app.screen.height / ROOM_HEIGHT);
       root.scale.set(scale);
       root.position.set(

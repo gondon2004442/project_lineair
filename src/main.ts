@@ -5,6 +5,7 @@
 import './style.css';
 import { createHud } from './hud';
 import { createInput } from './input';
+import { createPanel } from './panel';
 import { createRenderer } from './render';
 import { resolveSeed } from './rng';
 import { step } from './step';
@@ -16,7 +17,8 @@ async function boot(): Promise<void> {
   const hudLeft = document.getElementById('hud-left');
   const hudRight = document.getElementById('hud-right');
   const hudBanner = document.getElementById('hud-banner');
-  if (host === null || hudLeft === null || hudRight === null || hudBanner === null) {
+  const panelHost = document.getElementById('panel');
+  if (host === null || hudLeft === null || hudRight === null || hudBanner === null || panelHost === null) {
     throw new Error('Разметка оверлея не найдена');
   }
 
@@ -24,15 +26,25 @@ async function boot(): Promise<void> {
   const input = createInput(renderer.app.canvas);
   const hud = createHud(hudLeft, hudRight, hudBanner);
 
+  // Панель поднимается первой: она восстанавливает значения прошлого сеанса,
+  // и первый же мир должен собираться уже по ним.
+  const panel = createPanel(panelHost, {
+    restart: () => restartRun(),
+    resize: () => renderer.layout(),
+  });
+
   const seed = resolveSeed();
   let world = createWorld(seed, input.snapshot);
 
-  input.setProjection((sx, sy) => renderer.screenToWorld(sx, sy));
-  input.onRestart(() => {
+  function restartRun(): void {
     // Тот же seed — тот же забег.
     world = createWorld(seed, input.snapshot);
     renderer.drawRoom(world.map);
-  });
+    panel.clearRestartFlag();
+  }
+
+  input.setProjection((sx, sy) => renderer.screenToWorld(sx, sy));
+  input.onRestart(restartRun);
   input.onToggleHitboxes(() => {
     renderer.showHitboxes = !renderer.showHitboxes;
   });

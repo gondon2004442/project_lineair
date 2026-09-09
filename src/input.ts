@@ -2,6 +2,8 @@
  * Ввод. Слушатели пишут в один изменяемый снимок,
  * симуляция только читает его на своём шаге.
  */
+import { isPanelTarget } from './panel';
+
 export interface InputSnapshot {
   /** Направление движения, компоненты в [-1, 1]. */
   moveX: number;
@@ -59,6 +61,7 @@ export function createInput(target: HTMLElement): InputDevice {
   };
 
   window.addEventListener('keydown', (ev) => {
+    if (isPanelTarget(ev.target)) return;
     if (ev.code === 'F1') {
       ev.preventDefault();
       toggleHitboxes();
@@ -80,6 +83,7 @@ export function createInput(target: HTMLElement): InputDevice {
   });
 
   window.addEventListener('keyup', (ev) => {
+    if (isPanelTarget(ev.target)) return;
     if (held.delete(ev.code)) recomputeMove();
   });
 

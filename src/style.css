@@ -27,6 +27,15 @@ body {
   cursor: crosshair;
 }
 
+#stage {
+  position: fixed;
+  inset: 0;
+}
+
+body.panel-open #stage {
+  right: 340px;
+}
+
 #stage canvas {
   display: block;
 }
@@ -102,4 +111,184 @@ body {
 
 .hud-banner[hidden] {
   display: none;
+}
+
+/* --- Панель крутилок ---------------------------------------------------- */
+
+.panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 340px;
+  padding: 10px;
+  overflow-y: auto;
+  background: rgba(13, 13, 12, 0.95);
+  border-left: 2px solid var(--concrete);
+  z-index: 10;
+}
+
+.panel[hidden] {
+  display: none;
+}
+
+body.panel-open #hud-right {
+  right: 356px;
+}
+
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--concrete);
+}
+
+.panel-title {
+  color: var(--yellow);
+  letter-spacing: 0.16em;
+}
+
+.panel-hint {
+  color: var(--concrete-mid);
+}
+
+.panel-controls {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.panel-select,
+.panel-text,
+.panel-button {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 6px;
+  font: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--concrete-light);
+  background: var(--black);
+  border: 1px solid var(--concrete);
+  outline: none;
+}
+
+.panel-button {
+  cursor: pointer;
+}
+
+.panel-button:hover {
+  color: var(--black);
+  background: var(--yellow);
+  border-color: var(--yellow);
+}
+
+.panel-select:focus,
+.panel-text:focus {
+  border-color: var(--yellow);
+}
+
+.panel-status {
+  margin: 8px 0 4px;
+  color: var(--concrete-mid);
+}
+
+.panel-warning {
+  margin-bottom: 8px;
+  padding: 4px 6px;
+  color: var(--black);
+  background: var(--red);
+}
+
+.panel-warning[hidden] {
+  display: none;
+}
+
+.panel-group {
+  margin-top: 10px;
+  border-top: 1px solid var(--concrete);
+}
+
+.panel-group-title {
+  padding: 6px 0 4px;
+  color: var(--yellow);
+  letter-spacing: 0.16em;
+  cursor: pointer;
+  user-select: none;
+}
+
+.panel-group-title::before {
+  content: "— ";
+  color: var(--concrete-mid);
+}
+
+.panel-group-title.collapsed::before {
+  content: "+ ";
+}
+
+.panel-group-body[hidden] {
+  display: none;
+}
+
+.panel-row {
+  margin-bottom: 6px;
+}
+
+.panel-row-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.panel-label {
+  color: var(--concrete-mid);
+  cursor: pointer;
+  user-select: none;
+}
+
+.panel-value {
+  color: var(--concrete-light);
+  font-variant-numeric: tabular-nums;
+}
+
+.panel-value.changed {
+  color: var(--yellow);
+}
+
+/* Ползунок: прямоугольный, без скруглений и теней. */
+.panel-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 10px;
+  margin: 2px 0 0;
+  background: var(--concrete);
+  border: 1px solid var(--concrete-mid);
+  outline: none;
+  cursor: ew-resize;
+}
+
+.panel-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10px;
+  height: 14px;
+  margin-top: -1px;
+  background: var(--yellow);
+  border: 0;
+}
+
+.panel-slider::-moz-range-thumb {
+  width: 10px;
+  height: 14px;
+  background: var(--yellow);
+  border: 0;
+  border-radius: 0;
+}
+
+.panel-slider:focus {
+  border-color: var(--yellow);
 }

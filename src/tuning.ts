@@ -112,13 +112,13 @@ export const TUNING = {
     hitstopPlayerHurt: 0.12,
 
     /** Тряска экрана: амплитуда в пикселях мира. */
-    shakeShoot: 1.2,
-    shakeEnemyHit: 2.5,
-    shakeEnemyKill: 5,
-    shakePlayerHurt: 9,
+    shakeShoot: 0.5,
+    shakeEnemyHit: 1.2,
+    shakeEnemyKill: 2.6,
+    shakePlayerHurt: 5,
     /** Затухание тряски, единиц амплитуды в секунду. */
-    shakeDecay: 14,
-    shakeMax: 16,
+    shakeDecay: 18,
+    shakeMax: 10,
 
     /** Белая вспышка на теле, получившем урон. */
     flashTime: 0.08,
@@ -153,7 +153,7 @@ export const TUNING = {
     /** Как часто обновляется числовая часть оверлея. */
     overlayInterval: 0.2,
   },
-} as const;
+};
 
 /** Шаг симуляции в секундах. */
 export const STEP = 1 / TUNING.sim.hz;
@@ -164,3 +164,257 @@ export const ROOM_WIDTH = (TUNING.room.cols + TUNING.room.wall * 2) * TUNING.roo
 export const ROOM_HEIGHT = (TUNING.room.rows + TUNING.room.wall * 2) * TUNING.room.tile;
 
 export const DEG = Math.PI / 180;
+
+// --------------------------------------------------------------------------
+// Схема панели крутилок. Границы слайдеров — тоже числа, поэтому живут здесь.
+// --------------------------------------------------------------------------
+
+export interface TuningField {
+  /** Путь внутри TUNING, например 'player.speed'. */
+  path: string;
+  label: string;
+  min: number;
+  max: number;
+  step: number;
+  /** Значение читается при рождении сущности — нужен повтор забега. */
+  onRestart?: boolean;
+}
+
+export interface TuningGroup {
+  title: string;
+  fields: TuningField[];
+}
+
+export const PANEL: TuningGroup[] = [
+  {
+    title: 'СУБЪЕКТ',
+    fields: [
+      { path: 'player.speed', label: 'СКОРОСТЬ', min: 60, max: 600, step: 5 },
+      { path: 'player.accel', label: 'УСКОРЕНИЕ', min: 200, max: 8000, step: 50 },
+      { path: 'player.friction', label: 'ТРЕНИЕ', min: 100, max: 8000, step: 50 },
+      { path: 'player.recoil', label: 'ОТДАЧА', min: 0, max: 400, step: 5 },
+      { path: 'player.hurtIFrames', label: 'НЕУЯЗВИМОСТЬ ПОСЛЕ УРОНА', min: 0, max: 2.5, step: 0.05 },
+      { path: 'player.maxHp', label: 'ЗАПАС ХОДА', min: 1, max: 16, step: 1, onRestart: true },
+      { path: 'player.radius', label: 'ХИТБОКС', min: 4, max: 20, step: 0.5, onRestart: true },
+    ],
+  },
+  {
+    title: 'РЫВОК',
+    fields: [
+      { path: 'player.dashDistance', label: 'ДИСТАНЦИЯ', min: 40, max: 500, step: 5 },
+      { path: 'player.dashDuration', label: 'ДЛИТЕЛЬНОСТЬ', min: 0.05, max: 0.6, step: 0.01 },
+      { path: 'player.dashCooldown', label: 'ПЕРЕЗАРЯД', min: 0, max: 3, step: 0.05 },
+      { path: 'player.dashIFrames', label: 'ОКНО НЕУЯЗВИМОСТИ', min: 0, max: 0.6, step: 0.01 },
+      { path: 'player.dashExitFactor', label: 'ВЫНОС НА ВЫХОДЕ', min: 0, max: 1.5, step: 0.05 },
+    ],
+  },
+  {
+    title: 'ОГОНЬ СУБЪЕКТА',
+    fields: [
+      { path: 'playerBullet.speed', label: 'СКОРОСТЬ ПУЛИ', min: 150, max: 1800, step: 10 },
+      { path: 'playerBullet.interval', label: 'ТЕМП', min: 0.03, max: 0.6, step: 0.01 },
+      { path: 'playerBullet.spreadDeg', label: 'РАЗБРОС', min: 0, max: 25, step: 0.2 },
+      { path: 'playerBullet.damage', label: 'УРОН', min: 1, max: 6, step: 1 },
+      { path: 'playerBullet.life', label: 'ДАЛЬНОБОЙНОСТЬ', min: 0.2, max: 4, step: 0.1 },
+      { path: 'playerBullet.radius', label: 'РАЗМЕР ПУЛИ', min: 1, max: 14, step: 0.5 },
+    ],
+  },
+  {
+    title: 'ЗАРАЖЁННЫЕ',
+    fields: [
+      { path: 'enemy.count', label: 'КОЛИЧЕСТВО', min: 1, max: 40, step: 1, onRestart: true },
+      { path: 'enemy.maxHp', label: 'ПРОЧНОСТЬ', min: 1, max: 20, step: 1, onRestart: true },
+      { path: 'enemy.speed', label: 'СКОРОСТЬ', min: 20, max: 400, step: 5 },
+      { path: 'enemy.accel', label: 'УСКОРЕНИЕ', min: 100, max: 5000, step: 50 },
+      { path: 'enemy.friction', label: 'ТРЕНИЕ', min: 100, max: 5000, step: 50 },
+      { path: 'enemy.preferredRange', label: 'ДИСТАНЦИЯ БОЯ', min: 60, max: 600, step: 10 },
+      { path: 'enemy.backoffRatio', label: 'ПОРОГ ОТХОДА', min: 0.1, max: 1, step: 0.02 },
+      { path: 'enemy.strafeFactor', label: 'БОКОВОЕ СМЕЩЕНИЕ', min: 0, max: 1.5, step: 0.05 },
+      { path: 'enemy.aimDelay', label: 'ЗАДЕРЖКА ПЕРЕД КАСТОМ', min: 0, max: 3, step: 0.05 },
+      { path: 'enemy.castTime', label: 'ВРЕМЯ КАСТА', min: 0.05, max: 2.5, step: 0.05 },
+      { path: 'enemy.burstCount', label: 'ПУЛЬ В ОЧЕРЕДИ', min: 1, max: 12, step: 1 },
+      { path: 'enemy.burstInterval', label: 'ТЕМП ОЧЕРЕДИ', min: 0.03, max: 0.5, step: 0.01 },
+      { path: 'enemy.recoverTime', label: 'ПАУЗА ПОСЛЕ ОЧЕРЕДИ', min: 0.1, max: 4, step: 0.05 },
+      { path: 'enemy.separationForce', label: 'РАСТАЛКИВАНИЕ', min: 0, max: 900, step: 20 },
+    ],
+  },
+  {
+    title: 'ОГОНЬ ЗАРАЖЁННЫХ',
+    fields: [
+      { path: 'enemyBullet.speed', label: 'СКОРОСТЬ ПУЛИ', min: 60, max: 900, step: 10 },
+      { path: 'enemyBullet.spreadDeg', label: 'РАЗБРОС', min: 0, max: 40, step: 0.5 },
+      { path: 'enemyBullet.damage', label: 'УРОН', min: 1, max: 5, step: 1 },
+      { path: 'enemyBullet.life', label: 'ДАЛЬНОБОЙНОСТЬ', min: 0.5, max: 8, step: 0.25 },
+      { path: 'enemyBullet.radius', label: 'РАЗМЕР ПУЛИ', min: 2, max: 16, step: 0.5 },
+    ],
+  },
+  {
+    title: 'ОЩУЩЕНИЕ',
+    fields: [
+      { path: 'feel.hitstopEnemyHit', label: 'СТОП-КАДР: ПОПАДАНИЕ', min: 0, max: 0.25, step: 0.005 },
+      { path: 'feel.hitstopEnemyKill', label: 'СТОП-КАДР: УБИЙСТВО', min: 0, max: 0.4, step: 0.005 },
+      { path: 'feel.hitstopPlayerHurt', label: 'СТОП-КАДР: УРОН ПО НАМ', min: 0, max: 0.5, step: 0.005 },
+      { path: 'feel.shakeShoot', label: 'ТРЯСКА: ВЫСТРЕЛ', min: 0, max: 8, step: 0.1 },
+      { path: 'feel.shakeEnemyHit', label: 'ТРЯСКА: ПОПАДАНИЕ', min: 0, max: 12, step: 0.1 },
+      { path: 'feel.shakeEnemyKill', label: 'ТРЯСКА: УБИЙСТВО', min: 0, max: 20, step: 0.2 },
+      { path: 'feel.shakePlayerHurt', label: 'ТРЯСКА: УРОН ПО НАМ', min: 0, max: 30, step: 0.5 },
+      { path: 'feel.shakeDecay', label: 'ЗАТУХАНИЕ ТРЯСКИ', min: 2, max: 60, step: 1 },
+      { path: 'feel.shakeMax', label: 'ПОТОЛОК ТРЯСКИ', min: 0, max: 40, step: 0.5 },
+      { path: 'feel.flashTime', label: 'ВСПЫШКА НА ТЕЛЕ', min: 0, max: 0.4, step: 0.01 },
+      { path: 'feel.blinkRate', label: 'МИГАНИЕ В НЕУЯЗВИМОСТИ', min: 2, max: 60, step: 1 },
+    ],
+  },
+];
+
+// --------------------------------------------------------------------------
+// Пресеты. Пресет — это просто набор пар «путь → число».
+// --------------------------------------------------------------------------
+
+export type TuningPatch = Record<string, number>;
+
+export const PRESETS: Record<string, TuningPatch> = {
+  /** Точный: короткий разгон, злой темп, почти без разброса. */
+  tight: {
+    'player.speed': 290,
+    'player.accel': 6000,
+    'player.friction': 5000,
+    'player.recoil': 35,
+    'player.hurtIFrames': 0.9,
+    'player.dashDistance': 200,
+    'player.dashDuration': 0.14,
+    'player.dashCooldown': 0.6,
+    'player.dashIFrames': 0.13,
+    'player.dashExitFactor': 0.2,
+    'playerBullet.speed': 1050,
+    'playerBullet.interval': 0.11,
+    'playerBullet.spreadDeg': 0.6,
+    'enemy.count': 5,
+    'enemy.speed': 110,
+    'enemy.castTime': 0.4,
+    'enemyBullet.speed': 400,
+    'feel.hitstopEnemyHit': 0.03,
+    'feel.hitstopEnemyKill': 0.06,
+    'feel.shakeShoot': 0.4,
+    'feel.shakeEnemyHit': 1,
+    'feel.shakeEnemyKill': 2,
+    'feel.shakePlayerHurt': 4,
+    'feel.shakeDecay': 22,
+  },
+
+  /** Инерционный: разгоняется и тормозит долго, пуля тяжёлая, отдача толкает. */
+  floaty: {
+    'player.speed': 320,
+    'player.accel': 850,
+    'player.friction': 450,
+    'player.recoil': 170,
+    'player.hurtIFrames': 1,
+    'player.dashDistance': 270,
+    'player.dashDuration': 0.26,
+    'player.dashCooldown': 0.95,
+    'player.dashIFrames': 0.2,
+    'player.dashExitFactor': 0.85,
+    'playerBullet.speed': 700,
+    'playerBullet.interval': 0.17,
+    'playerBullet.spreadDeg': 3.5,
+    'enemy.count': 5,
+    'enemy.accel': 380,
+    'enemy.friction': 380,
+    'enemy.castTime': 0.55,
+    'enemyBullet.speed': 300,
+    'feel.hitstopEnemyHit': 0.05,
+    'feel.hitstopEnemyKill': 0.1,
+    'feel.shakeShoot': 1.2,
+    'feel.shakeEnemyHit': 2,
+    'feel.shakeEnemyKill': 4,
+    'feel.shakePlayerHurt': 7,
+    'feel.shakeDecay': 12,
+  },
+
+  /** Толпа: медленные пули, которые видно, много слабых заражённых. */
+  horde: {
+    'player.speed': 250,
+    'player.maxHp': 8,
+    'player.accel': 3000,
+    'player.friction': 2400,
+    'player.recoil': 60,
+    'player.dashDistance': 210,
+    'player.dashCooldown': 0.55,
+    'player.dashIFrames': 0.16,
+    'playerBullet.speed': 780,
+    'playerBullet.interval': 0.1,
+    'playerBullet.spreadDeg': 2.5,
+    'playerBullet.radius': 4.5,
+    'enemy.count': 16,
+    'enemy.maxHp': 2,
+    'enemy.speed': 78,
+    'enemy.preferredRange': 200,
+    'enemy.aimDelay': 0.7,
+    'enemy.castTime': 0.6,
+    'enemy.burstCount': 2,
+    'enemy.burstInterval': 0.18,
+    'enemy.recoverTime': 1.7,
+    'enemy.separationForce': 320,
+    'enemyBullet.speed': 185,
+    'enemyBullet.spreadDeg': 6,
+    'enemyBullet.life': 5,
+    'enemyBullet.radius': 6.5,
+    'feel.hitstopEnemyHit': 0.02,
+    'feel.hitstopEnemyKill': 0.04,
+    'feel.shakeShoot': 0.3,
+    'feel.shakeEnemyHit': 0.8,
+    'feel.shakeEnemyKill': 1.8,
+    'feel.shakePlayerHurt': 5,
+  },
+};
+
+// --------------------------------------------------------------------------
+// Доступ по пути. Нужен панели, чтобы не знать про структуру TUNING.
+// --------------------------------------------------------------------------
+
+type Node = Record<string, unknown>;
+
+export function getTuning(path: string): number {
+  let node: unknown = TUNING;
+  for (const part of path.split('.')) {
+    if (node === null || typeof node !== 'object') return Number.NaN;
+    node = (node as Node)[part];
+  }
+  return typeof node === 'number' ? node : Number.NaN;
+}
+
+export function setTuning(path: string, value: number): void {
+  const parts = path.split('.');
+  const last = parts.pop();
+  if (last === undefined) return;
+  let node: Node = TUNING as unknown as Node;
+  for (const part of parts) {
+    const next = node[part];
+    if (next === null || typeof next !== 'object') return;
+    node = next as Node;
+  }
+  node[last] = value;
+}
+
+/** Текущие значения всех полей панели. */
+export function snapshotTuning(): TuningPatch {
+  const patch: TuningPatch = {};
+  for (const group of PANEL) {
+    for (const field of group.fields) patch[field.path] = getTuning(field.path);
+  }
+  return patch;
+}
+
+/** Накатить набор значений. Незнакомые пути игнорируются. */
+export function applyTuning(patch: TuningPatch): void {
+  const known = new Set<string>();
+  for (const group of PANEL) {
+    for (const field of group.fields) known.add(field.path);
+  }
+  for (const [path, value] of Object.entries(patch)) {
+    if (!known.has(path) || !Number.isFinite(value)) continue;
+    setTuning(path, value);
+  }
+}
+
+/** Значения, с которыми проект собран. Снимается один раз при загрузке модуля. */
+export const BASELINE: TuningPatch = snapshotTuning();

@@ -99,13 +99,15 @@ export function enemySeparationSystem(w: World, dt: number): void {
       const dist = Math.hypot(dx, dy);
       const minDist = ba.radius + bb.radius;
       if (dist >= minDist || dist === 0) continue;
-      const push = (1 - dist / minDist) * TUNING.enemy.separationForce * dt;
+      // Правим положение, а не скорость: скорость через кадр перетрёт ИИ,
+      // и толпа схлопнется в один комок.
+      const push = ((1 - dist / minDist) * TUNING.enemy.separationForce * dt) / 2;
       const nx = dx / dist;
       const ny = dy / dist;
-      ba.vx -= nx * push;
-      ba.vy -= ny * push;
-      bb.vx += nx * push;
-      bb.vy += ny * push;
+      ta.x -= nx * push;
+      ta.y -= ny * push;
+      tb.x += nx * push;
+      tb.y += ny * push;
     }
   }
 }

@@ -5,6 +5,17 @@ import type { TileMap } from '../room';
 
 const SKIN = 0.01;
 
+interface Point {
+  x: number;
+  y: number;
+}
+
+interface Motion {
+  vx: number;
+  vy: number;
+  radius: number;
+}
+
 export function physicsSystem(w: World, dt: number): void {
   for (const e of w.alive) {
     const t = w.transform.get(e);
@@ -23,51 +34,57 @@ export function physicsSystem(w: World, dt: number): void {
   }
 }
 
-function moveX(map: TileMap, t: { x: number; y: number }, b: { vx: number; radius: number }, dx: number): void {
-  if (dx === 0) return;
+/**
+ * Разбор идёт и при нулевой скорости: тело могло оказаться в стене
+ * не своим ходом, например после расталкивания.
+ */
+function moveX(map: TileMap, t: Point, b: Motion, dx: number): void {
   t.x += dx;
   const r = b.radius;
   const top = Math.floor((t.y - r) / map.size);
   const bottom = Math.floor((t.y + r - SKIN) / map.size);
-  if (dx > 0) {
+
+  if (dx >= 0) {
     const cx = Math.floor((t.x + r) / map.size);
     for (let cy = top; cy <= bottom; cy++) {
       if (!isSolidCell(map, cx, cy)) continue;
       t.x = cx * map.size - r - SKIN;
-      b.vx = 0;
+      b.vx = Math.min(b.vx, 0);
       return;
     }
-  } else {
+  }
+  if (dx <= 0) {
     const cx = Math.floor((t.x - r) / map.size);
     for (let cy = top; cy <= bottom; cy++) {
       if (!isSolidCell(map, cx, cy)) continue;
       t.x = (cx + 1) * map.size + r + SKIN;
-      b.vx = 0;
+      b.vx = Math.max(b.vx, 0);
       return;
     }
   }
 }
 
-function moveY(map: TileMap, t: { x: number; y: number }, b: { vy: number; radius: number }, dy: number): void {
-  if (dy === 0) return;
+function moveY(map: TileMap, t: Point, b: Motion, dy: number): void {
   t.y += dy;
   const r = b.radius;
   const left = Math.floor((t.x - r) / map.size);
   const right = Math.floor((t.x + r - SKIN) / map.size);
-  if (dy > 0) {
+
+  if (dy >= 0) {
     const cy = Math.floor((t.y + r) / map.size);
     for (let cx = left; cx <= right; cx++) {
       if (!isSolidCell(map, cx, cy)) continue;
       t.y = cy * map.size - r - SKIN;
-      b.vy = 0;
+      b.vy = Math.min(b.vy, 0);
       return;
     }
-  } else {
+  }
+  if (dy <= 0) {
     const cy = Math.floor((t.y - r) / map.size);
     for (let cx = left; cx <= right; cx++) {
       if (!isSolidCell(map, cx, cy)) continue;
       t.y = (cy + 1) * map.size + r + SKIN;
-      b.vy = 0;
+      b.vy = Math.max(b.vy, 0);
       return;
     }
   }
