@@ -4,6 +4,7 @@ import { bulletSystem } from './systems/combat';
 import { enemyAiSystem, enemySeparationSystem } from './systems/enemyAi';
 import { feedbackSystem, lifecycleSystem, statusSystem } from './systems/lifecycle';
 import { physicsSystem } from './systems/physics';
+import { roomSystem } from './systems/rooms';
 import { playerControlSystem } from './systems/playerControl';
 import { STEP } from './tuning';
 
@@ -29,6 +30,7 @@ export function step(w: World): void {
   feedbackSystem(w, STEP);
 
   flushDoomed(w);
+  roomSystem(w);
   statusSystem(w);
   w.tick += 1;
 }

@@ -1,27 +1,38 @@
-/** Служебный оверлей: состояние субъекта, отладка, seed. */
-import type { World } from './ecs';
-import { entityCount } from './ecs';
+/** Служебный оверлей: состояние субъекта, схема этажа, отладка, seed. */
+import { TEMPLATES_BY_ID } from './data/roomTemplates';
+import { STAFFING_BY_ID } from './data/staffing';
+import { entityCount, type World } from './ecs';
+import { PALETTE } from './palette';
+import { DIRS } from './room';
 import { formatSeed } from './rng';
 import { TUNING } from './tuning';
+import { clearedCount, currentRoom } from './world';
 
 export interface Hud {
   update(w: World, fps: number, hitboxes: boolean, dt: number): void;
 }
 
-export function createHud(left: HTMLElement, right: HTMLElement, banner: HTMLElement): Hud {
+export function createHud(
+  left: HTMLElement,
+  right: HTMLElement,
+  map: HTMLElement,
+  banner: HTMLElement,
+): Hud {
   let cooldown = 0;
 
   const render = (w: World, fps: number, hitboxes: boolean): void => {
-    const h = w.health.get(w.player);
-    const p = w.playerC.get(w.player);
-    const hp = h === undefined ? 0 : Math.max(0, h.hp);
-    const max = h === undefined ? 0 : h.max;
-    const dashReady = p === undefined || p.dashCooldown <= 0;
+    const health = w.health.get(w.player);
+    const player = w.playerC.get(w.player);
+    const hp = health === undefined ? 0 : Math.max(0, health.hp);
+    const maxHp = health === undefined ? 0 : health.max;
+    const dashReady = player === undefined || player.dashCooldown <= 0;
+    const room = currentRoom(w);
 
     left.innerHTML = [
-      row('СУБЪЕКТ', bar(hp, max)),
+      row('СУБЪЕКТ', bar(hp, maxHp)),
       row('РЫВОК', dashReady ? '<span class="ok">ГОТОВ</span>' : '<span class="warn">ПЕРЕЗАРЯД</span>'),
-      row('ЗАРАЖЁННЫХ', String(w.enemyC.size)),
+      row('ШТАТ НА УЧАСТКЕ', String(w.enemyC.size)),
+      row('ДВЕРИ', w.map.doorsLocked ? '<span class="warn">ЗАПЕРТЫ</span>' : '<span class="ok">ОТКРЫТЫ</span>'),
     ].join('');
 
     right.innerHTML = [
@@ -33,12 +44,22 @@ export function createHud(left: HTMLElement, right: HTMLElement, banner: HTMLEle
       row('R', 'ПОВТОР'),
     ].join('');
 
+    const template = room === undefined ? undefined : TEMPLATES_BY_ID.get(room.template);
+    const staffing = room === undefined ? undefined : STAFFING_BY_ID.get(room.staffing);
+    map.innerHTML =
+      [
+        row('УЧАСТОК', `${w.room + 1} / ${w.floor.rooms.length}`),
+        row('ЗАЧИЩЕНО', `${clearedCount(w)} / ${w.floor.rooms.length}`),
+        row('ПЛАНИРОВКА', template === undefined ? '—' : template.label),
+        row('РАСПИСАНИЕ', staffing === undefined ? '—' : staffing.label),
+      ].join('') + schematic(w);
+
     if (w.status === 'dead') {
       banner.hidden = false;
       banner.innerHTML = '<b>СУБЪЕКТ ЛИКВИДИРОВАН</b><span>[R] ПОВТОРИТЬ ИСПЫТАНИЕ</span>';
     } else if (w.status === 'cleared') {
       banner.hidden = false;
-      banner.innerHTML = '<b>СЕКТОР ЗАЧИЩЕН</b><span>[R] ПОВТОРИТЬ ИСПЫТАНИЕ</span>';
+      banner.innerHTML = '<b>ЭТАЖ ЗАЧИЩЕН</b><span>[R] ПОВТОРИТЬ ИСПЫТАНИЕ</span>';
     } else {
       banner.hidden = true;
     }
@@ -52,6 +73,62 @@ export function createHud(left: HTMLElement, right: HTMLElement, banner: HTMLEle
       render(w, fps, hitboxes);
     },
   };
+}
+
+/** Схема этажа: квадрат — помещение, черта — дверь. */
+function schematic(w: World): string {
+  const step = TUNING.hud.mapStep;
+  const cell = TUNING.hud.mapCell;
+  const half = cell / 2;
+  const width = w.floor.width * step;
+  const height = w.floor.height * step;
+  const parts: string[] = [];
+
+  for (const room of w.floor.rooms) {
+    const cx = room.gx * step + half;
+    const cy = room.gy * step + half;
+    for (const dir of DIRS) {
+      const other = w.floor.rooms[room.neighbors[dir]];
+      if (other === undefined || other.index < room.index) continue;
+      const ox = other.gx * step + half;
+      const oy = other.gy * step + half;
+      parts.push(
+        `<line x1="${cx}" y1="${cy}" x2="${ox}" y2="${oy}" stroke="${hex(PALETTE.concreteMid)}" stroke-width="${TUNING.hud.mapLink}"/>`,
+      );
+    }
+  }
+
+  for (const room of w.floor.rooms) {
+    const x = room.gx * step;
+    const y = room.gy * step;
+    const current = room.index === w.room;
+    let fill = hex(PALETTE.black);
+    let stroke = hex(PALETTE.concrete);
+    if (current) {
+      fill = hex(PALETTE.yellow);
+      stroke = hex(PALETTE.yellow);
+    } else if (room.cleared) {
+      fill = hex(PALETTE.concrete);
+      stroke = hex(PALETTE.concreteMid);
+    } else if (room.visited) {
+      stroke = hex(PALETTE.red);
+    }
+    parts.push(
+      `<rect x="${x}" y="${y}" width="${cell}" height="${cell}" fill="${fill}" stroke="${stroke}" stroke-width="${TUNING.hud.mapStroke}"/>`,
+    );
+    if (room.index === w.floor.end && !current) {
+      const inset = TUNING.hud.mapEndInset;
+      parts.push(
+        `<rect x="${x + inset}" y="${y + inset}" width="${cell - inset * 2}" height="${cell - inset * 2}" fill="${hex(PALETTE.red)}"/>`,
+      );
+    }
+  }
+
+  return `<svg class="hud-schematic" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${parts.join('')}</svg>`;
+}
+
+function hex(color: number): string {
+  return `#${color.toString(16).padStart(6, '0')}`;
 }
 
 function row(label: string, value: string): string {

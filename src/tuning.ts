@@ -70,9 +70,30 @@ export const TUNING = {
     muzzle: 16,
   },
 
+  floor: {
+    /** Сколько помещений на этаже. */
+    roomsMin: 8,
+    roomsMax: 12,
+    /** Основной путь не короче этого. */
+    mainPathMin: 5,
+    /** Ответвлений от основного пути. */
+    branchesMin: 1,
+    branchesMax: 2,
+    /** Длина одного ответвления в помещениях. */
+    branchLengthMin: 1,
+    branchLengthMax: 2,
+    /**
+     * Множитель квоты штата: во сколько раз штатное расписание участка
+     * плотнее или реже, чем записано в данных.
+     */
+    staffScale: 1,
+    /** Смещение seed для каждого помещения: порядок обхода не влияет на расстановку. */
+    roomSeedStride: 0x9e3779b1,
+    /** Сколько раз пытаться подобрать точку появления, прежде чем взять любую. */
+    spawnAttempts: 200,
+  },
+
   enemy: {
-    /** Сколько заражённых в помещении. */
-    count: 5,
     radius: 11,
     maxHp: 3,
     speed: 110,
@@ -97,10 +118,8 @@ export const TUNING = {
 
     /** Сила расталкивания заражённых друг от друга. */
     separationForce: 240,
-    /** Ближе этого к субъекту заражённые не появляются. */
+    /** Ближе этого к точке входа штат не появляется. */
     spawnMinDistance: 300,
-    /** Отступ зоны появления от стен. */
-    spawnMargin: 64,
   },
 
   enemyBullet: {
@@ -149,8 +168,22 @@ export const TUNING = {
     telegraphWidth: 2,
     /** Длина луча наведения во время каста. */
     telegraphRay: 220,
+    /** Толщина порога в открытом проёме. */
+    doorThreshold: 5,
+    /** Полоса на запертой двери. */
+    doorBarInset: 9,
     /** Толщина контуров хитбоксов. */
     hitboxWidth: 1,
+  },
+
+  hud: {
+    /** Схема этажа: сторона квадрата-помещения и шаг сетки. */
+    mapCell: 14,
+    mapStep: 20,
+    mapStroke: 1,
+    mapLink: 2,
+    /** Отступ метки конечного помещения. */
+    mapEndInset: 4,
   },
 
   debug: {
@@ -228,7 +261,7 @@ export const PANEL: TuningGroup[] = [
   {
     title: 'ЗАРАЖЁННЫЕ',
     fields: [
-      { path: 'enemy.count', label: 'КОЛИЧЕСТВО', min: 1, max: 40, step: 1, onRestart: true },
+      { path: 'floor.staffScale', label: 'КВОТА ШТАТА', min: 0.2, max: 4, step: 0.1, onRestart: true },
       { path: 'enemy.maxHp', label: 'ПРОЧНОСТЬ', min: 1, max: 20, step: 1, onRestart: true },
       { path: 'enemy.speed', label: 'СКОРОСТЬ', min: 20, max: 400, step: 5 },
       { path: 'enemy.accel', label: 'УСКОРЕНИЕ', min: 100, max: 5000, step: 50 },
@@ -294,7 +327,6 @@ export const PRESETS: Record<string, TuningPatch> = {
     'playerBullet.speed': 1050,
     'playerBullet.interval': 0.11,
     'playerBullet.spreadDeg': 0.6,
-    'enemy.count': 5,
     'enemy.speed': 110,
     'enemy.castTime': 0.4,
     'enemyBullet.speed': 400,
@@ -322,7 +354,6 @@ export const PRESETS: Record<string, TuningPatch> = {
     'playerBullet.speed': 700,
     'playerBullet.interval': 0.17,
     'playerBullet.spreadDeg': 3.5,
-    'enemy.count': 5,
     'enemy.accel': 380,
     'enemy.friction': 380,
     'enemy.castTime': 0.55,
@@ -350,7 +381,7 @@ export const PRESETS: Record<string, TuningPatch> = {
     'playerBullet.interval': 0.1,
     'playerBullet.spreadDeg': 2.5,
     'playerBullet.radius': 4.5,
-    'enemy.count': 16,
+    'floor.staffScale': 2.4,
     'enemy.maxHp': 2,
     'enemy.speed': 78,
     'enemy.preferredRange': 200,

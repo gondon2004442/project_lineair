@@ -16,15 +16,23 @@ async function boot(): Promise<void> {
   const host = document.getElementById('stage');
   const hudLeft = document.getElementById('hud-left');
   const hudRight = document.getElementById('hud-right');
+  const hudMap = document.getElementById('hud-map');
   const hudBanner = document.getElementById('hud-banner');
   const panelHost = document.getElementById('panel');
-  if (host === null || hudLeft === null || hudRight === null || hudBanner === null || panelHost === null) {
+  if (
+    host === null ||
+    hudLeft === null ||
+    hudRight === null ||
+    hudMap === null ||
+    hudBanner === null ||
+    panelHost === null
+  ) {
     throw new Error('Разметка оверлея не найдена');
   }
 
   const renderer = await createRenderer(host);
   const input = createInput(renderer.app.canvas);
-  const hud = createHud(hudLeft, hudRight, hudBanner);
+  const hud = createHud(hudLeft, hudRight, hudMap, hudBanner);
 
   // Панель поднимается первой: она восстанавливает значения прошлого сеанса,
   // и первый же мир должен собираться уже по ним.
@@ -37,9 +45,8 @@ async function boot(): Promise<void> {
   let world = createWorld(seed, input.snapshot);
 
   function restartRun(): void {
-    // Тот же seed — тот же забег.
+    // Тот же seed — тот же этаж.
     world = createWorld(seed, input.snapshot);
-    renderer.drawRoom(world.map);
     panel.clearRestartFlag();
   }
 
@@ -55,7 +62,6 @@ async function boot(): Promise<void> {
   });
 
   renderer.layout();
-  renderer.drawRoom(world.map);
   window.addEventListener('resize', () => renderer.layout());
 
   let accumulator = 0;

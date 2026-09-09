@@ -7,7 +7,7 @@ import { Application, Container, Graphics } from 'pixi.js';
 import type { World } from './ecs';
 import { PALETTE } from './palette';
 import { makeRng } from './rng';
-import { isSolidCell, type TileMap } from './room';
+import { TILE_DOOR, TILE_WALL, type TileMap } from './room';
 import { ROOM_HEIGHT, ROOM_WIDTH, STEP, TUNING } from './tuning';
 
 export interface Renderer {
@@ -15,7 +15,6 @@ export interface Renderer {
   showHitboxes: boolean;
   screenToWorld(sx: number, sy: number): { x: number; y: number };
   layout(): void;
-  drawRoom(map: TileMap): void;
   draw(w: World, alpha: number): void;
 }
 
@@ -39,6 +38,8 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
   app.stage.addChild(root);
 
   const fxRng = makeRng(1);
+  // Бетон перерисовывается только когда карта сменилась или щёлкнул замок.
+  let drawnToken = -1;
 
   const renderer: Renderer = {
     app,
@@ -63,29 +64,12 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
       );
     },
 
-    drawRoom(map) {
-      roomLayer.clear();
-      const size = map.size;
-      for (let cy = 0; cy < map.rows; cy++) {
-        for (let cx = 0; cx < map.cols; cx++) {
-          const x = cx * size;
-          const y = cy * size;
-          if (isSolidCell(map, cx, cy)) {
-            roomLayer.rect(x, y, size, size).fill(PALETTE.concrete);
-            const inset = TUNING.render.wallInset;
-            roomLayer.rect(x + inset, y + inset, size - inset * 2, size - inset * 2).fill(PALETTE.concreteMid);
-          } else {
-            roomLayer.rect(x, y, size, size).fill(PALETTE.concreteDark);
-            roomLayer
-              .rect(x, y, size, TUNING.render.floorGrid)
-              .rect(x, y, TUNING.render.floorGrid, size)
-              .fill(PALETTE.concrete);
-          }
-        }
-      }
-    },
-
     draw(w, alpha) {
+      if (w.mapToken !== drawnToken) {
+        drawnToken = w.mapToken;
+        drawRoom(roomLayer, w.map);
+      }
+
       const shake = w.fx.shake;
       shakeLayer.position.set(fxRng.spread(shake), fxRng.spread(shake));
 
@@ -98,6 +82,48 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
   };
 
   return renderer;
+}
+
+/** Бетон, пол и дверные проёмы. Перерисовывается только при смене карты. */
+function drawRoom(g: Graphics, map: TileMap): void {
+  g.clear();
+  const size = map.size;
+  for (let cy = 0; cy < map.rows; cy++) {
+    for (let cx = 0; cx < map.cols; cx++) {
+      const x = cx * size;
+      const y = cy * size;
+      const tile = map.tiles[cy * map.cols + cx];
+
+      if (tile === TILE_WALL) {
+        const inset = TUNING.render.wallInset;
+        g.rect(x, y, size, size).fill(PALETTE.concrete);
+        g.rect(x + inset, y + inset, size - inset * 2, size - inset * 2).fill(PALETTE.concreteMid);
+        continue;
+      }
+
+      g.rect(x, y, size, size).fill(PALETTE.concreteDark);
+      g.rect(x, y, size, TUNING.render.floorGrid)
+        .rect(x, y, TUNING.render.floorGrid, size)
+        .fill(PALETTE.concrete);
+
+      if (tile !== TILE_DOOR) continue;
+      const horizontal = cy === 0 || cy === map.rows - 1;
+      if (map.doorsLocked) {
+        g.rect(x, y, size, size).fill(PALETTE.red);
+        const inset = TUNING.render.doorBarInset;
+        const bar = horizontal
+          ? { x, y: y + inset, w: size, h: size - inset * 2 }
+          : { x: x + inset, y, w: size - inset * 2, h: size };
+        g.rect(bar.x, bar.y, bar.w, bar.h).fill(PALETTE.yellow);
+      } else {
+        const t = TUNING.render.doorThreshold;
+        const strip = horizontal
+          ? { x, y: cy === 0 ? y + size - t : y, w: size, h: t }
+          : { x: cx === 0 ? x + size - t : x, y, w: t, h: size };
+        g.rect(strip.x, strip.y, strip.w, strip.h).fill(PALETTE.yellow);
+      }
+    }
+  }
 }
 
 function lerp(prev: number, next: number, alpha: number): number {

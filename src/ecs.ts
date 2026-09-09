@@ -2,6 +2,7 @@
  * Мини-ECS. Компоненты — плоские структуры без методов,
  * системы — функции над World. Никакой логики в сущностях.
  */
+import type { Floor } from './floor';
 import type { Rng } from './rng';
 import type { TileMap } from './room';
 import type { InputSnapshot } from './input';
@@ -85,7 +86,12 @@ export interface World {
   rng: Rng;
   /** Номер шага симуляции с начала забега. */
   tick: number;
+  floor: Floor;
+  /** Индекс текущего помещения на этаже. */
+  room: number;
   map: TileMap;
+  /** Растёт при любой перестройке карты: рендеру пора перерисовать бетон. */
+  mapToken: number;
   input: InputSnapshot;
   fx: Feedback;
   status: RunStatus;

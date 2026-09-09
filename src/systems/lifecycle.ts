@@ -23,9 +23,13 @@ export function lifecycleSystem(w: World, dt: number): void {
   }
 }
 
-/** Проверяется после фактического удаления сущностей. */
+/** Этаж считается пройденным, когда зачищены все помещения. */
 export function statusSystem(w: World): void {
-  if (w.status === 'playing' && w.enemyC.size === 0) w.status = 'cleared';
+  if (w.status !== 'playing') return;
+  for (const room of w.floor.rooms) {
+    if (!room.cleared) return;
+  }
+  w.status = 'cleared';
 }
 
 export function feedbackSystem(w: World, dt: number): void {
