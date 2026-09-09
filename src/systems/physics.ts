@@ -2,6 +2,7 @@
 import type { World } from '../ecs';
 import { isSolidCell } from '../room';
 import type { TileMap } from '../room';
+import { TUNING } from '../tuning';
 
 const SKIN = 0.01;
 
@@ -29,8 +30,15 @@ export function physicsSystem(w: World, dt: number): void {
       continue;
     }
 
-    moveX(w.map, t, b, b.vx * dt);
-    moveY(w.map, t, b, b.vy * dt);
+    // Дробим перемещение: за один разбор нельзя проскочить стену насквозь.
+    const reach = Math.max(Math.abs(b.vx), Math.abs(b.vy)) * dt;
+    const parts = Math.max(1, Math.ceil(reach / (w.map.size * TUNING.sim.maxMoveFraction)));
+    const slice = dt / parts;
+    for (let i = 0; i < parts; i++) {
+      // Скорость читается заново: столкновение могло её обнулить.
+      moveX(w.map, t, b, b.vx * slice);
+      moveY(w.map, t, b, b.vy * slice);
+    }
   }
 }
 

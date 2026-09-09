@@ -5,7 +5,8 @@
  * Единицы: расстояние — пиксели мира, время — секунды, скорость — px/с,
  * ускорение — px/с², углы в полях *Deg — градусы.
  *
- * Объект намеренно изменяемый: значения правятся на живую.
+ * Объект намеренно изменяемый: значения правятся на живую через панель
+ * крутилок (тильда). База ниже — набор, отобранный вручную на ощупь.
  */
 export const TUNING = {
   sim: {
@@ -13,6 +14,11 @@ export const TUNING = {
     hz: 60,
     /** Больше этого за кадр не досимулировываем (защита от «спирали смерти»). */
     maxFrameMs: 100,
+    /**
+     * Тело за один разбор столкновений не смещается больше, чем на эту долю
+     * клетки. Быстрый рывок иначе перепрыгивает стену насквозь.
+     */
+    maxMoveFraction: 0.4,
   },
 
   room: {
@@ -27,39 +33,39 @@ export const TUNING = {
 
   player: {
     radius: 9,
-    maxHp: 6,
+    maxHp: 12,
     /** Целевая скорость при полностью отклонённом вводе. */
-    speed: 265,
+    speed: 290,
     /** Разгон до целевой скорости. */
-    accel: 3400,
+    accel: 6000,
     /** Торможение при отпущенном вводе. */
-    friction: 2600,
+    friction: 5000,
 
     /** Рывок: дистанция и длительность задают его скорость. */
-    dashDistance: 190,
-    dashDuration: 0.16,
-    dashCooldown: 0.7,
+    dashDistance: 110,
+    dashDuration: 0.05,
+    dashCooldown: 0.6,
     /** Окно неуязвимости от начала рывка. */
-    dashIFrames: 0.14,
+    dashIFrames: 0.13,
     /** Скорость на выходе из рывка — доля от dash-скорости. */
-    dashExitFactor: 0.35,
+    dashExitFactor: 0.2,
 
     /** Неуязвимость после получения урона. */
-    hurtIFrames: 0.8,
+    hurtIFrames: 0.9,
     /** Отдача, толкающая субъекта назад при выстреле. */
-    recoil: 85,
+    recoil: 35,
   },
 
   playerBullet: {
-    speed: 900,
+    speed: 1050,
     radius: 3.5,
     damage: 1,
     /** Время жизни, если ни во что не попал. */
     life: 1.1,
     /** Разброс от линии прицела. */
-    spreadDeg: 1.6,
+    spreadDeg: 0.6,
     /** Интервал между выстрелами при зажатой ЛКМ. */
-    interval: 0.13,
+    interval: 0.11,
     /** Вынос точки вылета от центра субъекта. */
     muzzle: 16,
   },
@@ -69,7 +75,7 @@ export const TUNING = {
     count: 5,
     radius: 11,
     maxHp: 3,
-    speed: 96,
+    speed: 110,
     accel: 900,
     friction: 1200,
 
@@ -82,7 +88,7 @@ export const TUNING = {
     /** Как долго держится в зоне обстрела, прежде чем начать каст. */
     aimDelay: 0.55,
     /** Каст: заражённый стоит и телеграфирует очередь. */
-    castTime: 0.45,
+    castTime: 0.4,
     /** Очередь. */
     burstCount: 3,
     burstInterval: 0.12,
@@ -98,7 +104,7 @@ export const TUNING = {
   },
 
   enemyBullet: {
-    speed: 340,
+    speed: 400,
     radius: 5,
     damage: 1,
     life: 3,
@@ -107,17 +113,17 @@ export const TUNING = {
 
   feel: {
     /** Стоп-кадр: симуляция замирает на эти секунды. */
-    hitstopEnemyHit: 0.035,
-    hitstopEnemyKill: 0.07,
+    hitstopEnemyHit: 0.03,
+    hitstopEnemyKill: 0.06,
     hitstopPlayerHurt: 0.12,
 
     /** Тряска экрана: амплитуда в пикселях мира. */
-    shakeShoot: 0.5,
-    shakeEnemyHit: 1.2,
-    shakeEnemyKill: 2.6,
-    shakePlayerHurt: 5,
+    shakeShoot: 0.4,
+    shakeEnemyHit: 1,
+    shakeEnemyKill: 2,
+    shakePlayerHurt: 4,
     /** Затухание тряски, единиц амплитуды в секунду. */
-    shakeDecay: 18,
+    shakeDecay: 22,
     shakeMax: 10,
 
     /** Белая вспышка на теле, получившем урон. */
