@@ -1,0 +1,105 @@
+/* Служебная типографика: моноширинный шрифт, прямые углы, ничего мягкого. */
+:root {
+  --black: #0d0d0c;
+  --concrete: #2b2b27;
+  --concrete-mid: #45453e;
+  --concrete-light: #a9a89d;
+  --red: #c4122f;
+  --yellow: #e8b21a;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  border-radius: 0;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--black);
+  color: var(--concrete-light);
+  font: 12px/1.35 "IBM Plex Mono", "DejaVu Sans Mono", Consolas, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: crosshair;
+}
+
+#stage canvas {
+  display: block;
+}
+
+#hud {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.hud-block {
+  position: absolute;
+  top: 10px;
+  min-width: 190px;
+  padding: 6px 8px;
+  background: rgba(13, 13, 12, 0.82);
+  border: 1px solid var(--concrete);
+}
+
+#hud-left {
+  left: 10px;
+}
+
+#hud-right {
+  right: 10px;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.key {
+  color: var(--concrete-mid);
+}
+
+.val {
+  color: var(--concrete-light);
+}
+
+.ok {
+  color: var(--yellow);
+}
+
+.warn {
+  color: var(--red);
+}
+
+.hud-banner {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 28px;
+  background: var(--black);
+  border: 2px solid var(--red);
+}
+
+.hud-banner b {
+  font-size: 20px;
+  letter-spacing: 0.22em;
+  color: var(--red);
+}
+
+.hud-banner span {
+  color: var(--concrete-light);
+}
+
+.hud-banner[hidden] {
+  display: none;
+}
