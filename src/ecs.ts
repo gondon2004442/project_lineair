@@ -48,15 +48,64 @@ export interface PlayerC {
   dashY: number;
 }
 
-export type EnemyPhase = 'chase' | 'cast' | 'burst' | 'recover';
+/** Общее для всякого сотрудника: какую ставку он занимает. */
+export interface StaffC {
+  post: string;
+  title: string;
+  /** Меньше — раньше закрывают вакансию. */
+  priority: number;
+  /** Насечек на табличке. */
+  plateMarks: number;
+  /** Пока > 0 — табличка светится: телеграф. */
+  plateFlash: number;
+}
 
-export interface EnemyC {
-  phase: EnemyPhase;
-  /** Обратный отсчёт текущей фазы. */
+export type InternPhase = 'route' | 'promotion';
+
+export interface InternC {
+  phase: InternPhase;
+  /** Куда идёт сейчас. */
+  targetX: number;
+  targetY: number;
+  /** Пауза на точке или обратный отсчёт переназначения. */
   timer: number;
+  /** На какую должность его переводят. */
+  promoteTo: string;
+}
+
+export interface InspectorC {
+  /** Ось движения: 0 — по горизонтали, 1 — по вертикали. */
+  axis: 0 | 1;
+  /** Куда стреляет: единичный вектор, зафиксированный на такте. */
+  aimX: number;
+  aimY: number;
+  /** Сколько выстрелов осталось в текущем такте. */
   shotsLeft: number;
-  /** Знак бокового смещения при подходе. */
-  strafeSign: number;
+  /** Обратный отсчёт до следующего выстрела внутри такта. */
+  shotTimer: number;
+}
+
+export type RegistrarPhase = 'idle' | 'windup' | 'fan';
+
+export interface RegistrarC {
+  phase: RegistrarPhase;
+  timer: number;
+  /** Обратный отсчёт до следующего приказа о закрытии ставки. */
+  orderTimer: number;
+  /** Обратный отсчёт добора со стороны. */
+  hireTimer: number;
+  /** Сколько человек уже добрано на этом участке. */
+  hired: number;
+}
+
+/** Строка штатного расписания участка в работе. */
+export interface RosterEntry {
+  post: string;
+  title: string;
+  priority: number;
+  quota: number;
+  /** Пересчитывается каждый шаг по живым сотрудникам. */
+  occupied: number;
 }
 
 export interface BulletC {
@@ -72,6 +121,10 @@ export interface DrawC {
   /** Половина стороны / радиус отрисовки. */
   size: number;
   color: number;
+  /** Контур вместо заливки. */
+  hollow: boolean;
+  /** Стол под телом. */
+  desk: boolean;
 }
 
 export type RunStatus = 'playing' | 'dead' | 'cleared';
@@ -96,6 +149,12 @@ export interface World {
   fx: Feedback;
   status: RunStatus;
   player: Entity;
+  /** Штатное расписание текущего участка. */
+  roster: RosterEntry[];
+  /** Общий метроном участка: по его долям бьют инспекторы. */
+  metronome: number;
+  /** Такт, на котором сейчас участок. */
+  beat: number;
 
   nextEntity: Entity;
   alive: Set<Entity>;
@@ -105,7 +164,10 @@ export interface World {
   body: Map<Entity, Body>;
   health: Map<Entity, Health>;
   playerC: Map<Entity, PlayerC>;
-  enemyC: Map<Entity, EnemyC>;
+  staffC: Map<Entity, StaffC>;
+  internC: Map<Entity, InternC>;
+  inspectorC: Map<Entity, InspectorC>;
+  registrarC: Map<Entity, RegistrarC>;
   bulletC: Map<Entity, BulletC>;
   drawC: Map<Entity, DrawC>;
 }
@@ -128,7 +190,10 @@ export function flushDoomed(w: World): void {
     w.body.delete(e);
     w.health.delete(e);
     w.playerC.delete(e);
-    w.enemyC.delete(e);
+    w.staffC.delete(e);
+    w.internC.delete(e);
+    w.inspectorC.delete(e);
+    w.registrarC.delete(e);
     w.bulletC.delete(e);
     w.drawC.delete(e);
   }

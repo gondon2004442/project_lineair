@@ -7,7 +7,7 @@ export function roomSystem(w: World): void {
   const room = w.floor.rooms[w.room];
   if (room === undefined) return;
 
-  if (!room.cleared && w.enemyC.size === 0) {
+  if (!room.cleared && w.staffC.size === 0) {
     room.cleared = true;
     w.map.doorsLocked = false;
     w.mapToken += 1;

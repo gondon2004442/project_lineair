@@ -93,34 +93,85 @@ export const TUNING = {
     spawnAttempts: 200,
   },
 
-  enemy: {
-    radius: 11,
-    maxHp: 3,
-    speed: 110,
-    accel: 900,
-    friction: 1200,
-
-    /** Дистанция, на которой заражённый хочет держаться. */
-    preferredRange: 260,
-    /** Ближе preferredRange * backoffRatio — отходит. */
-    backoffRatio: 0.62,
-    /** Доля скорости, уходящая в боковое смещение. */
-    strafeFactor: 0.4,
-    /** Как долго держится в зоне обстрела, прежде чем начать каст. */
-    aimDelay: 0.55,
-    /** Каст: заражённый стоит и телеграфирует очередь. */
-    castTime: 0.4,
-    /** Очередь. */
-    burstCount: 3,
-    burstInterval: 0.12,
-    /** Пауза после очереди. */
-    recoverTime: 1.25,
-
-    /** Сила расталкивания заражённых друг от друга. */
+  /** Общее для всего штата, независимо от должности. */
+  staff: {
+    /** Сила расталкивания сотрудников друг от друга. */
     separationForce: 240,
     /** Ближе этого к точке входа штат не появляется. */
     spawnMinDistance: 300,
   },
+
+  /** Числа по должностям. Опознание — в src/data/posts.ts. */
+  post: {
+    intern: {
+      hp: 1,
+      radius: 9,
+      speed: 74,
+      accel: 700,
+      friction: 900,
+      /** Пауза на точке маршрута. */
+      waypointPause: 0.7,
+      /** Насколько близко к точке считается «дошёл». */
+      waypointReach: 22,
+      /** Сколько идёт переназначение на должность. */
+      promotionTime: 1.2,
+    },
+
+    inspector: {
+      hp: 3,
+      radius: 11,
+      /** Ходит только по осям, поворот на 90 градусов. */
+      speed: 110,
+      accel: 900,
+      friction: 1200,
+      /**
+       * Насколько сильно надо разойтись по оси, чтобы инспектор
+       * переключился на неё. Меньше — суетливее мечется на углах.
+       */
+      axisSwitchBias: 40,
+      /** Дистанция, на которой инспектор держится от субъекта. */
+      standoff: 220,
+      /** Ближе standoff * backoffRatio — отходит по своей оси. */
+      backoffRatio: 0.65,
+      /** Метроном участка: доля такта в секундах. */
+      metronomeInterval: 1.8,
+      /** Выстрелов за такт. */
+      shotsPerBeat: 3,
+      /** Промежуток между выстрелами внутри такта. */
+      shotGap: 0.12,
+      /** За сколько до доли вспыхивает табличка. */
+      telegraphLead: 0.4,
+    },
+
+    registrar: {
+      hp: 8,
+      radius: 14,
+      /** Сидит за столом: не ходит, но расталкивание его двигать не должно. */
+      speed: 0,
+      accel: 0,
+      friction: 4000,
+      /** Веер картотечных карточек. */
+      fanCount: 5,
+      fanSpreadDeg: 34,
+      fanInterval: 2.4,
+      /** Замах перед веером. */
+      fanTelegraph: 0.45,
+      /** Карточка. */
+      cardSpeed: 250,
+      cardRadius: 6,
+      cardDamage: 1,
+      cardLife: 3.5,
+      /** Пауза между приказами о закрытии ставок. */
+      orderInterval: 1.8,
+      /** Сколько идёт добор штата со стороны, когда повышать некого. */
+      hireDelay: 3.2,
+      /** Потолок добора за участок: без него живой Регистратор бесконечен. */
+      hireCap: 6,
+      /** Приоритет ставки, на которую приходит добор. */
+      hirePriority: 3,
+    },
+  },
+
 
   enemyBullet: {
     speed: 400,
@@ -172,6 +223,20 @@ export const TUNING = {
     doorThreshold: 5,
     /** Полоса на запертой двери. */
     doorBarInset: 9,
+    /** Табличка на груди: высота, ширина как доля от силуэта. */
+    plateHeight: 5,
+    plateWidthFactor: 1.3,
+    /** Насечка на табличке. */
+    plateMarkSize: 2,
+    plateMarkGap: 2,
+    /** Насколько стол Регистратора шире его силуэта. */
+    deskExtra: 6,
+    /** Счётчик незакрытых ставок над Регистратором. */
+    vacancyMark: 4,
+    vacancyGap: 3,
+    vacancyLift: 12,
+    /** Толщина контура полого силуэта. */
+    hollowWidth: 2,
     /** Толщина контуров хитбоксов. */
     hitboxWidth: 1,
   },
@@ -259,26 +324,58 @@ export const PANEL: TuningGroup[] = [
     ],
   },
   {
-    title: 'ЗАРАЖЁННЫЕ',
+    title: 'ШТАТ',
     fields: [
       { path: 'floor.staffScale', label: 'КВОТА ШТАТА', min: 0.2, max: 4, step: 0.1, onRestart: true },
-      { path: 'enemy.maxHp', label: 'ПРОЧНОСТЬ', min: 1, max: 20, step: 1, onRestart: true },
-      { path: 'enemy.speed', label: 'СКОРОСТЬ', min: 20, max: 400, step: 5 },
-      { path: 'enemy.accel', label: 'УСКОРЕНИЕ', min: 100, max: 5000, step: 50 },
-      { path: 'enemy.friction', label: 'ТРЕНИЕ', min: 100, max: 5000, step: 50 },
-      { path: 'enemy.preferredRange', label: 'ДИСТАНЦИЯ БОЯ', min: 60, max: 600, step: 10 },
-      { path: 'enemy.backoffRatio', label: 'ПОРОГ ОТХОДА', min: 0.1, max: 1, step: 0.02 },
-      { path: 'enemy.strafeFactor', label: 'БОКОВОЕ СМЕЩЕНИЕ', min: 0, max: 1.5, step: 0.05 },
-      { path: 'enemy.aimDelay', label: 'ЗАДЕРЖКА ПЕРЕД КАСТОМ', min: 0, max: 3, step: 0.05 },
-      { path: 'enemy.castTime', label: 'ВРЕМЯ КАСТА', min: 0.05, max: 2.5, step: 0.05 },
-      { path: 'enemy.burstCount', label: 'ПУЛЬ В ОЧЕРЕДИ', min: 1, max: 12, step: 1 },
-      { path: 'enemy.burstInterval', label: 'ТЕМП ОЧЕРЕДИ', min: 0.03, max: 0.5, step: 0.01 },
-      { path: 'enemy.recoverTime', label: 'ПАУЗА ПОСЛЕ ОЧЕРЕДИ', min: 0.1, max: 4, step: 0.05 },
-      { path: 'enemy.separationForce', label: 'РАСТАЛКИВАНИЕ', min: 0, max: 900, step: 20 },
+      { path: 'staff.separationForce', label: 'РАСТАЛКИВАНИЕ', min: 0, max: 900, step: 20 },
+      { path: 'staff.spawnMinDistance', label: 'ОТСТУП ОТ ВХОДА', min: 0, max: 600, step: 20, onRestart: true },
     ],
   },
   {
-    title: 'ОГОНЬ ЗАРАЖЁННЫХ',
+    title: 'СТАЖЁР',
+    fields: [
+      { path: 'post.intern.hp', label: 'ПРОЧНОСТЬ', min: 1, max: 10, step: 1, onRestart: true },
+      { path: 'post.intern.radius', label: 'ХИТБОКС', min: 4, max: 20, step: 0.5, onRestart: true },
+      { path: 'post.intern.speed', label: 'СКОРОСТЬ', min: 10, max: 300, step: 2 },
+      { path: 'post.intern.waypointPause', label: 'ПАУЗА НА ТОЧКЕ', min: 0, max: 3, step: 0.1 },
+      { path: 'post.intern.promotionTime', label: 'ВРЕМЯ ПЕРЕНАЗНАЧЕНИЯ', min: 0.1, max: 5, step: 0.1 },
+    ],
+  },
+  {
+    title: 'ИНСПЕКТОР',
+    fields: [
+      { path: 'post.inspector.hp', label: 'ПРОЧНОСТЬ', min: 1, max: 20, step: 1, onRestart: true },
+      { path: 'post.inspector.radius', label: 'ХИТБОКС', min: 4, max: 24, step: 0.5, onRestart: true },
+      { path: 'post.inspector.speed', label: 'СКОРОСТЬ ПО ОСИ', min: 20, max: 400, step: 5 },
+      { path: 'post.inspector.accel', label: 'УСКОРЕНИЕ', min: 100, max: 5000, step: 50 },
+      { path: 'post.inspector.friction', label: 'ТРЕНИЕ', min: 100, max: 5000, step: 50 },
+      { path: 'post.inspector.axisSwitchBias', label: 'ПОРОГ СМЕНЫ ОСИ', min: 0, max: 200, step: 5 },
+      { path: 'post.inspector.standoff', label: 'ДИСТАНЦИЯ БОЯ', min: 60, max: 600, step: 10 },
+      { path: 'post.inspector.backoffRatio', label: 'ПОРОГ ОТХОДА', min: 0.1, max: 1, step: 0.02 },
+      { path: 'post.inspector.metronomeInterval', label: 'ДОЛЯ МЕТРОНОМА', min: 0.3, max: 5, step: 0.05 },
+      { path: 'post.inspector.shotsPerBeat', label: 'ВЫСТРЕЛОВ ЗА ТАКТ', min: 1, max: 8, step: 1 },
+      { path: 'post.inspector.shotGap', label: 'ПРОМЕЖУТОК В ТАКТЕ', min: 0.03, max: 0.5, step: 0.01 },
+      { path: 'post.inspector.telegraphLead', label: 'УПРЕЖДЕНИЕ ТЕЛЕГРАФА', min: 0.05, max: 1.5, step: 0.05 },
+    ],
+  },
+  {
+    title: 'РЕГИСТРАТОР',
+    fields: [
+      { path: 'post.registrar.hp', label: 'ПРОЧНОСТЬ', min: 1, max: 40, step: 1, onRestart: true },
+      { path: 'post.registrar.radius', label: 'ХИТБОКС', min: 6, max: 28, step: 0.5, onRestart: true },
+      { path: 'post.registrar.fanCount', label: 'КАРТОЧЕК В ВЕЕРЕ', min: 1, max: 15, step: 1 },
+      { path: 'post.registrar.fanSpreadDeg', label: 'РАСКРЫВ ВЕЕРА', min: 4, max: 180, step: 2 },
+      { path: 'post.registrar.fanInterval', label: 'ИНТЕРВАЛ ВЕЕРА', min: 0.4, max: 8, step: 0.1 },
+      { path: 'post.registrar.fanTelegraph', label: 'ЗАМАХ', min: 0.05, max: 2, step: 0.05 },
+      { path: 'post.registrar.cardSpeed', label: 'СКОРОСТЬ КАРТОЧКИ', min: 60, max: 900, step: 10 },
+      { path: 'post.registrar.cardRadius', label: 'РАЗМЕР КАРТОЧКИ', min: 2, max: 16, step: 0.5 },
+      { path: 'post.registrar.orderInterval', label: 'ПАУЗА МЕЖДУ ПРИКАЗАМИ', min: 0.2, max: 8, step: 0.1 },
+      { path: 'post.registrar.hireDelay', label: 'ДОБОР СО СТОРОНЫ', min: 0.5, max: 12, step: 0.1 },
+      { path: 'post.registrar.hireCap', label: 'ПОТОЛОК ДОБОРА', min: 0, max: 30, step: 1, onRestart: true },
+    ],
+  },
+  {
+    title: 'ОГОНЬ ИНСПЕКТОРОВ',
     fields: [
       { path: 'enemyBullet.speed', label: 'СКОРОСТЬ ПУЛИ', min: 60, max: 900, step: 10 },
       { path: 'enemyBullet.spreadDeg', label: 'РАЗБРОС', min: 0, max: 40, step: 0.5 },
@@ -327,8 +424,8 @@ export const PRESETS: Record<string, TuningPatch> = {
     'playerBullet.speed': 1050,
     'playerBullet.interval': 0.11,
     'playerBullet.spreadDeg': 0.6,
-    'enemy.speed': 110,
-    'enemy.castTime': 0.4,
+    'post.inspector.metronomeInterval': 1.5,
+    'post.inspector.telegraphLead': 0.3,
     'enemyBullet.speed': 400,
     'feel.hitstopEnemyHit': 0.03,
     'feel.hitstopEnemyKill': 0.06,
@@ -354,9 +451,10 @@ export const PRESETS: Record<string, TuningPatch> = {
     'playerBullet.speed': 700,
     'playerBullet.interval': 0.17,
     'playerBullet.spreadDeg': 3.5,
-    'enemy.accel': 380,
-    'enemy.friction': 380,
-    'enemy.castTime': 0.55,
+    'post.inspector.accel': 380,
+    'post.inspector.friction': 380,
+    'post.inspector.metronomeInterval': 2.2,
+    'post.inspector.telegraphLead': 0.55,
     'enemyBullet.speed': 300,
     'feel.hitstopEnemyHit': 0.05,
     'feel.hitstopEnemyKill': 0.1,
@@ -382,15 +480,15 @@ export const PRESETS: Record<string, TuningPatch> = {
     'playerBullet.spreadDeg': 2.5,
     'playerBullet.radius': 4.5,
     'floor.staffScale': 2.4,
-    'enemy.maxHp': 2,
-    'enemy.speed': 78,
-    'enemy.preferredRange': 200,
-    'enemy.aimDelay': 0.7,
-    'enemy.castTime': 0.6,
-    'enemy.burstCount': 2,
-    'enemy.burstInterval': 0.18,
-    'enemy.recoverTime': 1.7,
-    'enemy.separationForce': 320,
+    'post.inspector.hp': 2,
+    'post.inspector.speed': 78,
+    'post.inspector.metronomeInterval': 2.4,
+    'post.inspector.telegraphLead': 0.6,
+    'post.inspector.shotsPerBeat': 2,
+    'post.inspector.shotGap': 0.18,
+    'post.registrar.fanCount': 3,
+    'post.registrar.fanInterval': 3.2,
+    'staff.separationForce': 320,
     'enemyBullet.speed': 185,
     'enemyBullet.spreadDeg': 6,
     'enemyBullet.life': 5,

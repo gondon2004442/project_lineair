@@ -4,10 +4,9 @@
  * Помещение описывается не списком врагов, а тем, какие должности
  * на участке должны быть заняты. Генератор выбирает вакансии.
  *
- * ВНИМАНИЕ: реализована пока одна должность — 'inspector'.
- * Незанятые пока строки штата (регистратор, стажёр, ревизор, курьер,
- * заведующий) сюда не вписаны: данные не должны обещать того,
- * чего нет в поведении.
+ * Реализованы должности 'intern', 'inspector', 'registrar'.
+ * Ревизор, Курьер и Заведующий сюда не вписаны: данные не должны
+ * обещать того, чего нет в поведении.
  */
 export interface StaffPost {
   /** Идентификатор должности. Поведение ищется по нему. */
@@ -34,17 +33,28 @@ export const STAFFING: Staffing[] = [
   {
     id: 'patrol',
     label: 'ОБХОД УЧАСТКА',
-    posts: [{ post: 'inspector', title: 'ИНСПЕКТОР', count: 3, priority: 2 }],
+    posts: [
+      { post: 'inspector', title: 'ИНСПЕКТОР', count: 2, priority: 2 },
+      { post: 'intern', title: 'СТАЖЁР', count: 2, priority: 3 },
+    ],
   },
   {
     id: 'registry',
     label: 'КАРТОТЕЧНЫЙ УЧАСТОК',
-    posts: [{ post: 'inspector', title: 'ИНСПЕКТОР', count: 5, priority: 2 }],
+    posts: [
+      { post: 'registrar', title: 'РЕГИСТРАТОР', count: 1, priority: 1 },
+      { post: 'inspector', title: 'ИНСПЕКТОР', count: 3, priority: 2 },
+      { post: 'intern', title: 'СТАЖЁР', count: 4, priority: 3 },
+    ],
   },
   {
     id: 'head_office',
     label: 'ПРИЁМНАЯ ЗАВЕДУЮЩЕГО',
-    posts: [{ post: 'inspector', title: 'ИНСПЕКТОР', count: 8, priority: 2 }],
+    posts: [
+      { post: 'registrar', title: 'РЕГИСТРАТОР', count: 1, priority: 1 },
+      { post: 'inspector', title: 'ИНСПЕКТОР', count: 5, priority: 2 },
+      { post: 'intern', title: 'СТАЖЁР', count: 4, priority: 3 },
+    ],
   },
 ];
 

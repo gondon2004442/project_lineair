@@ -1,7 +1,10 @@
 /** Один шаг симуляции. Порядок систем — здесь и больше нигде. */
 import { flushDoomed, type World } from './ecs';
 import { bulletSystem } from './systems/combat';
-import { enemyAiSystem, enemySeparationSystem } from './systems/enemyAi';
+import { internSystem } from './systems/postIntern';
+import { inspectorSystem } from './systems/postInspector';
+import { registrarSystem } from './systems/postRegistrar';
+import { metronomeSystem, rosterSystem, separationSystem } from './systems/staff';
 import { feedbackSystem, lifecycleSystem, statusSystem } from './systems/lifecycle';
 import { physicsSystem } from './systems/physics';
 import { roomSystem } from './systems/rooms';
@@ -22,8 +25,16 @@ export function step(w: World): void {
   }
 
   if (w.status !== 'dead') playerControlSystem(w, STEP);
-  enemyAiSystem(w, STEP);
-  enemySeparationSystem(w, STEP);
+
+  rosterSystem(w, STEP);
+  const beforeBeat = w.beat;
+  metronomeSystem(w, STEP);
+  const beatStruck = w.beat !== beforeBeat;
+
+  inspectorSystem(w, STEP, beatStruck);
+  internSystem(w, STEP);
+  registrarSystem(w, STEP);
+  separationSystem(w, STEP);
   physicsSystem(w, STEP);
   bulletSystem(w, STEP);
   lifecycleSystem(w, STEP);

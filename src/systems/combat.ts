@@ -18,7 +18,7 @@ export function bulletSystem(w: World, dt: number): void {
     if (b === undefined) continue;
 
     if (bullet.faction === 'player') {
-      for (const [target] of w.enemyC) {
+      for (const [target] of w.staffC) {
         if (hit(w, e, b.radius, target)) {
           applyDamage(w, target, bullet.damage);
           destroyEntity(w, e);

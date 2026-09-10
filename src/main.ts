@@ -10,7 +10,7 @@ import { createRenderer } from './render';
 import { resolveSeed } from './rng';
 import { step } from './step';
 import { STEP, TUNING } from './tuning';
-import { createWorld } from './world';
+import { createWorld, enterRoom } from './world';
 
 async function boot(): Promise<void> {
   const host = document.getElementById('stage');
@@ -58,7 +58,7 @@ async function boot(): Promise<void> {
 
   // Отладочный доступ из консоли: ручной прогон симуляции и проверка детерминизма.
   Object.defineProperty(window, 'lineair', {
-    value: { world: () => world, createWorld, step },
+    value: { world: () => world, createWorld, enterRoom, step },
   });
 
   renderer.layout();

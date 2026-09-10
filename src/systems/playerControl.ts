@@ -73,6 +73,7 @@ export function playerControlSystem(w: World, dt: number): void {
     spawnBullet(
       w,
       'player',
+      TUNING.playerBullet,
       t.x + dirX * TUNING.playerBullet.muzzle,
       t.y + dirY * TUNING.playerBullet.muzzle,
       dirX,

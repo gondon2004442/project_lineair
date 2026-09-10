@@ -1,11 +1,13 @@
 /** Служебный оверлей: состояние субъекта, схема этажа, отладка, seed. */
 import { TEMPLATES_BY_ID } from './data/roomTemplates';
+import { POST_REGISTRAR } from './data/posts';
 import { STAFFING_BY_ID } from './data/staffing';
 import { entityCount, type World } from './ecs';
 import { PALETTE } from './palette';
 import { DIRS } from './room';
 import { formatSeed } from './rng';
 import { TUNING } from './tuning';
+import { hasRegistrar, vacancyCount } from './systems/staff';
 import { clearedCount, currentRoom } from './world';
 
 export interface Hud {
@@ -31,7 +33,8 @@ export function createHud(
     left.innerHTML = [
       row('СУБЪЕКТ', bar(hp, maxHp)),
       row('РЫВОК', dashReady ? '<span class="ok">ГОТОВ</span>' : '<span class="warn">ПЕРЕЗАРЯД</span>'),
-      row('ШТАТ НА УЧАСТКЕ', String(w.enemyC.size)),
+      row('ШТАТ НА УЧАСТКЕ', String(w.staffC.size)),
+      row('ВАКАНСИЙ', vacancyLine(w)),
       row('ДВЕРИ', w.map.doorsLocked ? '<span class="warn">ЗАПЕРТЫ</span>' : '<span class="ok">ОТКРЫТЫ</span>'),
     ].join('');
 
@@ -116,6 +119,13 @@ function schematic(w: World): string {
     parts.push(
       `<rect x="${x}" y="${y}" width="${cell}" height="${cell}" fill="${fill}" stroke="${stroke}" stroke-width="${TUNING.hud.mapStroke}"/>`,
     );
+    // Посещённый, но не зачищенный участок с кадровым отделом — жёлтая метка.
+    if (room.visited && !room.cleared && !current && hasRegistrarPost(room.staffing)) {
+      const inset = TUNING.hud.mapEndInset;
+      parts.push(
+        `<rect x="${x + inset}" y="${y + inset}" width="${cell - inset * 2}" height="${cell - inset * 2}" fill="${hex(PALETTE.yellow)}"/>`,
+      );
+    }
     if (room.index === w.floor.end && !current) {
       const inset = TUNING.hud.mapEndInset;
       parts.push(
@@ -127,8 +137,22 @@ function schematic(w: World): string {
   return `<svg class="hud-schematic" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${parts.join('')}</svg>`;
 }
 
+/** Есть ли в расписании участка ставка Регистратора. */
+function hasRegistrarPost(staffing: string): boolean {
+  const table = STAFFING_BY_ID.get(staffing);
+  if (table === undefined) return false;
+  return table.posts.some((post) => post.post === POST_REGISTRAR);
+}
+
 function hex(color: number): string {
   return `#${color.toString(16).padStart(6, '0')}`;
+}
+
+/** Пока Регистратор жив, вакансии закрываются — это и есть угроза. */
+function vacancyLine(w: World): string {
+  const open = vacancyCount(w);
+  if (!hasRegistrar(w)) return `<span>${open} · НЕКОМУ</span>`;
+  return `<span class="${open > 0 ? 'warn' : 'ok'}">${open} · ОТДЕЛ РАБОТАЕТ</span>`;
 }
 
 function row(label: string, value: string): string {

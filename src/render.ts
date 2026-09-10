@@ -7,6 +7,7 @@ import { Application, Container, Graphics } from 'pixi.js';
 import type { World } from './ecs';
 import { PALETTE } from './palette';
 import { makeRng } from './rng';
+import { vacancyCount } from './systems/staff';
 import { TILE_DOOR, TILE_WALL, type TileMap } from './room';
 import { ROOM_HEIGHT, ROOM_WIDTH, STEP, TUNING } from './tuning';
 
@@ -133,18 +134,20 @@ function lerp(prev: number, next: number, alpha: number): number {
 function drawEntities(g: Graphics, w: World, alpha: number): void {
   const time = w.tick * STEP;
 
-  for (const [e, enemy] of w.enemyC) {
-    if (enemy.phase !== 'cast') continue;
+  // Линия огня инспектора: пока табличка горит, видно, с какой оси уходить.
+  for (const [e, inspector] of w.inspectorC) {
+    const staff = w.staffC.get(e);
     const t = w.transform.get(e);
     const pt = w.transform.get(w.player);
-    if (t === undefined || pt === undefined) continue;
+    if (staff === undefined || staff.plateFlash <= 0 || t === undefined || pt === undefined) continue;
     const x = lerp(t.px, t.x, alpha);
     const y = lerp(t.py, t.y, alpha);
-    const dx = pt.x - t.x;
-    const dy = pt.y - t.y;
-    const len = Math.hypot(dx, dy) || 1;
+    const aim =
+      inspector.shotsLeft > 0
+        ? { x: inspector.aimX, y: inspector.aimY }
+        : snapAxis(pt.x - t.x, pt.y - t.y);
     g.moveTo(x, y)
-      .lineTo(x + (dx / len) * TUNING.render.telegraphRay, y + (dy / len) * TUNING.render.telegraphRay)
+      .lineTo(x + aim.x * TUNING.render.telegraphRay, y + aim.y * TUNING.render.telegraphRay)
       .stroke({ width: TUNING.render.telegraphWidth, color: PALETTE.yellow, alpha: 0.55 });
   }
 
@@ -184,9 +187,22 @@ function drawEntities(g: Graphics, w: World, alpha: number): void {
       else if (health.iframes > 0 && Math.floor(time * TUNING.feel.blinkRate) % 2 === 0) continue;
     }
 
+    if (draw.desk) {
+      const extra = TUNING.render.deskExtra;
+      g.rect(x - draw.size - extra, y - draw.size - extra, (draw.size + extra) * 2, (draw.size + extra) * 2)
+        .fill(PALETTE.concrete);
+    }
+
     switch (draw.shape) {
       case 'square':
-        g.rect(x - draw.size, y - draw.size, draw.size * 2, draw.size * 2).fill(color);
+        if (draw.hollow) {
+          g.rect(x - draw.size, y - draw.size, draw.size * 2, draw.size * 2).stroke({
+            width: TUNING.render.hollowWidth,
+            color,
+          });
+        } else {
+          g.rect(x - draw.size, y - draw.size, draw.size * 2, draw.size * 2).fill(color);
+        }
         break;
       case 'diamond':
         g.poly([x, y - draw.size, x + draw.size, y, x, y + draw.size, x - draw.size, y]).fill(color);
@@ -196,15 +212,51 @@ function drawEntities(g: Graphics, w: World, alpha: number): void {
         break;
     }
 
-    const enemy = w.enemyC.get(e);
-    if (enemy !== undefined && enemy.phase === 'cast') {
+    const staff = w.staffC.get(e);
+    if (staff === undefined) continue;
+    drawPlate(g, x, y, draw.size, staff.plateMarks);
+    if (staff.plateFlash > 0) {
       const inset = TUNING.render.telegraphInset;
-      g.rect(x - draw.size - inset, y - draw.size - inset, (draw.size + inset) * 2, (draw.size + inset) * 2).stroke({
-        width: TUNING.render.telegraphWidth,
-        color: PALETTE.yellow,
-      });
+      g.rect(x - draw.size - inset, y - draw.size - inset, (draw.size + inset) * 2, (draw.size + inset) * 2)
+        .stroke({ width: TUNING.render.telegraphWidth, color: PALETTE.yellow });
     }
+    if (w.registrarC.has(e)) drawVacancyCount(g, x, y, draw.size, vacancyCount(w));
   }
+}
+
+/** Табличка на груди: жёлтая пластина с насечками по старшинству. */
+function drawPlate(g: Graphics, x: number, y: number, size: number, marks: number): void {
+  const width = size * TUNING.render.plateWidthFactor;
+  const height = TUNING.render.plateHeight;
+  const top = y - height / 2;
+  g.rect(x - width / 2, top, width, height).fill(PALETTE.yellow);
+
+  const mark = TUNING.render.plateMarkSize;
+  const gap = TUNING.render.plateMarkGap;
+  const total = marks * mark + Math.max(0, marks - 1) * gap;
+  let cursor = x - total / 2;
+  for (let i = 0; i < marks; i++) {
+    g.rect(cursor, top + (height - mark) / 2, mark, mark).fill(PALETTE.black);
+    cursor += mark + gap;
+  }
+}
+
+/** Сколько ставок Регистратору ещё закрывать. */
+function drawVacancyCount(g: Graphics, x: number, y: number, size: number, open: number): void {
+  const mark = TUNING.render.vacancyMark;
+  const gap = TUNING.render.vacancyGap;
+  const total = open * mark + Math.max(0, open - 1) * gap;
+  let cursor = x - total / 2;
+  const top = y - size - TUNING.render.vacancyLift;
+  for (let i = 0; i < open; i++) {
+    g.rect(cursor, top, mark, mark).fill(PALETTE.yellow);
+    cursor += mark + gap;
+  }
+}
+
+function snapAxis(dx: number, dy: number): { x: number; y: number } {
+  if (Math.abs(dx) >= Math.abs(dy)) return { x: Math.sign(dx) || 1, y: 0 };
+  return { x: 0, y: Math.sign(dy) || 1 };
 }
 
 function drawHitboxes(g: Graphics, w: World, alpha: number): void {

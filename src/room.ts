@@ -179,6 +179,22 @@ export function entryPosition(map: TileMap, dir: Dir): { x: number; y: number } 
   return { x: cx * map.size, y: cy * map.size };
 }
 
+/** Случайная свободная клетка помещения. Возвращает центр клетки. */
+export function randomFloorPoint(
+  map: TileMap,
+  roll: (n: number) => number,
+  attempts: number,
+): { x: number; y: number } {
+  const wall = TUNING.room.wall;
+  for (let i = 0; i < attempts; i++) {
+    const cx = wall + roll(TUNING.room.cols);
+    const cy = wall + roll(TUNING.room.rows);
+    if (map.tiles[cy * map.cols + cx] !== TILE_FLOOR) continue;
+    return { x: (cx + 0.5) * map.size, y: (cy + 0.5) * map.size };
+  }
+  return roomCenter(map);
+}
+
 /** Субъект встал на клетку проёма — значит, уходит в соседнее помещение. */
 export function standingInDoor(map: TileMap, dir: Dir, x: number, y: number): boolean {
   const cx = Math.floor(x / map.size);

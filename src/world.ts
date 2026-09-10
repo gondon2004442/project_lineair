@@ -12,7 +12,7 @@ import {
   type Dir,
   type TileMap,
 } from './room';
-import { spawnEnemy, spawnPlayer } from './spawn';
+import { spawnPlayer, spawnStaff } from './spawn';
 import { TUNING } from './tuning';
 
 export function createWorld(seed: number, input: InputSnapshot): World {
@@ -30,6 +30,9 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     fx: { shake: 0, hitstop: 0 },
     status: 'playing',
     player: -1,
+    roster: [],
+    metronome: TUNING.post.inspector.metronomeInterval,
+    beat: 0,
     nextEntity: 1,
     alive: new Set(),
     doomed: [],
@@ -37,7 +40,10 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     body: new Map(),
     health: new Map(),
     playerC: new Map(),
-    enemyC: new Map(),
+    staffC: new Map(),
+    internC: new Map(),
+    inspectorC: new Map(),
+    registrarC: new Map(),
     bulletC: new Map(),
     drawC: new Map(),
   };
@@ -62,12 +68,32 @@ export function enterRoom(w: World, index: number, fromDir: Dir | null): void {
   w.map.doorsLocked = !room.cleared;
   w.mapToken += 1;
 
+  w.metronome = TUNING.post.inspector.metronomeInterval;
+  w.beat = 0;
+
   const spot = fromDir === null ? roomCenter(w.map) : entryPosition(w.map, fromDir);
   placePlayer(w, spot.x, spot.y);
+  buildRoster(w, room);
   if (!room.cleared) staffRoom(w, room, spot.x, spot.y);
-  if (w.enemyC.size === 0 && !room.cleared) {
+  if (w.staffC.size === 0 && !room.cleared) {
     room.cleared = true;
     w.map.doorsLocked = false;
+  }
+}
+
+/** Штатное расписание участка в работе: квота на каждую должность. */
+function buildRoster(w: World, room: RoomNode): void {
+  const staffing = STAFFING_BY_ID.get(room.staffing);
+  w.roster = [];
+  if (staffing === undefined) return;
+  for (const post of staffing.posts) {
+    w.roster.push({
+      post: post.post,
+      title: post.title,
+      priority: post.priority,
+      quota: quotaFor(post.count),
+      occupied: 0,
+    });
   }
 }
 
@@ -79,14 +105,16 @@ function staffRoom(w: World, room: RoomNode, entryX: number, entryY: number): vo
 
   const posts = [...staffing.posts].sort((a, b) => a.priority - b.priority);
   for (const post of posts) {
-    const quota = Math.max(1, Math.round(post.count * TUNING.floor.staffScale));
+    const quota = quotaFor(post.count);
     for (let i = 0; i < quota; i++) {
       const spot = findSpawnSpot(w.map, rng, entryX, entryY);
-      // Пока в штате одна должность: остальные строки расписания
-      // появятся вместе со своим поведением.
-      if (post.post === 'inspector') spawnEnemy(w, spot.x, spot.y);
+      spawnStaff(w, post.post, post.priority, spot.x, spot.y);
     }
   }
+}
+
+function quotaFor(count: number): number {
+  return Math.max(1, Math.round(count * TUNING.floor.staffScale));
 }
 
 /** Свободная клетка подальше от точки входа. */
@@ -104,7 +132,7 @@ function findSpawnSpot(
     const x = (cx + 0.5) * map.size;
     const y = (cy + 0.5) * map.size;
     fallback = { x, y };
-    if (Math.hypot(x - awayX, y - awayY) >= TUNING.enemy.spawnMinDistance) return { x, y };
+    if (Math.hypot(x - awayX, y - awayY) >= TUNING.staff.spawnMinDistance) return { x, y };
   }
   return fallback;
 }
@@ -127,7 +155,10 @@ function clearExceptPlayer(w: World): void {
     w.body.delete(e);
     w.health.delete(e);
     w.playerC.delete(e);
-    w.enemyC.delete(e);
+    w.staffC.delete(e);
+    w.internC.delete(e);
+    w.inspectorC.delete(e);
+    w.registrarC.delete(e);
     w.bulletC.delete(e);
     w.drawC.delete(e);
   }
