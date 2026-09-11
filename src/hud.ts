@@ -43,6 +43,7 @@ export function createHud(
       row('ВАКАНСИЙ', vacancyLine(w)),
       row('ДВЕРИ', w.map.doorsLocked ? '<span class="warn">ЗАПЕРТЫ</span>' : '<span class="ok">ОТКРЫТЫ</span>'),
       weaponRows(w),
+      energyRow(w),
     ].join('');
 
     right.innerHTML = [
@@ -125,6 +126,20 @@ function weaponRows(w: World): string {
     rows.push(row('ЗАРЯД', `<span class="ok">${gauge(Math.round(ratio * 10), 10)}</span>`));
   }
   return rows.join('');
+}
+
+/** Телекинез: запас энергии и что сейчас в руках. */
+function energyRow(w: World): string {
+  const player = w.playerC.get(w.player);
+  if (player === undefined) return '';
+  const max = Math.max(1, TUNING.telekinesis.energyMax);
+  const ratio = Math.max(0, Math.min(1, player.energy / max));
+  const enough = player.energy >= TUNING.telekinesis.grabCost;
+  const held = w.propC.get(player.held);
+  return (
+    row('ЭНЕРГИЯ (ПКМ)', `<span class="${enough ? 'ok' : 'warn'}">${gauge(Math.round(ratio * 10), 10)}</span>`) +
+    (held === undefined ? '' : row('В ЗАХВАТЕ', `<span class="ok">${held.title}</span>`))
+  );
 }
 
 /** Личное дело: служебные отчёты по выданным предметам. */

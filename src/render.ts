@@ -8,7 +8,8 @@ import type { World } from './ecs';
 import { PALETTE } from './palette';
 import { makeRng } from './rng';
 import { vacancyCount } from './systems/staff';
-import { TILE_DOOR, TILE_WALL, type TileMap } from './room';
+import { grabCandidate } from './systems/telekinesis';
+import { TILE_DOOR, TILE_WALL, TILE_WEAK, type TileMap } from './room';
 import { ROOM_HEIGHT, ROOM_WIDTH, STEP, TUNING } from './tuning';
 
 export interface Renderer {
@@ -102,6 +103,30 @@ function drawRoom(g: Graphics, map: TileMap): void {
         continue;
       }
 
+      if (tile === TILE_WEAK) {
+        // Перегородка: та же клетка, но набрана панелями. Панелей тем
+        // меньше, чем сильнее её уже разбили — износ виден без цифр.
+        const inset = TUNING.render.wallInset;
+        const gap = TUNING.render.weakPanelGap;
+        g.rect(x, y, size, size).fill(PALETTE.concrete);
+        const maxHp = Math.max(1, TUNING.room.weakWallHp);
+        const left = map.weakHp[cy * map.cols + cx] ?? maxHp;
+        const panels = Math.max(1, Math.ceil((left / maxHp) * 4));
+        const side = (size - inset * 2 - gap) / 2;
+        const spots: ReadonlyArray<readonly [number, number]> = [
+          [x + inset, y + inset],
+          [x + inset + side + gap, y + inset],
+          [x + inset, y + inset + side + gap],
+          [x + inset + side + gap, y + inset + side + gap],
+        ];
+        for (let i = 0; i < panels; i++) {
+          const spot = spots[i];
+          if (spot === undefined) continue;
+          g.rect(spot[0], spot[1], side, side).fill(PALETTE.concreteMid);
+        }
+        continue;
+      }
+
       g.rect(x, y, size, size).fill(PALETTE.concreteDark);
       g.rect(x, y, size, TUNING.render.floorGrid)
         .rect(x, y, TUNING.render.floorGrid, size)
@@ -152,6 +177,30 @@ function drawEntities(g: Graphics, w: World, alpha: number): void {
     g.moveTo(x, y)
       .lineTo(x + aim.x * TUNING.render.telegraphRay, y + aim.y * TUNING.render.telegraphRay)
       .stroke({ width: TUNING.render.telegraphWidth, color: PALETTE.yellow, alpha: 0.55 });
+  }
+
+  // Цель захвата и удерживаемое — жёлтой рамкой.
+  const candidate = grabCandidate(w);
+  const heldEntity = w.playerC.get(w.player)?.held ?? -1;
+  for (const mark of [candidate, heldEntity]) {
+    if (mark < 0) continue;
+    const t = w.transform.get(mark);
+    const draw = w.drawC.get(mark);
+    if (t === undefined || draw === undefined) continue;
+    const x = lerp(t.px, t.x, alpha);
+    const y = lerp(t.py, t.y, alpha);
+    const inset = TUNING.render.telegraphInset;
+    g.rect(x - draw.size - inset, y - draw.size - inset, (draw.size + inset) * 2, (draw.size + inset) * 2)
+      .stroke({ width: TUNING.render.telegraphWidth, color: PALETTE.yellow, alpha: mark === heldEntity ? 1 : 0.45 });
+  }
+  if (heldEntity >= 0) {
+    const t = w.transform.get(heldEntity);
+    const pt = w.transform.get(w.player);
+    if (t !== undefined && pt !== undefined) {
+      g.moveTo(lerp(pt.px, pt.x, alpha), lerp(pt.py, pt.y, alpha))
+        .lineTo(lerp(t.px, t.x, alpha), lerp(t.py, t.y, alpha))
+        .stroke({ width: TUNING.render.telegraphWidth, color: PALETTE.yellow, alpha: 0.35 });
+    }
   }
 
   const player = w.playerC.get(w.player);

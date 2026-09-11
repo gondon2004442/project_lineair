@@ -29,6 +29,8 @@ export const TUNING = {
     tile: 32,
     /** Толщина стены в клетках. */
     wall: 1,
+    /** Прочность разрушаемой перегородки. */
+    weakWallHp: 6,
   },
 
   player: {
@@ -159,10 +161,70 @@ export const TUNING = {
     staffScale: 1,
     /** Смещение seed для каждого помещения: порядок обхода не влияет на расстановку. */
     roomSeedStride: 0x9e3779b1,
+    /** Смещение seed для расстановки мебели участка. */
+    propSeedStride: 0xc2b2ae35,
     /** Смещение seed для выдачи предмета за участок. */
     itemSeedStride: 0x85ebca6b,
     /** Сколько раз пытаться подобрать точку появления, прежде чем взять любую. */
     spawnAttempts: 200,
+  },
+
+  /** Физические объекты: что можно поднять телекинезом и бросить. */
+  prop: {
+    /** Ниже этой скорости брошенный предмет никого не задевает. */
+    minImpactSpeed: 140,
+    /** Урон = impulseDamage * масса * скорость / 1000. */
+    impulseDamage: 4,
+    /** Сколько прочности теряет сам предмет от удара. */
+    impactSelfDamage: 1,
+    /** Трение катящегося предмета. Делится на массу: тяжёлое несёт дальше. */
+    friction: 900,
+    /** Сила, которой предмет расталкивает тела вокруг себя. */
+    pushForce: 260,
+    /** Ближе этого ко входу мебель не появляется. */
+    spawnClearance: 60,
+
+    chair: {
+      radius: 10,
+      hp: 2,
+      mass: 1,
+      /** Во сколько раз быстрее базовой скорости броска летит. */
+      speedFactor: 1.25,
+    },
+    cabinet: {
+      radius: 18,
+      hp: 5,
+      mass: 2.6,
+      speedFactor: 0.65,
+    },
+    rubble: {
+      radius: 12,
+      hp: 3,
+      mass: 1.7,
+      speedFactor: 0.95,
+    },
+  },
+
+  /** Телекинез: захват по ПКМ, бросок на отпускании. */
+  telekinesis: {
+    /** Дальше этого предмет не поднять. */
+    grabRange: 260,
+    /** На каком расстоянии перед субъектом висит поднятое. */
+    holdDistance: 52,
+    /** Как быстро поднятое подтягивается к точке удержания. */
+    holdPull: 14,
+    /** Базовая скорость броска, умножается на speedFactor предмета. */
+    throwSpeed: 900,
+
+    /** Энергия. */
+    energyMax: 100,
+    /** Разовая плата за захват. */
+    grabCost: 15,
+    /** Расход на удержание, в секунду. */
+    holdDrain: 14,
+    /** Восполнение энергии в секунду и пауза после траты. */
+    energyRegen: 24,
+    energyRegenDelay: 0.5,
   },
 
   /** Общее для всего штата, независимо от должности. */
@@ -307,6 +369,8 @@ export const TUNING = {
     vacancyMark: 4,
     vacancyGap: 3,
     vacancyLift: 12,
+    /** Зазор между панелями разрушаемой перегородки. */
+    weakPanelGap: 2,
     /** Во сколько раз стрела зарядной формы длиннее своей ширины. */
     barLengthFactor: 3,
     /** Толщина контура полого силуэта. */
@@ -446,6 +510,41 @@ export const PANEL: TuningGroup[] = [
       { path: 'weapon.volley.cost', label: 'РАСХОД', min: 0, max: 14, step: 1 },
       { path: 'weapon.volley.ammoMax', label: 'ОБОЙМА', min: 1, max: 60, step: 1 },
       { path: 'weapon.volley.reloadTime', label: 'ПЕРЕЗАРЯДКА', min: 0.1, max: 5, step: 0.05 },
+    ],
+  },
+  {
+    title: 'ТЕЛЕКИНЕЗ',
+    fields: [
+      { path: 'telekinesis.grabRange', label: 'ДАЛЬНОСТЬ ЗАХВАТА', min: 40, max: 700, step: 10 },
+      { path: 'telekinesis.holdDistance', label: 'ДИСТАНЦИЯ УДЕРЖАНИЯ', min: 20, max: 200, step: 2 },
+      { path: 'telekinesis.holdPull', label: 'ЖЁСТКОСТЬ УДЕРЖАНИЯ', min: 1, max: 40, step: 1 },
+      { path: 'telekinesis.throwSpeed', label: 'СИЛА БРОСКА', min: 100, max: 2200, step: 20 },
+      { path: 'telekinesis.energyMax', label: 'ЗАПАС ЭНЕРГИИ', min: 10, max: 400, step: 5 },
+      { path: 'telekinesis.grabCost', label: 'ПЛАТА ЗА ЗАХВАТ', min: 0, max: 100, step: 1 },
+      { path: 'telekinesis.holdDrain', label: 'РАСХОД НА УДЕРЖАНИЕ', min: 0, max: 80, step: 1 },
+      { path: 'telekinesis.energyRegen', label: 'ВОСПОЛНЕНИЕ ЭНЕРГИИ', min: 1, max: 120, step: 1 },
+      { path: 'telekinesis.energyRegenDelay', label: 'ПАУЗА ВОСПОЛНЕНИЯ', min: 0, max: 3, step: 0.05 },
+    ],
+  },
+  {
+    title: 'ОБЪЕКТЫ',
+    fields: [
+      { path: 'prop.impulseDamage', label: 'УРОН ОТ ИМПУЛЬСА', min: 0, max: 20, step: 0.5 },
+      { path: 'prop.minImpactSpeed', label: 'ПОРОГ УДАРА', min: 0, max: 600, step: 10 },
+      { path: 'prop.impactSelfDamage', label: 'ИЗНОС ОТ УДАРА', min: 0, max: 5, step: 1 },
+      { path: 'prop.friction', label: 'ТРЕНИЕ', min: 100, max: 4000, step: 50 },
+      { path: 'prop.pushForce', label: 'РАСТАЛКИВАНИЕ ТЕЛ', min: 0, max: 900, step: 20 },
+      { path: 'prop.spawnClearance', label: 'ОТСТУП МЕБЕЛИ ОТ ВХОДА', min: 0, max: 400, step: 10, onRestart: true },
+      { path: 'prop.chair.hp', label: 'СТУЛ: ПРОЧНОСТЬ', min: 1, max: 20, step: 1, onRestart: true },
+      { path: 'prop.chair.mass', label: 'СТУЛ: МАССА', min: 0.2, max: 8, step: 0.1 },
+      { path: 'prop.chair.speedFactor', label: 'СТУЛ: РАЗГОН', min: 0.2, max: 3, step: 0.05 },
+      { path: 'prop.cabinet.hp', label: 'ШКАФ: ПРОЧНОСТЬ', min: 1, max: 30, step: 1, onRestart: true },
+      { path: 'prop.cabinet.mass', label: 'ШКАФ: МАССА', min: 0.2, max: 12, step: 0.1 },
+      { path: 'prop.cabinet.speedFactor', label: 'ШКАФ: РАЗГОН', min: 0.2, max: 3, step: 0.05 },
+      { path: 'prop.rubble.hp', label: 'ОБЛОМОК: ПРОЧНОСТЬ', min: 1, max: 20, step: 1, onRestart: true },
+      { path: 'prop.rubble.mass', label: 'ОБЛОМОК: МАССА', min: 0.2, max: 8, step: 0.1 },
+      { path: 'prop.rubble.speedFactor', label: 'ОБЛОМОК: РАЗГОН', min: 0.2, max: 3, step: 0.05 },
+      { path: 'room.weakWallHp', label: 'ПЕРЕГОРОДКА: ПРОЧНОСТЬ', min: 1, max: 40, step: 1, onRestart: true },
     ],
   },
   {

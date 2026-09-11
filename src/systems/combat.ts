@@ -1,6 +1,9 @@
 /** Жизнь снаряда: время, бетон, наведение, попадание и пробитие. */
+import { PROP_RUBBLE } from '../data/props';
 import { destroyEntity, type Entity, type World } from '../ecs';
-import { isSolidPoint } from '../room';
+import { cellCenter, damageWall, isSolidPoint, tileAtPoint, TILE_WEAK } from '../room';
+import { spawnProp } from '../spawn';
+import { TUNING } from '../tuning';
 import { applyDamage } from './damage';
 
 export function bulletSystem(w: World, dt: number): void {
@@ -9,7 +12,19 @@ export function bulletSystem(w: World, dt: number): void {
     if (t === undefined) continue;
 
     bullet.life -= dt;
-    if (bullet.life <= 0 || isSolidPoint(w.map, t.x, t.y)) {
+    if (bullet.life <= 0) {
+      destroyEntity(w, e);
+      continue;
+    }
+    if (isSolidPoint(w.map, t.x, t.y)) {
+      // Перегородка не просто гасит снаряд, она от него крошится.
+      if (tileAtPoint(w.map, t.x, t.y) === TILE_WEAK) {
+        if (damageWall(w.map, t.x, t.y, bullet.damage)) {
+          const cell = cellCenter(w.map, t.x, t.y);
+          spawnProp(w, PROP_RUBBLE, cell.x, cell.y);
+        }
+        w.mapToken += 1;
+      }
       destroyEntity(w, e);
       continue;
     }
@@ -18,6 +33,28 @@ export function bulletSystem(w: World, dt: number): void {
     if (b === undefined) continue;
 
     if (bullet.homing > 0) steer(w, e, t.x, t.y, b, bullet.homing * dt);
+
+    // Мебель — укрытие для обеих сторон. Своё удерживаемое снаряд не задевает:
+    // иначе держать шкаф и стрелять было бы нельзя.
+    const heldByPlayer = w.playerC.get(w.player)?.held ?? -1;
+    let blocked = false;
+    for (const [prop, propC] of w.propC) {
+      if (propC.phase === 'held' && bullet.faction === 'player' && prop === heldByPlayer) continue;
+      if (prop === bullet.lastHit || !hit(w, e, b.radius, prop)) continue;
+      const health = w.health.get(prop);
+      if (health !== undefined) {
+        health.hp -= bullet.damage;
+        health.flash = TUNING.feel.flashTime;
+      }
+      bullet.lastHit = prop;
+      if (bullet.pierce <= 0) {
+        destroyEntity(w, e);
+        blocked = true;
+        break;
+      }
+      bullet.pierce -= 1;
+    }
+    if (blocked) continue;
 
     if (bullet.faction === 'player') {
       for (const [target] of w.staffC) {

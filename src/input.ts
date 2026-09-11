@@ -12,6 +12,8 @@ export interface InputSnapshot {
   aimX: number;
   aimY: number;
   fireHeld: boolean;
+  /** ПКМ зажата: телекинез держит объект. */
+  grabHeld: boolean;
   /** Рывок запрошен и ещё не израсходован. */
   dashQueued: boolean;
   /** На сколько форм провернули колесо и ещё не отработали. */
@@ -44,6 +46,7 @@ export function createInput(target: HTMLElement): InputDevice {
     aimX: 0,
     aimY: 0,
     fireHeld: false,
+    grabHeld: false,
     dashQueued: false,
     formStep: 0,
     reloadQueued: false,
@@ -108,6 +111,7 @@ export function createInput(target: HTMLElement): InputDevice {
     held.clear();
     recomputeMove();
     snapshot.fireHeld = false;
+    snapshot.grabHeld = false;
     snapshot.formStep = 0;
     snapshot.reloadQueued = false;
   });
@@ -120,6 +124,7 @@ export function createInput(target: HTMLElement): InputDevice {
 
   target.addEventListener('pointerdown', (ev) => {
     if (ev.button === 0) snapshot.fireHeld = true;
+    if (ev.button === 2) snapshot.grabHeld = true;
     const p = project(ev.clientX, ev.clientY);
     snapshot.aimX = p.x;
     snapshot.aimY = p.y;
@@ -127,6 +132,7 @@ export function createInput(target: HTMLElement): InputDevice {
 
   window.addEventListener('pointerup', (ev) => {
     if (ev.button === 0) snapshot.fireHeld = false;
+    if (ev.button === 2) snapshot.grabHeld = false;
   });
 
   target.addEventListener(

@@ -12,7 +12,8 @@ import {
   type Dir,
   type TileMap,
 } from './room';
-import { spawnPlayer, spawnStaff } from './spawn';
+import { PROPS } from './data/props';
+import { spawnPlayer, spawnProp, spawnStaff } from './spawn';
 import { TUNING } from './tuning';
 
 export function createWorld(seed: number, input: InputSnapshot): World {
@@ -45,6 +46,7 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     internC: new Map(),
     inspectorC: new Map(),
     registrarC: new Map(),
+    propC: new Map(),
     bulletC: new Map(),
     drawC: new Map(),
   };
@@ -75,6 +77,7 @@ export function enterRoom(w: World, index: number, fromDir: Dir | null): void {
   const spot = fromDir === null ? roomCenter(w.map) : entryPosition(w.map, fromDir);
   placePlayer(w, spot.x, spot.y);
   buildRoster(w, room);
+  scatterProps(w, room, spot.x, spot.y);
   if (!room.cleared) staffRoom(w, room, spot.x, spot.y);
   if (w.staffC.size === 0 && !room.cleared) {
     room.cleared = true;
@@ -114,6 +117,23 @@ function staffRoom(w: World, room: RoomNode, entryX: number, entryY: number): vo
   }
 }
 
+/**
+ * Мебель участка. Своя случайность на помещение, поэтому обстановка
+ * не зависит от порядка обхода и восстанавливается при возврате.
+ */
+function scatterProps(w: World, room: RoomNode, entryX: number, entryY: number): void {
+  if (room.kind === 'start') return;
+  const rng = makeRng((w.seed + room.index * TUNING.floor.propSeedStride) >>> 0);
+  for (const spec of PROPS) {
+    for (let i = 0; i < spec.scatter; i++) {
+      // Мебели отступ от входа нужен свой, куда меньший, чем штату:
+      // иначе поднять при входе будет нечего, захват до неё не достанет.
+      const spot = findSpawnSpot(w.map, rng, entryX, entryY, TUNING.prop.spawnClearance);
+      spawnProp(w, spec.id, spot.x, spot.y);
+    }
+  }
+}
+
 function quotaFor(count: number): number {
   return Math.max(1, Math.round(count * TUNING.floor.staffScale));
 }
@@ -124,6 +144,7 @@ function findSpawnSpot(
   rng: ReturnType<typeof makeRng>,
   awayX: number,
   awayY: number,
+  clearance: number = TUNING.staff.spawnMinDistance,
 ): { x: number; y: number } {
   let fallback = { x: awayX, y: awayY };
   for (let attempt = 0; attempt < TUNING.floor.spawnAttempts; attempt++) {
@@ -133,7 +154,7 @@ function findSpawnSpot(
     const x = (cx + 0.5) * map.size;
     const y = (cy + 0.5) * map.size;
     fallback = { x, y };
-    if (Math.hypot(x - awayX, y - awayY) >= TUNING.staff.spawnMinDistance) return { x, y };
+    if (Math.hypot(x - awayX, y - awayY) >= clearance) return { x, y };
   }
   return fallback;
 }
@@ -149,6 +170,9 @@ function placePlayer(w: World, x: number, y: number): void {
 }
 
 function clearExceptPlayer(w: World): void {
+  // Удерживаемое остаётся на прошлом участке.
+  const player = w.playerC.get(w.player);
+  if (player !== undefined) player.held = -1;
   for (const e of [...w.alive]) {
     if (e === w.player) continue;
     w.alive.delete(e);
@@ -160,6 +184,7 @@ function clearExceptPlayer(w: World): void {
     w.internC.delete(e);
     w.inspectorC.delete(e);
     w.registrarC.delete(e);
+    w.propC.delete(e);
     w.bulletC.delete(e);
     w.drawC.delete(e);
   }

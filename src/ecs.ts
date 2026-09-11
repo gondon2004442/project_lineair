@@ -56,6 +56,10 @@ export interface PlayerC {
   /** Сколько снарядов залпа осталось выпустить и когда следующий. */
   queued: number;
   queueTimer: number;
+  /** Телекинез: запас энергии, пауза до восполнения и что сейчас держим. */
+  energy: number;
+  energyDelay: number;
+  held: Entity;
   dashTime: number;
   dashCooldown: number;
   dashX: number;
@@ -120,6 +124,18 @@ export interface RosterEntry {
   quota: number;
   /** Пересчитывается каждый шаг по живым сотрудникам. */
   occupied: number;
+}
+
+export type PropPhase = 'idle' | 'held' | 'thrown';
+
+/** Физический объект участка: стул, шкаф, бетонный обломок. */
+export interface PropC {
+  kind: string;
+  title: string;
+  phase: PropPhase;
+  mass: number;
+  /** Кого уже задел в этом полёте: одно тело — один удар. */
+  lastHit: Entity;
 }
 
 export interface BulletC {
@@ -190,6 +206,7 @@ export interface World {
   internC: Map<Entity, InternC>;
   inspectorC: Map<Entity, InspectorC>;
   registrarC: Map<Entity, RegistrarC>;
+  propC: Map<Entity, PropC>;
   bulletC: Map<Entity, BulletC>;
   drawC: Map<Entity, DrawC>;
 }
@@ -216,6 +233,7 @@ export function flushDoomed(w: World): void {
     w.internC.delete(e);
     w.inspectorC.delete(e);
     w.registrarC.delete(e);
+    w.propC.delete(e);
     w.bulletC.delete(e);
     w.drawC.delete(e);
   }

@@ -8,6 +8,8 @@ import { TUNING } from './tuning';
 export const TILE_FLOOR = 0;
 export const TILE_WALL = 1;
 export const TILE_DOOR = 2;
+/** Разрушаемая перегородка: тот же бетон, но с прочностью. */
+export const TILE_WEAK = 3;
 
 /** Стороны помещения. Порядок задаёт индексы в neighbors и doors. */
 export const NORTH = 0;
@@ -34,6 +36,8 @@ export interface TileMap {
   rows: number;
   size: number;
   tiles: Uint8Array;
+  /** Прочность разрушаемых перегородок по тем же индексам. */
+  weakHp: Uint8Array;
   /** Пока true, дверные клетки непроходимы. */
   doorsLocked: boolean;
 }
@@ -69,6 +73,7 @@ export function buildRoomMap(templateId: string, doors: readonly boolean[]): Til
     rows: MAP_ROWS,
     size: TUNING.room.tile,
     tiles: new Uint8Array(MAP_COLS * MAP_ROWS),
+    weakHp: new Uint8Array(MAP_COLS * MAP_ROWS),
     doorsLocked: true,
   };
 
@@ -104,9 +109,12 @@ function paint(map: TileMap, template: RoomTemplate): void {
       let tile = TILE_WALL;
       if (!border) {
         const row = template.rows[cy - WALL];
-        tile = row !== undefined && row[cx - WALL] === '#' ? TILE_WALL : TILE_FLOOR;
+        const glyph = row === undefined ? '.' : row[cx - WALL];
+        tile = glyph === '#' ? TILE_WALL : glyph === '%' ? TILE_WEAK : TILE_FLOOR;
       }
-      map.tiles[cy * map.cols + cx] = tile;
+      const at = cy * map.cols + cx;
+      map.tiles[at] = tile;
+      map.weakHp[at] = tile === TILE_WEAK ? TUNING.room.weakWallHp : 0;
     }
   }
 }
@@ -128,7 +136,8 @@ function doorsReachable(map: TileMap, doors: readonly boolean[]): boolean {
       const ny = cy + dy;
       if (nx < 0 || ny < 0 || nx >= map.cols || ny >= map.rows) continue;
       const at2 = ny * map.cols + nx;
-      if (seen[at2] === 1 || map.tiles[at2] === TILE_WALL) continue;
+      const blocked = map.tiles[at2] === TILE_WALL || map.tiles[at2] === TILE_WEAK;
+      if (seen[at2] === 1 || blocked) continue;
       seen[at2] = 1;
       stack.push(at2);
     }
@@ -145,11 +154,39 @@ function doorsReachable(map: TileMap, doors: readonly boolean[]): boolean {
 export function isSolidCell(map: TileMap, cx: number, cy: number): boolean {
   if (cx < 0 || cy < 0 || cx >= map.cols || cy >= map.rows) return true;
   const tile = map.tiles[cy * map.cols + cx];
-  return tile === TILE_WALL || (tile === TILE_DOOR && map.doorsLocked);
+  return tile === TILE_WALL || tile === TILE_WEAK || (tile === TILE_DOOR && map.doorsLocked);
 }
 
 export function isSolidPoint(map: TileMap, x: number, y: number): boolean {
   return isSolidCell(map, Math.floor(x / map.size), Math.floor(y / map.size));
+}
+
+/**
+ * Ударить по перегородке. Возвращает true, если она рассыпалась —
+ * тогда вызывающий оставляет на её месте обломок.
+ */
+export function damageWall(map: TileMap, x: number, y: number, amount: number): boolean {
+  const cx = Math.floor(x / map.size);
+  const cy = Math.floor(y / map.size);
+  if (cx < 0 || cy < 0 || cx >= map.cols || cy >= map.rows) return false;
+  const at = cy * map.cols + cx;
+  if (map.tiles[at] !== TILE_WEAK) return false;
+  const left = (map.weakHp[at] ?? 0) - Math.max(1, Math.round(amount));
+  if (left > 0) {
+    map.weakHp[at] = left;
+    return false;
+  }
+  map.tiles[at] = TILE_FLOOR;
+  map.weakHp[at] = 0;
+  return true;
+}
+
+/** Центр клетки, в которой лежит точка. */
+export function cellCenter(map: TileMap, x: number, y: number): { x: number; y: number } {
+  return {
+    x: (Math.floor(x / map.size) + 0.5) * map.size,
+    y: (Math.floor(y / map.size) + 0.5) * map.size,
+  };
 }
 
 export function tileAtPoint(map: TileMap, x: number, y: number): number {

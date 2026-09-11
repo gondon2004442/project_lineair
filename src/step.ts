@@ -7,6 +7,8 @@ import { registrarSystem } from './systems/postRegistrar';
 import { metronomeSystem, rosterSystem, separationSystem } from './systems/staff';
 import { feedbackSystem, lifecycleSystem, statusSystem } from './systems/lifecycle';
 import { physicsSystem } from './systems/physics';
+import { propPushSystem, propSystem } from './systems/props';
+import { telekinesisSystem } from './systems/telekinesis';
 import { roomSystem } from './systems/rooms';
 import { playerControlSystem } from './systems/playerControl';
 import { STEP } from './tuning';
@@ -35,6 +37,9 @@ export function step(w: World): void {
   internSystem(w, STEP);
   registrarSystem(w, STEP);
   separationSystem(w, STEP);
+  telekinesisSystem(w, STEP);
+  propSystem(w, STEP);
+  propPushSystem(w, STEP);
   physicsSystem(w, STEP);
   bulletSystem(w, STEP);
   lifecycleSystem(w, STEP);

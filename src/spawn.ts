@@ -1,5 +1,6 @@
 /** Фабрики сущностей: набор компонентов и ничего больше. */
 import { POSTS_BY_ID, POST_INSPECTOR, POST_INTERN, POST_REGISTRAR } from './data/posts';
+import { PROPS_BY_ID, PROP_CABINET, PROP_RUBBLE } from './data/props';
 import { WEAPON_FORMS } from './data/weaponForms';
 import { createEntity, type Entity, type Faction, type Shape, type World } from './ecs';
 import { PALETTE } from './palette';
@@ -40,6 +41,9 @@ export function spawnPlayer(w: World, x: number, y: number): Entity {
     charge: 0,
     queued: 0,
     queueTimer: 0,
+    energy: TUNING.telekinesis.energyMax,
+    energyDelay: 0,
+    held: -1,
     dashTime: 0,
     dashCooldown: 0,
     dashX: 1,
@@ -134,6 +138,49 @@ function attachBehaviour(w: World, e: Entity, post: string, x: number, y: number
       w.inspectorC.set(e, { axis: 0, aimX: 1, aimY: 0, shotsLeft: 0, shotTimer: 0 });
       break;
   }
+}
+
+/** Числа предмета: прочность, размер, масса, разгон при броске. */
+export interface PropNumbers {
+  radius: number;
+  hp: number;
+  mass: number;
+  speedFactor: number;
+}
+
+export function propNumbers(kind: string): PropNumbers {
+  switch (kind) {
+    case PROP_CABINET:
+      return TUNING.prop.cabinet;
+    case PROP_RUBBLE:
+      return TUNING.prop.rubble;
+    default:
+      return TUNING.prop.chair;
+  }
+}
+
+export function spawnProp(w: World, kind: string, x: number, y: number): Entity {
+  const spec = PROPS_BY_ID.get(kind);
+  const numbers = propNumbers(kind);
+  const e = createEntity(w);
+  w.transform.set(e, { x, y, px: x, py: y });
+  w.body.set(e, { vx: 0, vy: 0, radius: numbers.radius });
+  w.health.set(e, { hp: numbers.hp, max: numbers.hp, iframes: 0, flash: 0 });
+  w.propC.set(e, {
+    kind,
+    title: spec === undefined ? kind.toUpperCase() : spec.title,
+    phase: 'idle',
+    mass: numbers.mass,
+    lastHit: -1,
+  });
+  w.drawC.set(e, {
+    shape: 'square',
+    size: numbers.radius,
+    color: PALETTE.concreteMid,
+    hollow: spec !== undefined && spec.hollow,
+    desk: false,
+  });
+  return e;
 }
 
 /** Спецификация снаряда: у каждого стрелка своя. */

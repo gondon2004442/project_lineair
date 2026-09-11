@@ -8,6 +8,9 @@ export function lifecycleSystem(w: World, dt: number): void {
     h.flash = Math.max(0, h.flash - dt);
     if (h.hp > 0) continue;
 
+    // Разрушение предметов ведёт своя система: она оставляет обломок.
+    if (w.propC.has(e)) continue;
+
     if (e === w.player) {
       if (w.status !== 'dead') {
         w.status = 'dead';
