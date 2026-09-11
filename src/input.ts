@@ -14,6 +14,8 @@ export interface InputSnapshot {
   fireHeld: boolean;
   /** Рывок запрошен и ещё не израсходован. */
   dashQueued: boolean;
+  /** На сколько форм провернули колесо и ещё не отработали. */
+  formStep: number;
 }
 
 export interface InputDevice {
@@ -23,6 +25,7 @@ export interface InputDevice {
   /** Подписки на служебные клавиши: рестарт и хитбоксы. */
   onRestart(handler: () => void): void;
   onToggleHitboxes(handler: () => void): void;
+  onToggleDossier(handler: () => void): void;
 }
 
 const MOVE_KEYS: Record<string, [number, number]> = {
@@ -40,11 +43,13 @@ export function createInput(target: HTMLElement): InputDevice {
     aimY: 0,
     fireHeld: false,
     dashQueued: false,
+    formStep: 0,
   };
   const held = new Set<string>();
   let project = (sx: number, sy: number): { x: number; y: number } => ({ x: sx, y: sy });
   let restart = (): void => {};
   let toggleHitboxes = (): void => {};
+  let toggleDossier = (): void => {};
 
   const recomputeMove = (): void => {
     let mx = 0;
@@ -72,6 +77,10 @@ export function createInput(target: HTMLElement): InputDevice {
       restart();
       return;
     }
+    if (ev.code === 'KeyI') {
+      toggleDossier();
+      return;
+    }
     if (ev.code === 'ShiftLeft' || ev.code === 'ShiftRight') {
       snapshot.dashQueued = true;
       return;
@@ -91,6 +100,7 @@ export function createInput(target: HTMLElement): InputDevice {
     held.clear();
     recomputeMove();
     snapshot.fireHeld = false;
+    snapshot.formStep = 0;
   });
 
   target.addEventListener('pointermove', (ev) => {
@@ -110,6 +120,16 @@ export function createInput(target: HTMLElement): InputDevice {
     if (ev.button === 0) snapshot.fireHeld = false;
   });
 
+  target.addEventListener(
+    'wheel',
+    (ev) => {
+      ev.preventDefault();
+      if (ev.deltaY === 0) return;
+      snapshot.formStep += ev.deltaY > 0 ? 1 : -1;
+    },
+    { passive: false },
+  );
+
   window.addEventListener('contextmenu', (ev) => ev.preventDefault());
 
   return {
@@ -122,6 +142,9 @@ export function createInput(target: HTMLElement): InputDevice {
     },
     onToggleHitboxes(handler) {
       toggleHitboxes = handler;
+    },
+    onToggleDossier(handler) {
+      toggleDossier = handler;
     },
   };
 }

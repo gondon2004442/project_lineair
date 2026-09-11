@@ -17,6 +17,7 @@ async function boot(): Promise<void> {
   const hudLeft = document.getElementById('hud-left');
   const hudRight = document.getElementById('hud-right');
   const hudMap = document.getElementById('hud-map');
+  const hudDossier = document.getElementById('hud-dossier');
   const hudBanner = document.getElementById('hud-banner');
   const panelHost = document.getElementById('panel');
   if (
@@ -24,6 +25,7 @@ async function boot(): Promise<void> {
     hudLeft === null ||
     hudRight === null ||
     hudMap === null ||
+    hudDossier === null ||
     hudBanner === null ||
     panelHost === null
   ) {
@@ -32,7 +34,7 @@ async function boot(): Promise<void> {
 
   const renderer = await createRenderer(host);
   const input = createInput(renderer.app.canvas);
-  const hud = createHud(hudLeft, hudRight, hudMap, hudBanner);
+  const hud = createHud(hudLeft, hudRight, hudMap, hudDossier, hudBanner);
 
   // Панель поднимается первой: она восстанавливает значения прошлого сеанса,
   // и первый же мир должен собираться уже по ним.
@@ -55,6 +57,7 @@ async function boot(): Promise<void> {
   input.onToggleHitboxes(() => {
     renderer.showHitboxes = !renderer.showHitboxes;
   });
+  input.onToggleDossier(() => hud.toggleDossier());
 
   // Отладочный доступ из консоли: ручной прогон симуляции и проверка детерминизма.
   Object.defineProperty(window, 'lineair', {

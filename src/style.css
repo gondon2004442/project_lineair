@@ -306,3 +306,51 @@ body.panel-open #hud-right {
   display: block;
   margin-top: 8px;
 }
+
+/* --- Личное дело -------------------------------------------------------- */
+
+.hud-dossier {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(560px, 80vw);
+  max-height: 78vh;
+  overflow-y: auto;
+  padding: 14px 18px;
+  background: var(--black);
+  border: 2px solid var(--yellow);
+  pointer-events: auto;
+}
+
+.hud-dossier[hidden] {
+  display: none;
+}
+
+.hud-dossier b {
+  display: block;
+  color: var(--yellow);
+  letter-spacing: 0.22em;
+}
+
+.dossier-hint {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--concrete-mid);
+}
+
+.dossier-item {
+  padding: 8px 0;
+  border-top: 1px solid var(--concrete);
+}
+
+.dossier-code {
+  color: var(--red);
+  letter-spacing: 0.14em;
+}
+
+.dossier-line {
+  color: var(--concrete-light);
+  text-transform: none;
+  letter-spacing: 0.04em;
+}

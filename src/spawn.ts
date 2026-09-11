@@ -1,6 +1,7 @@
 /** Фабрики сущностей: набор компонентов и ничего больше. */
 import { POSTS_BY_ID, POST_INSPECTOR, POST_INTERN, POST_REGISTRAR } from './data/posts';
-import { createEntity, type Entity, type Faction, type World } from './ecs';
+import { WEAPON_FORMS } from './data/weaponForms';
+import { createEntity, type Entity, type Faction, type Shape, type World } from './ecs';
 import { PALETTE } from './palette';
 import { TUNING } from './tuning';
 
@@ -31,6 +32,13 @@ export function spawnPlayer(w: World, x: number, y: number): Entity {
     aimY: 0,
     phase: 'normal',
     fireCooldown: 0,
+    form: 0,
+    switchCooldown: 0,
+    ammo: WEAPON_FORMS.map((form) => Math.max(1, Math.round(TUNING.weapon[form.id].ammoMax))),
+    regenDelay: WEAPON_FORMS.map(() => 0),
+    charge: 0,
+    queued: 0,
+    queueTimer: 0,
     dashTime: 0,
     dashCooldown: 0,
     dashX: 1,
@@ -133,6 +141,11 @@ export interface BulletSpec {
   radius: number;
   damage: number;
   life: number;
+  /** Сколько тел пробивает. */
+  pierce?: number;
+  /** Доворот на цель, радиан в секунду. */
+  homing?: number;
+  shape?: Shape;
 }
 
 export function spawnBullet(
@@ -147,9 +160,16 @@ export function spawnBullet(
   const e = createEntity(w);
   w.transform.set(e, { x, y, px: x, py: y });
   w.body.set(e, { vx: dirX * spec.speed, vy: dirY * spec.speed, radius: spec.radius });
-  w.bulletC.set(e, { faction, damage: spec.damage, life: spec.life });
+  w.bulletC.set(e, {
+    faction,
+    damage: spec.damage,
+    life: spec.life,
+    pierce: spec.pierce ?? 0,
+    homing: spec.homing ?? 0,
+    lastHit: -1,
+  });
   w.drawC.set(e, {
-    shape: faction === 'player' ? 'dot' : 'diamond',
+    shape: spec.shape ?? (faction === 'player' ? 'dot' : 'diamond'),
     size: spec.radius,
     color: faction === 'player' ? PALETTE.yellow : PALETTE.red,
     hollow: false,

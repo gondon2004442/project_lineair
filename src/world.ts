@@ -31,6 +31,7 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     status: 'playing',
     player: -1,
     roster: [],
+    build: [],
     metronome: TUNING.post.inspector.metronomeInterval,
     beat: 0,
     nextEntity: 1,

@@ -56,19 +56,90 @@ export const TUNING = {
     recoil: 35,
   },
 
-  playerBullet: {
-    speed: 1050,
-    radius: 3.5,
-    damage: 1,
-    /** Время жизни, если ни во что не попал. */
-    life: 1.1,
-    /** Разброс от линии прицела. */
-    spreadDeg: 0.6,
-    /** Интервал между выстрелами при зажатой ЛКМ. */
-    interval: 0.11,
+  /**
+   * Одно оружие, четыре формы. Переключение колесом мыши.
+   * У каждой формы свой регенерирующий боезапас: пока бьёшь одной,
+   * вторая восполняется.
+   */
+  weapon: {
     /** Вынос точки вылета от центра субъекта. */
     muzzle: 16,
+    /** Пауза после переключения формы. */
+    switchCooldown: 0.12,
+
+    /** Точная одиночная. */
+    precise: {
+      damage: 1,
+      speed: 1050,
+      radius: 3.5,
+      life: 1.1,
+      spreadDeg: 0.6,
+      interval: 0.11,
+      cost: 1,
+      ammoMax: 14,
+      /** Восполнение боезапаса в секунду. */
+      regen: 3.2,
+      /** Пауза после выстрела, прежде чем боезапас пойдёт в рост. */
+      regenDelay: 0.45,
+    },
+
+    /** Дробовая: сноп на короткую дистанцию. */
+    scatter: {
+      damage: 1,
+      speed: 760,
+      /** Разнобой скоростей внутри снопа. */
+      speedJitter: 120,
+      radius: 3,
+      life: 0.34,
+      spreadDeg: 26,
+      pellets: 7,
+      interval: 0.5,
+      cost: 4,
+      ammoMax: 14,
+      regen: 2.1,
+      regenDelay: 0.8,
+    },
+
+    /** Зарядная пробивающая: держишь ЛКМ, отпускаешь — бьёшь насквозь. */
+    lance: {
+      /** Урон без заряда и на полном заряде. */
+      damage: 2,
+      damageCharged: 7,
+      speed: 1400,
+      radius: 6,
+      life: 1.4,
+      /** Сколько тел пробивает. */
+      pierce: 4,
+      /** Время полного заряда. */
+      chargeTime: 0.8,
+      /** Раньше этого заряда выстрела не будет и боезапас не тратится. */
+      minCharge: 0.18,
+      cost: 6,
+      ammoMax: 14,
+      regen: 1.7,
+      regenDelay: 1,
+    },
+
+    /** Залповая с самонаведением. */
+    volley: {
+      damage: 1,
+      speed: 540,
+      radius: 4,
+      life: 2.4,
+      /** Снарядов в залпе и промежуток между ними. */
+      count: 5,
+      gap: 0.07,
+      /** Скорость доворота на цель, градусов в секунду. */
+      homingDeg: 260,
+      spreadDeg: 40,
+      interval: 0.85,
+      cost: 5,
+      ammoMax: 14,
+      regen: 1.5,
+      regenDelay: 0.9,
+    },
   },
+
 
   floor: {
     /** Сколько помещений на этаже. */
@@ -89,6 +160,8 @@ export const TUNING = {
     staffScale: 1,
     /** Смещение seed для каждого помещения: порядок обхода не влияет на расстановку. */
     roomSeedStride: 0x9e3779b1,
+    /** Смещение seed для выдачи предмета за участок. */
+    itemSeedStride: 0x85ebca6b,
     /** Сколько раз пытаться подобрать точку появления, прежде чем взять любую. */
     spawnAttempts: 200,
   },
@@ -235,6 +308,8 @@ export const TUNING = {
     vacancyMark: 4,
     vacancyGap: 3,
     vacancyLift: 12,
+    /** Во сколько раз стрела зарядной формы длиннее своей ширины. */
+    barLengthFactor: 3,
     /** Толщина контура полого силуэта. */
     hollowWidth: 2,
     /** Толщина контуров хитбоксов. */
@@ -247,6 +322,8 @@ export const TUNING = {
     mapStep: 20,
     mapStroke: 1,
     mapLink: 2,
+    /** Длина полоски боезапаса в знаках. */
+    gaugeWidth: 14,
     /** Отступ метки конечного помещения. */
     mapEndInset: 4,
   },
@@ -313,14 +390,64 @@ export const PANEL: TuningGroup[] = [
     ],
   },
   {
-    title: 'ОГОНЬ СУБЪЕКТА',
+    title: 'ФОРМА: ТОЧНАЯ',
     fields: [
-      { path: 'playerBullet.speed', label: 'СКОРОСТЬ ПУЛИ', min: 150, max: 1800, step: 10 },
-      { path: 'playerBullet.interval', label: 'ТЕМП', min: 0.03, max: 0.6, step: 0.01 },
-      { path: 'playerBullet.spreadDeg', label: 'РАЗБРОС', min: 0, max: 25, step: 0.2 },
-      { path: 'playerBullet.damage', label: 'УРОН', min: 1, max: 6, step: 1 },
-      { path: 'playerBullet.life', label: 'ДАЛЬНОБОЙНОСТЬ', min: 0.2, max: 4, step: 0.1 },
-      { path: 'playerBullet.radius', label: 'РАЗМЕР ПУЛИ', min: 1, max: 14, step: 0.5 },
+      { path: 'weapon.precise.damage', label: 'УРОН', min: 1, max: 10, step: 1 },
+      { path: 'weapon.precise.speed', label: 'СКОРОСТЬ', min: 150, max: 1800, step: 10 },
+      { path: 'weapon.precise.interval', label: 'ТЕМП', min: 0.03, max: 0.6, step: 0.01 },
+      { path: 'weapon.precise.spreadDeg', label: 'РАЗБРОС', min: 0, max: 25, step: 0.2 },
+      { path: 'weapon.precise.life', label: 'ДАЛЬНОБОЙНОСТЬ', min: 0.2, max: 4, step: 0.1 },
+      { path: 'weapon.precise.radius', label: 'РАЗМЕР', min: 1, max: 14, step: 0.5 },
+      { path: 'weapon.precise.cost', label: 'РАСХОД', min: 0, max: 10, step: 1 },
+      { path: 'weapon.precise.ammoMax', label: 'БОЕЗАПАС', min: 1, max: 60, step: 1 },
+      { path: 'weapon.precise.regen', label: 'ВОСПОЛНЕНИЕ', min: 0.1, max: 20, step: 0.1 },
+      { path: 'weapon.precise.regenDelay', label: 'ПАУЗА ВОСПОЛНЕНИЯ', min: 0, max: 3, step: 0.05 },
+    ],
+  },
+  {
+    title: 'ФОРМА: ДРОБОВАЯ',
+    fields: [
+      { path: 'weapon.scatter.damage', label: 'УРОН ДРОБИНЫ', min: 1, max: 10, step: 1 },
+      { path: 'weapon.scatter.pellets', label: 'ДРОБИН В СНОПЕ', min: 1, max: 24, step: 1 },
+      { path: 'weapon.scatter.spreadDeg', label: 'РАСКРЫВ СНОПА', min: 2, max: 120, step: 1 },
+      { path: 'weapon.scatter.speed', label: 'СКОРОСТЬ', min: 150, max: 1600, step: 10 },
+      { path: 'weapon.scatter.speedJitter', label: 'РАЗНОБОЙ СКОРОСТЕЙ', min: 0, max: 400, step: 10 },
+      { path: 'weapon.scatter.life', label: 'ДАЛЬНОБОЙНОСТЬ', min: 0.1, max: 2, step: 0.02 },
+      { path: 'weapon.scatter.interval', label: 'ТЕМП', min: 0.1, max: 2, step: 0.05 },
+      { path: 'weapon.scatter.cost', label: 'РАСХОД', min: 0, max: 14, step: 1 },
+      { path: 'weapon.scatter.ammoMax', label: 'БОЕЗАПАС', min: 1, max: 60, step: 1 },
+      { path: 'weapon.scatter.regen', label: 'ВОСПОЛНЕНИЕ', min: 0.1, max: 20, step: 0.1 },
+    ],
+  },
+  {
+    title: 'ФОРМА: ЗАРЯДНАЯ',
+    fields: [
+      { path: 'weapon.lance.damage', label: 'УРОН БЕЗ ЗАРЯДА', min: 1, max: 20, step: 1 },
+      { path: 'weapon.lance.damageCharged', label: 'УРОН НА ПОЛНОМ', min: 1, max: 40, step: 1 },
+      { path: 'weapon.lance.pierce', label: 'ПРОБИВАЕТ ТЕЛ', min: 0, max: 20, step: 1 },
+      { path: 'weapon.lance.chargeTime', label: 'ВРЕМЯ ЗАРЯДА', min: 0.1, max: 3, step: 0.05 },
+      { path: 'weapon.lance.minCharge', label: 'ПОРОГ ВЫСТРЕЛА', min: 0, max: 1, step: 0.02 },
+      { path: 'weapon.lance.speed', label: 'СКОРОСТЬ', min: 200, max: 2500, step: 20 },
+      { path: 'weapon.lance.life', label: 'ДАЛЬНОБОЙНОСТЬ', min: 0.2, max: 4, step: 0.1 },
+      { path: 'weapon.lance.cost', label: 'РАСХОД', min: 0, max: 14, step: 1 },
+      { path: 'weapon.lance.ammoMax', label: 'БОЕЗАПАС', min: 1, max: 60, step: 1 },
+      { path: 'weapon.lance.regen', label: 'ВОСПОЛНЕНИЕ', min: 0.1, max: 20, step: 0.1 },
+    ],
+  },
+  {
+    title: 'ФОРМА: ЗАЛПОВАЯ',
+    fields: [
+      { path: 'weapon.volley.damage', label: 'УРОН', min: 1, max: 10, step: 1 },
+      { path: 'weapon.volley.count', label: 'СНАРЯДОВ В ЗАЛПЕ', min: 1, max: 16, step: 1 },
+      { path: 'weapon.volley.homingDeg', label: 'ДОВОРОТ, ГРАД/С', min: 0, max: 900, step: 10 },
+      { path: 'weapon.volley.speed', label: 'СКОРОСТЬ', min: 100, max: 1200, step: 10 },
+      { path: 'weapon.volley.spreadDeg', label: 'РАЗЛЁТ ЗАЛПА', min: 0, max: 180, step: 2 },
+      { path: 'weapon.volley.gap', label: 'ПРОМЕЖУТОК В ЗАЛПЕ', min: 0, max: 0.5, step: 0.01 },
+      { path: 'weapon.volley.life', label: 'ДАЛЬНОБОЙНОСТЬ', min: 0.2, max: 6, step: 0.1 },
+      { path: 'weapon.volley.interval', label: 'ТЕМП', min: 0.2, max: 3, step: 0.05 },
+      { path: 'weapon.volley.cost', label: 'РАСХОД', min: 0, max: 14, step: 1 },
+      { path: 'weapon.volley.ammoMax', label: 'БОЕЗАПАС', min: 1, max: 60, step: 1 },
+      { path: 'weapon.volley.regen', label: 'ВОСПОЛНЕНИЕ', min: 0.1, max: 20, step: 0.1 },
     ],
   },
   {
@@ -421,9 +548,9 @@ export const PRESETS: Record<string, TuningPatch> = {
     'player.dashCooldown': 0.6,
     'player.dashIFrames': 0.13,
     'player.dashExitFactor': 0.2,
-    'playerBullet.speed': 1050,
-    'playerBullet.interval': 0.11,
-    'playerBullet.spreadDeg': 0.6,
+    'weapon.precise.speed': 1050,
+    'weapon.precise.interval': 0.11,
+    'weapon.precise.spreadDeg': 0.6,
     'post.inspector.metronomeInterval': 1.5,
     'post.inspector.telegraphLead': 0.3,
     'enemyBullet.speed': 400,
@@ -448,9 +575,9 @@ export const PRESETS: Record<string, TuningPatch> = {
     'player.dashCooldown': 0.95,
     'player.dashIFrames': 0.2,
     'player.dashExitFactor': 0.85,
-    'playerBullet.speed': 700,
-    'playerBullet.interval': 0.17,
-    'playerBullet.spreadDeg': 3.5,
+    'weapon.precise.speed': 700,
+    'weapon.precise.interval': 0.17,
+    'weapon.precise.spreadDeg': 3.5,
     'post.inspector.accel': 380,
     'post.inspector.friction': 380,
     'post.inspector.metronomeInterval': 2.2,
@@ -475,10 +602,10 @@ export const PRESETS: Record<string, TuningPatch> = {
     'player.dashDistance': 210,
     'player.dashCooldown': 0.55,
     'player.dashIFrames': 0.16,
-    'playerBullet.speed': 780,
-    'playerBullet.interval': 0.1,
-    'playerBullet.spreadDeg': 2.5,
-    'playerBullet.radius': 4.5,
+    'weapon.precise.speed': 780,
+    'weapon.precise.interval': 0.1,
+    'weapon.precise.spreadDeg': 2.5,
+    'weapon.precise.radius': 4.5,
     'floor.staffScale': 2.4,
     'post.inspector.hp': 2,
     'post.inspector.speed': 78,

@@ -42,6 +42,18 @@ export interface PlayerC {
   aimY: number;
   phase: PlayerPhase;
   fireCooldown: number;
+  /** Индекс текущей формы оружия в WEAPON_FORMS. */
+  form: number;
+  /** Пауза после переключения формы. */
+  switchCooldown: number;
+  /** Боезапас по формам и пауза перед восполнением по формам. */
+  ammo: number[];
+  regenDelay: number[];
+  /** Накопленный заряд зарядной формы, секунды. */
+  charge: number;
+  /** Сколько снарядов залпа осталось выпустить и когда следующий. */
+  queued: number;
+  queueTimer: number;
   dashTime: number;
   dashCooldown: number;
   dashX: number;
@@ -112,9 +124,15 @@ export interface BulletC {
   faction: Faction;
   damage: number;
   life: number;
+  /** Сколько ещё тел пробьёт, прежде чем погаснуть. */
+  pierce: number;
+  /** Скорость доворота на цель, радиан в секунду. 0 — не наводится. */
+  homing: number;
+  /** Кого уже зацепил: пробивающий снаряд не бьёт одного дважды. */
+  lastHit: Entity;
 }
 
-export type Shape = 'square' | 'diamond' | 'dot';
+export type Shape = 'square' | 'diamond' | 'dot' | 'bar';
 
 export interface DrawC {
   shape: Shape;
@@ -151,6 +169,8 @@ export interface World {
   player: Entity;
   /** Штатное расписание текущего участка. */
   roster: RosterEntry[];
+  /** Выданные предметы: правки к параметрам оружия. */
+  build: string[];
   /** Общий метроном участка: по его долям бьют инспекторы. */
   metronome: number;
   /** Такт, на котором сейчас участок. */

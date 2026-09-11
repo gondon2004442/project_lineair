@@ -1,6 +1,8 @@
 /** Служебный оверлей: состояние субъекта, схема этажа, отладка, seed. */
 import { TEMPLATES_BY_ID } from './data/roomTemplates';
+import { ITEMS_BY_ID } from './data/items';
 import { POST_REGISTRAR } from './data/posts';
+import { WEAPON_FORMS } from './data/weaponForms';
 import { STAFFING_BY_ID } from './data/staffing';
 import { entityCount, type World } from './ecs';
 import { PALETTE } from './palette';
@@ -8,19 +10,23 @@ import { DIRS } from './room';
 import { formatSeed } from './rng';
 import { TUNING } from './tuning';
 import { hasRegistrar, vacancyCount } from './systems/staff';
+import { ammoMax, currentForm, formStat } from './weapon';
 import { clearedCount, currentRoom } from './world';
 
 export interface Hud {
   update(w: World, fps: number, hitboxes: boolean, dt: number): void;
+  toggleDossier(): void;
 }
 
 export function createHud(
   left: HTMLElement,
   right: HTMLElement,
   map: HTMLElement,
+  dossier: HTMLElement,
   banner: HTMLElement,
 ): Hud {
   let cooldown = 0;
+  let dossierOpen = false;
 
   const render = (w: World, fps: number, hitboxes: boolean): void => {
     const health = w.health.get(w.player);
@@ -36,6 +42,7 @@ export function createHud(
       row('ШТАТ НА УЧАСТКЕ', String(w.staffC.size)),
       row('ВАКАНСИЙ', vacancyLine(w)),
       row('ДВЕРИ', w.map.doorsLocked ? '<span class="warn">ЗАПЕРТЫ</span>' : '<span class="ok">ОТКРЫТЫ</span>'),
+      weaponRows(w),
     ].join('');
 
     right.innerHTML = [
@@ -45,7 +52,11 @@ export function createHud(
       row('ШАГ', String(w.tick)),
       row('F1 ХИТБОКСЫ', hitboxes ? '<span class="ok">ВКЛ</span>' : 'ВЫКЛ'),
       row('R', 'ПОВТОР'),
+      row('I ЛИЧНОЕ ДЕЛО', `${w.build.length} ПРЕДМЕТОВ`),
     ].join('');
+
+    dossier.hidden = !dossierOpen;
+    if (dossierOpen) dossier.innerHTML = dossierBody(w);
 
     const template = room === undefined ? undefined : TEMPLATES_BY_ID.get(room.template);
     const staffing = room === undefined ? undefined : STAFFING_BY_ID.get(room.staffing);
@@ -75,7 +86,59 @@ export function createHud(
       cooldown = TUNING.debug.overlayInterval;
       render(w, fps, hitboxes);
     },
+    toggleDossier() {
+      dossierOpen = !dossierOpen;
+      dossier.hidden = !dossierOpen;
+      // Следующий кадр оверлея соберёт содержимое.
+      cooldown = 0;
+    },
   };
+}
+
+/** Текущая форма, её боезапас и заряд. */
+function weaponRows(w: World): string {
+  const player = w.playerC.get(w.player);
+  if (player === undefined) return '';
+  const form = currentForm(w);
+  const index = WEAPON_FORMS.findIndex((f) => f.id === form.id);
+  const max = ammoMax(w, form.id);
+  const have = Math.floor(player.ammo[index] ?? 0);
+  const cost = Math.max(0, formStat(w, form.id, 'cost'));
+  const ready = have >= cost;
+
+  const rows = [
+    row('ФОРМА (КОЛЕСО)', `<span class="ok">${form.code} · ${form.title}</span>`),
+    row('БОЕЗАПАС', `<span class="${ready ? 'ok' : 'warn'}">${gauge(have, max)} ${have}/${max}</span>`),
+  ];
+  if (form.id === 'lance') {
+    const full = formStat(w, 'lance', 'chargeTime');
+    const ratio = full <= 0 ? 1 : Math.min(1, player.charge / full);
+    rows.push(row('ЗАРЯД', `<span class="ok">${gauge(Math.round(ratio * 10), 10)}</span>`));
+  }
+  return rows.join('');
+}
+
+/** Личное дело: служебные отчёты по выданным предметам. */
+function dossierBody(w: World): string {
+  const head = '<b>ЛИЧНОЕ ДЕЛО СУБЪЕКТА</b><span class="dossier-hint">[I] ЗАКРЫТЬ</span>';
+  if (w.build.length === 0) {
+    return `${head}<div class="dossier-item"><div class="dossier-line">ВЫДАЧ НЕ ЗАФИКСИРОВАНО.</div></div>`;
+  }
+  const blocks = w.build.map((id) => {
+    const item = ITEMS_BY_ID.get(id);
+    if (item === undefined) return '';
+    const lines = item.report.map((line) => `<div class="dossier-line">${line}</div>`).join('');
+    return `<div class="dossier-item"><div class="dossier-code">${item.code} · ${item.title}</div>${lines}</div>`;
+  });
+  return head + blocks.join('');
+}
+
+function gauge(current: number, max: number): string {
+  const width = Math.min(max, TUNING.hud.gaugeWidth);
+  const filled = max <= 0 ? 0 : Math.round((current / max) * width);
+  let out = '';
+  for (let i = 0; i < width; i++) out += i < filled ? '#' : '.';
+  return out;
 }
 
 /** Схема этажа: квадрат — помещение, черта — дверь. */

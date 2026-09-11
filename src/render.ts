@@ -213,6 +213,29 @@ function drawEntities(g: Graphics, w: World, alpha: number): void {
       case 'dot':
         g.rect(x - draw.size, y - draw.size, draw.size * 2, draw.size * 2).fill(color);
         break;
+      case 'bar': {
+        // Стрела зарядной формы: вытянута вдоль своей скорости.
+        const body = w.body.get(e);
+        const vx = body === undefined ? 1 : body.vx;
+        const vy = body === undefined ? 0 : body.vy;
+        const len = Math.hypot(vx, vy) || 1;
+        const ux = vx / len;
+        const uy = vy / len;
+        const half = draw.size * TUNING.render.barLengthFactor;
+        const px = -uy * draw.size;
+        const py = ux * draw.size;
+        g.poly([
+          x + ux * half + px,
+          y + uy * half + py,
+          x + ux * half - px,
+          y + uy * half - py,
+          x - ux * half - px,
+          y - uy * half - py,
+          x - ux * half + px,
+          y - uy * half + py,
+        ]).fill(color);
+        break;
+      }
     }
 
     const staff = w.staffC.get(e);
