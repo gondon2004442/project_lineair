@@ -16,6 +16,8 @@ export interface InputSnapshot {
   dashQueued: boolean;
   /** На сколько форм провернули колесо и ещё не отработали. */
   formStep: number;
+  /** Перезарядка запрошена и ещё не отработана. */
+  reloadQueued: boolean;
 }
 
 export interface InputDevice {
@@ -44,6 +46,7 @@ export function createInput(target: HTMLElement): InputDevice {
     fireHeld: false,
     dashQueued: false,
     formStep: 0,
+    reloadQueued: false,
   };
   const held = new Set<string>();
   let project = (sx: number, sy: number): { x: number; y: number } => ({ x: sx, y: sy });
@@ -73,8 +76,13 @@ export function createInput(target: HTMLElement): InputDevice {
       return;
     }
     if (ev.repeat) return;
-    if (ev.code === 'KeyR') {
+    if (ev.code === 'F2') {
+      ev.preventDefault();
       restart();
+      return;
+    }
+    if (ev.code === 'KeyR') {
+      snapshot.reloadQueued = true;
       return;
     }
     if (ev.code === 'KeyI') {
@@ -101,6 +109,7 @@ export function createInput(target: HTMLElement): InputDevice {
     recomputeMove();
     snapshot.fireHeld = false;
     snapshot.formStep = 0;
+    snapshot.reloadQueued = false;
   });
 
   target.addEventListener('pointermove', (ev) => {

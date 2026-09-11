@@ -1,7 +1,7 @@
 /**
  * Прицел, разгон, рывок и стрельба субъекта.
- * Формы оружия переключаются колесом, у каждой свой боезапас,
- * который восполняется, пока форма молчит.
+ * Формы оружия переключаются колесом, у каждой своя обойма.
+ * Перезарядка по R или сама, когда патронов на выстрел не хватило.
  */
 import { WEAPON_FORMS } from '../data/weaponForms';
 import type { PlayerC, World } from '../ecs';
@@ -39,17 +39,24 @@ export function playerControlSystem(w: World, dt: number): void {
   p.dashCooldown = Math.max(0, p.dashCooldown - dt);
   p.fireCooldown = Math.max(0, p.fireCooldown - dt);
   p.switchCooldown = Math.max(0, p.switchCooldown - dt);
-  regenAmmo(w, p, dt);
+  reloadTick(w, p, dt);
 
   if (w.input.formStep !== 0 && p.switchCooldown <= 0) {
     const count = WEAPON_FORMS.length;
     p.form = (((p.form + w.input.formStep) % count) + count) % count;
     p.switchCooldown = TUNING.weapon.switchCooldown;
-    // Незавершённые заряд и залп при смене формы сбрасываются.
+    // Незавершённые заряд, залп и перезарядка при смене формы сбрасываются.
     p.charge = 0;
     p.queued = 0;
+    p.reloading = false;
+    p.reloadTimer = 0;
   }
   w.input.formStep = 0;
+
+  if (w.input.reloadQueued) {
+    w.input.reloadQueued = false;
+    startReload(w, p);
+  }
 
   if (w.input.dashQueued) {
     w.input.dashQueued = false;
@@ -87,24 +94,33 @@ export function playerControlSystem(w: World, dt: number): void {
   fireSystem(w, p, t.x, t.y, dt);
 }
 
-function regenAmmo(w: World, p: PlayerC, dt: number): void {
-  for (let i = 0; i < WEAPON_FORMS.length; i++) {
-    const form = WEAPON_FORMS[i];
-    if (form === undefined) continue;
-    const delay = p.regenDelay[i] ?? 0;
-    if (delay > 0) {
-      p.regenDelay[i] = Math.max(0, delay - dt);
-      continue;
-    }
-    const max = ammoMax(w, form.id);
-    const current = Math.min(p.ammo[i] ?? max, max);
-    p.ammo[i] = Math.min(max, current + formStat(w, form.id, 'regen') * dt);
-  }
+function reloadTick(w: World, p: PlayerC, dt: number): void {
+  if (!p.reloading) return;
+  p.reloadTimer -= dt;
+  if (p.reloadTimer > 0) return;
+  const form = WEAPON_FORMS[p.form];
+  p.reloading = false;
+  p.reloadTimer = 0;
+  if (form === undefined) return;
+  p.ammo[p.form] = ammoMax(w, form.id);
+}
+
+/** Начать перезарядку текущей формы. Полная обойма — не повод. */
+export function startReload(w: World, p: PlayerC): boolean {
+  const form = WEAPON_FORMS[p.form];
+  if (form === undefined || p.reloading) return false;
+  if ((p.ammo[p.form] ?? 0) >= ammoMax(w, form.id)) return false;
+  p.reloading = true;
+  p.reloadTimer = formStat(w, form.id, 'reloadTime');
+  // Недобранный заряд и недострелянный залп перезарядка отменяет.
+  p.charge = 0;
+  p.queued = 0;
+  return true;
 }
 
 function fireSystem(w: World, p: PlayerC, x: number, y: number, dt: number): void {
   const form = WEAPON_FORMS[p.form];
-  if (form === undefined || w.status === 'dead') return;
+  if (form === undefined || w.status === 'dead' || p.reloading) return;
 
   // Залп доигрывается сам, даже если ЛКМ уже отпущена.
   if (p.queued > 0) {
@@ -118,6 +134,12 @@ function fireSystem(w: World, p: PlayerC, x: number, y: number, dt: number): voi
   }
 
   if (form.id === 'lance') {
+    // Не набираем заряд впустую: пустая обойма уходит в перезарядку сразу.
+    if (w.input.fireHeld && (p.ammo[p.form] ?? 0) < Math.max(0, formStat(w, 'lance', 'cost'))) {
+      p.charge = 0;
+      startReload(w, p);
+      return;
+    }
     if (w.input.fireHeld) {
       p.charge = Math.min(formStat(w, 'lance', 'chargeTime'), p.charge + dt);
       return;
@@ -154,15 +176,17 @@ function fireSystem(w: World, p: PlayerC, x: number, y: number, dt: number): voi
   }
 }
 
-/** Списать боезапас формы. Не хватило — выстрела нет. */
+/** Списать патроны. Не хватило — уходим в перезарядку вместо выстрела. */
 function spend(w: World, p: PlayerC, formId: string): boolean {
   const index = WEAPON_FORMS.findIndex((form) => form.id === formId);
   if (index < 0) return false;
   const cost = Math.max(0, formStat(w, formId, 'cost'));
   const have = p.ammo[index] ?? 0;
-  if (have < cost) return false;
+  if (have < cost) {
+    startReload(w, p);
+    return false;
+  }
   p.ammo[index] = have - cost;
-  p.regenDelay[index] = formStat(w, formId, 'regenDelay');
   return true;
 }
 

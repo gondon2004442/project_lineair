@@ -58,8 +58,9 @@ export const TUNING = {
 
   /**
    * Одно оружие, четыре формы. Переключение колесом мыши.
-   * У каждой формы свой регенерирующий боезапас: пока бьёшь одной,
-   * вторая восполняется.
+   * У каждой формы своя обойма: перезарядка по R, запас патронов не
+   * ограничен. Обоймы не общие, поэтому переключиться на заряженную форму —
+   * это всегда быстрее, чем перезарядить текущую.
    */
   weapon: {
     /** Вынос точки вылета от центра субъекта. */
@@ -77,10 +78,8 @@ export const TUNING = {
       interval: 0.11,
       cost: 1,
       ammoMax: 14,
-      /** Восполнение боезапаса в секунду. */
-      regen: 3.2,
-      /** Пауза после выстрела, прежде чем боезапас пойдёт в рост. */
-      regenDelay: 0.45,
+      /** Сколько длится перезарядка обоймы. */
+      reloadTime: 0.95,
     },
 
     /** Дробовая: сноп на короткую дистанцию. */
@@ -96,8 +95,8 @@ export const TUNING = {
       interval: 0.5,
       cost: 4,
       ammoMax: 14,
-      regen: 2.1,
-      regenDelay: 0.8,
+      /** Сколько длится перезарядка обоймы. */
+      reloadTime: 1.4,
     },
 
     /** Зарядная пробивающая: держишь ЛКМ, отпускаешь — бьёшь насквозь. */
@@ -116,8 +115,8 @@ export const TUNING = {
       minCharge: 0.18,
       cost: 6,
       ammoMax: 14,
-      regen: 1.7,
-      regenDelay: 1,
+      /** Сколько длится перезарядка обоймы. */
+      reloadTime: 1.6,
     },
 
     /** Залповая с самонаведением. */
@@ -135,8 +134,8 @@ export const TUNING = {
       interval: 0.85,
       cost: 5,
       ammoMax: 14,
-      regen: 1.5,
-      regenDelay: 0.9,
+      /** Сколько длится перезарядка обоймы. */
+      reloadTime: 1.45,
     },
   },
 
@@ -399,9 +398,8 @@ export const PANEL: TuningGroup[] = [
       { path: 'weapon.precise.life', label: 'ДАЛЬНОБОЙНОСТЬ', min: 0.2, max: 4, step: 0.1 },
       { path: 'weapon.precise.radius', label: 'РАЗМЕР', min: 1, max: 14, step: 0.5 },
       { path: 'weapon.precise.cost', label: 'РАСХОД', min: 0, max: 10, step: 1 },
-      { path: 'weapon.precise.ammoMax', label: 'БОЕЗАПАС', min: 1, max: 60, step: 1 },
-      { path: 'weapon.precise.regen', label: 'ВОСПОЛНЕНИЕ', min: 0.1, max: 20, step: 0.1 },
-      { path: 'weapon.precise.regenDelay', label: 'ПАУЗА ВОСПОЛНЕНИЯ', min: 0, max: 3, step: 0.05 },
+      { path: 'weapon.precise.ammoMax', label: 'ОБОЙМА', min: 1, max: 60, step: 1 },
+      { path: 'weapon.precise.reloadTime', label: 'ПЕРЕЗАРЯДКА', min: 0.1, max: 5, step: 0.05 },
     ],
   },
   {
@@ -415,8 +413,8 @@ export const PANEL: TuningGroup[] = [
       { path: 'weapon.scatter.life', label: 'ДАЛЬНОБОЙНОСТЬ', min: 0.1, max: 2, step: 0.02 },
       { path: 'weapon.scatter.interval', label: 'ТЕМП', min: 0.1, max: 2, step: 0.05 },
       { path: 'weapon.scatter.cost', label: 'РАСХОД', min: 0, max: 14, step: 1 },
-      { path: 'weapon.scatter.ammoMax', label: 'БОЕЗАПАС', min: 1, max: 60, step: 1 },
-      { path: 'weapon.scatter.regen', label: 'ВОСПОЛНЕНИЕ', min: 0.1, max: 20, step: 0.1 },
+      { path: 'weapon.scatter.ammoMax', label: 'ОБОЙМА', min: 1, max: 60, step: 1 },
+      { path: 'weapon.scatter.reloadTime', label: 'ПЕРЕЗАРЯДКА', min: 0.1, max: 5, step: 0.05 },
     ],
   },
   {
@@ -430,8 +428,8 @@ export const PANEL: TuningGroup[] = [
       { path: 'weapon.lance.speed', label: 'СКОРОСТЬ', min: 200, max: 2500, step: 20 },
       { path: 'weapon.lance.life', label: 'ДАЛЬНОБОЙНОСТЬ', min: 0.2, max: 4, step: 0.1 },
       { path: 'weapon.lance.cost', label: 'РАСХОД', min: 0, max: 14, step: 1 },
-      { path: 'weapon.lance.ammoMax', label: 'БОЕЗАПАС', min: 1, max: 60, step: 1 },
-      { path: 'weapon.lance.regen', label: 'ВОСПОЛНЕНИЕ', min: 0.1, max: 20, step: 0.1 },
+      { path: 'weapon.lance.ammoMax', label: 'ОБОЙМА', min: 1, max: 60, step: 1 },
+      { path: 'weapon.lance.reloadTime', label: 'ПЕРЕЗАРЯДКА', min: 0.1, max: 5, step: 0.05 },
     ],
   },
   {
@@ -446,8 +444,8 @@ export const PANEL: TuningGroup[] = [
       { path: 'weapon.volley.life', label: 'ДАЛЬНОБОЙНОСТЬ', min: 0.2, max: 6, step: 0.1 },
       { path: 'weapon.volley.interval', label: 'ТЕМП', min: 0.2, max: 3, step: 0.05 },
       { path: 'weapon.volley.cost', label: 'РАСХОД', min: 0, max: 14, step: 1 },
-      { path: 'weapon.volley.ammoMax', label: 'БОЕЗАПАС', min: 1, max: 60, step: 1 },
-      { path: 'weapon.volley.regen', label: 'ВОСПОЛНЕНИЕ', min: 0.1, max: 20, step: 0.1 },
+      { path: 'weapon.volley.ammoMax', label: 'ОБОЙМА', min: 1, max: 60, step: 1 },
+      { path: 'weapon.volley.reloadTime', label: 'ПЕРЕЗАРЯДКА', min: 0.1, max: 5, step: 0.05 },
     ],
   },
   {

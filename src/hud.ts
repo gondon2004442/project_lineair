@@ -51,7 +51,7 @@ export function createHud(
       row('СУЩНОСТЕЙ', String(entityCount(w))),
       row('ШАГ', String(w.tick)),
       row('F1 ХИТБОКСЫ', hitboxes ? '<span class="ok">ВКЛ</span>' : 'ВЫКЛ'),
-      row('R', 'ПОВТОР'),
+      row('F2', 'ПОВТОР'),
       row('I ЛИЧНОЕ ДЕЛО', `${w.build.length} ПРЕДМЕТОВ`),
     ].join('');
 
@@ -70,10 +70,10 @@ export function createHud(
 
     if (w.status === 'dead') {
       banner.hidden = false;
-      banner.innerHTML = '<b>СУБЪЕКТ ЛИКВИДИРОВАН</b><span>[R] ПОВТОРИТЬ ИСПЫТАНИЕ</span>';
+      banner.innerHTML = '<b>СУБЪЕКТ ЛИКВИДИРОВАН</b><span>[F2] ПОВТОРИТЬ ИСПЫТАНИЕ</span>';
     } else if (w.status === 'cleared') {
       banner.hidden = false;
-      banner.innerHTML = '<b>ЭТАЖ ЗАЧИЩЕН</b><span>[R] ПОВТОРИТЬ ИСПЫТАНИЕ</span>';
+      banner.innerHTML = '<b>ЭТАЖ ЗАЧИЩЕН</b><span>[F2] ПОВТОРИТЬ ИСПЫТАНИЕ</span>';
     } else {
       banner.hidden = true;
     }
@@ -106,11 +106,20 @@ function weaponRows(w: World): string {
   const cost = Math.max(0, formStat(w, form.id, 'cost'));
   const ready = have >= cost;
 
-  const rows = [
-    row('ФОРМА (КОЛЕСО)', `<span class="ok">${form.code} · ${form.title}</span>`),
-    row('БОЕЗАПАС', `<span class="${ready ? 'ok' : 'warn'}">${gauge(have, max)} ${have}/${max}</span>`),
-  ];
-  if (form.id === 'lance') {
+  const rows = [row('ФОРМА (КОЛЕСО)', `<span class="ok">${form.code} · ${form.title}</span>`)];
+
+  if (player.reloading) {
+    const full = formStat(w, form.id, 'reloadTime');
+    const done = full <= 0 ? 1 : Math.max(0, Math.min(1, 1 - player.reloadTimer / full));
+    rows.push(
+      row('ПЕРЕЗАРЯДКА', `<span class="warn">${gauge(Math.round(done * 10), 10)}</span>`),
+    );
+  } else {
+    rows.push(
+      row('ОБОЙМА (R)', `<span class="${ready ? 'ok' : 'warn'}">${gauge(have, max)} ${have}/${max}</span>`),
+    );
+  }
+  if (form.id === 'lance' && !player.reloading) {
     const full = formStat(w, 'lance', 'chargeTime');
     const ratio = full <= 0 ? 1 : Math.min(1, player.charge / full);
     rows.push(row('ЗАРЯД', `<span class="ok">${gauge(Math.round(ratio * 10), 10)}</span>`));
