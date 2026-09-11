@@ -1,11 +1,12 @@
 /**
  * Инспектор. Ходит как ладья: только по осям, повороты на 90 градусов.
- * Стреляет строго по доле общего метронома и строго вдоль оси —
- * поэтому убивается позиционированием: сойди с его линии.
+ * Стреляет строго по доле общего метронома — прямо в субъекта.
+ * Направление защёлкивается на доле и дальше не ведётся: линию огня видно
+ * заранее, уходить от неё надо движением, а не стоянием вне оси.
  */
 import type { World } from '../ecs';
 import { spawnBullet } from '../spawn';
-import { TUNING } from '../tuning';
+import { DEG, TUNING } from '../tuning';
 import { approach } from './staff';
 
 export function inspectorSystem(w: World, dt: number, beatStruck: boolean): void {
@@ -49,24 +50,29 @@ export function inspectorSystem(w: World, dt: number, beatStruck: boolean): void
       if (beatStruck) {
         inspector.shotsLeft = Math.max(1, Math.round(cfg.shotsPerBeat));
         inspector.shotTimer = 0;
-        // Прицел защёлкивается на такте и уже не ведётся: строго по оси.
-        const axis = snapToAxis(dx, dy);
-        inspector.aimX = axis.x;
-        inspector.aimY = axis.y;
+        // Прицел защёлкивается на доле и дальше не ведётся.
+        const len = Math.hypot(dx, dy) || 1;
+        inspector.aimX = dx / len;
+        inspector.aimY = dy / len;
       }
 
       if (inspector.shotsLeft > 0) {
         inspector.shotTimer -= dt;
         if (inspector.shotTimer <= 0) {
           const muzzle = b.radius + TUNING.enemyBullet.radius;
+          const angle =
+            Math.atan2(inspector.aimY, inspector.aimX) +
+            w.rng.spread(TUNING.enemyBullet.spreadDeg * DEG);
+          const dirX = Math.cos(angle);
+          const dirY = Math.sin(angle);
           spawnBullet(
             w,
             'enemy',
             TUNING.enemyBullet,
-            t.x + inspector.aimX * muzzle,
-            t.y + inspector.aimY * muzzle,
-            inspector.aimX,
-            inspector.aimY,
+            t.x + dirX * muzzle,
+            t.y + dirY * muzzle,
+            dirX,
+            dirY,
           );
           inspector.shotsLeft -= 1;
           inspector.shotTimer = cfg.shotGap;
@@ -79,10 +85,4 @@ export function inspectorSystem(w: World, dt: number, beatStruck: boolean): void
     b.vx = approach(b.vx, desiredVx, rate);
     b.vy = approach(b.vy, desiredVy, rate);
   }
-}
-
-/** Ближайшая из четырёх осей. Диагоналей у инспектора не бывает. */
-function snapToAxis(dx: number, dy: number): { x: number; y: number } {
-  if (Math.abs(dx) >= Math.abs(dy)) return { x: Math.sign(dx) || 1, y: 0 };
-  return { x: 0, y: Math.sign(dy) || 1 };
 }

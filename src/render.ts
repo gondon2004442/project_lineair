@@ -134,7 +134,7 @@ function lerp(prev: number, next: number, alpha: number): number {
 function drawEntities(g: Graphics, w: World, alpha: number): void {
   const time = w.tick * STEP;
 
-  // Линия огня инспектора: пока табличка горит, видно, с какой оси уходить.
+  // Линия огня инспектора: пока табличка горит, видно, откуда уходить.
   for (const [e, inspector] of w.inspectorC) {
     const staff = w.staffC.get(e);
     const t = w.transform.get(e);
@@ -142,10 +142,13 @@ function drawEntities(g: Graphics, w: World, alpha: number): void {
     if (staff === undefined || staff.plateFlash <= 0 || t === undefined || pt === undefined) continue;
     const x = lerp(t.px, t.x, alpha);
     const y = lerp(t.py, t.y, alpha);
+    const dx = pt.x - t.x;
+    const dy = pt.y - t.y;
+    const len = Math.hypot(dx, dy) || 1;
     const aim =
       inspector.shotsLeft > 0
         ? { x: inspector.aimX, y: inspector.aimY }
-        : snapAxis(pt.x - t.x, pt.y - t.y);
+        : { x: dx / len, y: dy / len };
     g.moveTo(x, y)
       .lineTo(x + aim.x * TUNING.render.telegraphRay, y + aim.y * TUNING.render.telegraphRay)
       .stroke({ width: TUNING.render.telegraphWidth, color: PALETTE.yellow, alpha: 0.55 });
@@ -252,11 +255,6 @@ function drawVacancyCount(g: Graphics, x: number, y: number, size: number, open:
     g.rect(cursor, top, mark, mark).fill(PALETTE.yellow);
     cursor += mark + gap;
   }
-}
-
-function snapAxis(dx: number, dy: number): { x: number; y: number } {
-  if (Math.abs(dx) >= Math.abs(dy)) return { x: Math.sign(dx) || 1, y: 0 };
-  return { x: 0, y: Math.sign(dy) || 1 };
 }
 
 function drawHitboxes(g: Graphics, w: World, alpha: number): void {
