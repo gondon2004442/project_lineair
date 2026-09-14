@@ -304,6 +304,35 @@ export const TUNING = {
       /** Приоритет ставки, на которую приходит добор. */
       hirePriority: 3,
     },
+
+    /**
+     * Ревизор. Пока ведёт опись имущества участка — неуязвим.
+     * Опись кончилась — открывается на время окна, потом начинает заново.
+     * Ломай мебель быстрее, чем он её описывает.
+     */
+    auditor: {
+      hp: 10,
+      radius: 15,
+      speed: 108,
+      accel: 700,
+      friction: 1100,
+      /** Насколько близко надо подойти к предмету, чтобы начать опись. */
+      reach: 46,
+      /** Сколько занимает описание одного предмета. */
+      inventoryTime: 0.9,
+      /**
+       * Сколько Ревизор пытается дойти до предмета, прежде чем внести его
+       * издалека. Без этого один предмет за бетоном вешал бы опись навсегда,
+       * а Ревизора делал бы неуязвимым до конца забега.
+       */
+      reachTimeout: 5,
+      /** Сколько Ревизор открыт после того, как опись закончена. */
+      openTime: 4,
+      /** Выписывает предписание раз в столько секунд. */
+      shotInterval: 2.6,
+      /** Замах перед предписанием. */
+      shotTelegraph: 0.5,
+    },
   },
 
 
@@ -369,6 +398,9 @@ export const TUNING = {
     vacancyMark: 4,
     vacancyGap: 3,
     vacancyLift: 12,
+    /** Глухая рамка вокруг Ревизора, пока идёт опись. */
+    auditShieldInset: 4,
+    auditShieldWidth: 2,
     /** Зазор между панелями разрушаемой перегородки. */
     weakPanelGap: 2,
     /** Во сколько раз стрела зарядной формы длиннее своей ширины. */
@@ -510,6 +542,20 @@ export const PANEL: TuningGroup[] = [
       { path: 'weapon.volley.cost', label: 'РАСХОД', min: 0, max: 14, step: 1 },
       { path: 'weapon.volley.ammoMax', label: 'ОБОЙМА', min: 1, max: 60, step: 1 },
       { path: 'weapon.volley.reloadTime', label: 'ПЕРЕЗАРЯДКА', min: 0.1, max: 5, step: 0.05 },
+    ],
+  },
+  {
+    title: 'РЕВИЗОР',
+    fields: [
+      { path: 'post.auditor.hp', label: 'ПРОЧНОСТЬ', min: 1, max: 60, step: 1, onRestart: true },
+      { path: 'post.auditor.radius', label: 'ХИТБОКС', min: 6, max: 30, step: 0.5, onRestart: true },
+      { path: 'post.auditor.speed', label: 'СКОРОСТЬ', min: 20, max: 300, step: 2 },
+      { path: 'post.auditor.reach', label: 'ДИСТАНЦИЯ ОПИСИ', min: 20, max: 200, step: 2 },
+      { path: 'post.auditor.inventoryTime', label: 'ВРЕМЯ НА ПРЕДМЕТ', min: 0.1, max: 6, step: 0.1 },
+      { path: 'post.auditor.reachTimeout', label: 'ТЕРПЕНИЕ НА ПОДХОДЕ', min: 0.5, max: 20, step: 0.5 },
+      { path: 'post.auditor.openTime', label: 'ОКНО УЯЗВИМОСТИ', min: 0.5, max: 15, step: 0.5 },
+      { path: 'post.auditor.shotInterval', label: 'ИНТЕРВАЛ ПРЕДПИСАНИЙ', min: 0.3, max: 10, step: 0.1 },
+      { path: 'post.auditor.shotTelegraph', label: 'ЗАМАХ', min: 0.05, max: 2, step: 0.05 },
     ],
   },
   {

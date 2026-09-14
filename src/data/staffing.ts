@@ -4,9 +4,9 @@
  * Помещение описывается не списком врагов, а тем, какие должности
  * на участке должны быть заняты. Генератор выбирает вакансии.
  *
- * Реализованы должности 'intern', 'inspector', 'registrar'.
- * Ревизор, Курьер и Заведующий сюда не вписаны: данные не должны
- * обещать того, чего нет в поведении.
+ * Реализованы должности 'intern', 'inspector', 'registrar', 'auditor'.
+ * Курьер и Заведующий сюда не вписаны: данные не должны обещать того,
+ * чего нет в поведении.
  */
 export interface StaffPost {
   /** Идентификатор должности. Поведение ищется по нему. */
@@ -42,6 +42,7 @@ export const STAFFING: Staffing[] = [
     id: 'registry',
     label: 'КАРТОТЕЧНЫЙ УЧАСТОК',
     posts: [
+      { post: 'auditor', title: 'РЕВИЗОР', count: 1, priority: 1 },
       { post: 'registrar', title: 'РЕГИСТРАТОР', count: 1, priority: 1 },
       { post: 'inspector', title: 'ИНСПЕКТОР', count: 3, priority: 2 },
       { post: 'intern', title: 'СТАЖЁР', count: 4, priority: 3 },
@@ -51,6 +52,7 @@ export const STAFFING: Staffing[] = [
     id: 'head_office',
     label: 'ПРИЁМНАЯ ЗАВЕДУЮЩЕГО',
     posts: [
+      { post: 'auditor', title: 'РЕВИЗОР', count: 1, priority: 1 },
       { post: 'registrar', title: 'РЕГИСТРАТОР', count: 1, priority: 1 },
       { post: 'inspector', title: 'ИНСПЕКТОР', count: 5, priority: 2 },
       { post: 'intern', title: 'СТАЖЁР', count: 4, priority: 3 },

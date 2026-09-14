@@ -8,6 +8,7 @@ import type { World } from './ecs';
 import { PALETTE } from './palette';
 import { makeRng } from './rng';
 import { vacancyCount } from './systems/staff';
+import { pendingItems } from './systems/postAuditor';
 import { grabCandidate } from './systems/telekinesis';
 import { TILE_DOOR, TILE_WALL, TILE_WEAK, type TileMap } from './room';
 import { ROOM_HEIGHT, ROOM_WIDTH, STEP, TUNING } from './tuning';
@@ -179,6 +180,17 @@ function drawEntities(g: Graphics, w: World, alpha: number): void {
       .stroke({ width: TUNING.render.telegraphWidth, color: PALETTE.yellow, alpha: 0.55 });
   }
 
+  // Ревизор: луч на предмет, который он сейчас вносит в опись.
+  for (const [e, auditor] of w.auditorC) {
+    if (auditor.phase === 'open' || auditor.target < 0) continue;
+    const t = w.transform.get(e);
+    const tt = w.transform.get(auditor.target);
+    if (t === undefined || tt === undefined) continue;
+    g.moveTo(lerp(t.px, t.x, alpha), lerp(t.py, t.y, alpha))
+      .lineTo(lerp(tt.px, tt.x, alpha), lerp(tt.py, tt.y, alpha))
+      .stroke({ width: TUNING.render.telegraphWidth, color: PALETTE.yellow, alpha: 0.5 });
+  }
+
   // Цель захвата и удерживаемое — жёлтой рамкой.
   const candidate = grabCandidate(w);
   const heldEntity = w.playerC.get(w.player)?.held ?? -1;
@@ -296,6 +308,20 @@ function drawEntities(g: Graphics, w: World, alpha: number): void {
         .stroke({ width: TUNING.render.telegraphWidth, color: PALETTE.yellow });
     }
     if (w.registrarC.has(e)) drawVacancyCount(g, x, y, draw.size, vacancyCount(w));
+
+    // Ревизор: счётчик невнесённых строк над головой, а пока идёт опись —
+    // ещё и глухая рамка. Она же и есть «по нему не проходит».
+    const auditor = w.auditorC.get(e);
+    if (auditor !== undefined) {
+      if (auditor.phase === 'open') {
+        drawVacancyCount(g, x, y, draw.size, 0);
+      } else {
+        drawVacancyCount(g, x, y, draw.size, pendingItems(w));
+        const inset = TUNING.render.auditShieldInset;
+        g.rect(x - draw.size - inset, y - draw.size - inset, (draw.size + inset) * 2, (draw.size + inset) * 2)
+          .stroke({ width: TUNING.render.auditShieldWidth, color: PALETTE.concreteLight });
+      }
+    }
   }
 }
 

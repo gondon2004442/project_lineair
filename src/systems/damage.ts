@@ -5,6 +5,9 @@ import { TUNING } from '../tuning';
 export function applyDamage(w: World, target: Entity, amount: number): boolean {
   const h = w.health.get(target);
   if (h === undefined || h.hp <= 0 || h.iframes > 0) return false;
+  // Ревизор неуязвим, пока не закончил опись имущества участка.
+  const auditor = w.auditorC.get(target);
+  if (auditor !== undefined && auditor.phase !== 'open') return false;
 
   h.hp -= amount;
   h.flash = TUNING.feel.flashTime;

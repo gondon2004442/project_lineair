@@ -126,6 +126,21 @@ export interface RosterEntry {
   occupied: number;
 }
 
+export type AuditorPhase = 'audit' | 'open' | 'shot';
+
+export interface AuditorC {
+  /** Пока 'audit' — урон по Ревизору не проходит. */
+  phase: AuditorPhase;
+  /** Что описывает сейчас. */
+  target: Entity;
+  /** Обратный отсчёт описи предмета или окна уязвимости. */
+  timer: number;
+  /** Сколько ещё пытаться дойти до текущего предмета. */
+  approachTimer: number;
+  /** Обратный отсчёт до следующего предписания. */
+  shotTimer: number;
+}
+
 export type PropPhase = 'idle' | 'held' | 'thrown';
 
 /** Физический объект участка: стул, шкаф, бетонный обломок. */
@@ -134,6 +149,8 @@ export interface PropC {
   title: string;
   phase: PropPhase;
   mass: number;
+  /** Внесён ли предмет в текущую опись Ревизора. */
+  audited: boolean;
   /** Кого уже задел в этом полёте: одно тело — один удар. */
   lastHit: Entity;
 }
@@ -206,6 +223,7 @@ export interface World {
   internC: Map<Entity, InternC>;
   inspectorC: Map<Entity, InspectorC>;
   registrarC: Map<Entity, RegistrarC>;
+  auditorC: Map<Entity, AuditorC>;
   propC: Map<Entity, PropC>;
   bulletC: Map<Entity, BulletC>;
   drawC: Map<Entity, DrawC>;
@@ -233,6 +251,7 @@ export function flushDoomed(w: World): void {
     w.internC.delete(e);
     w.inspectorC.delete(e);
     w.registrarC.delete(e);
+    w.auditorC.delete(e);
     w.propC.delete(e);
     w.bulletC.delete(e);
     w.drawC.delete(e);

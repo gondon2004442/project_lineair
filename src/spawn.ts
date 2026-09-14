@@ -1,5 +1,5 @@
 /** Фабрики сущностей: набор компонентов и ничего больше. */
-import { POSTS_BY_ID, POST_INSPECTOR, POST_INTERN, POST_REGISTRAR } from './data/posts';
+import { POSTS_BY_ID, POST_AUDITOR, POST_INSPECTOR, POST_INTERN, POST_REGISTRAR } from './data/posts';
 import { PROPS_BY_ID, PROP_CABINET, PROP_RUBBLE } from './data/props';
 import { WEAPON_FORMS } from './data/weaponForms';
 import { createEntity, type Entity, type Faction, type Shape, type World } from './ecs';
@@ -18,6 +18,8 @@ export function postNumbers(post: string): PostNumbers {
       return TUNING.post.intern;
     case POST_REGISTRAR:
       return TUNING.post.registrar;
+    case POST_AUDITOR:
+      return TUNING.post.auditor;
     default:
       return TUNING.post.inspector;
   }
@@ -100,6 +102,7 @@ export function reassign(w: World, e: Entity, post: string): void {
   w.internC.delete(e);
   w.inspectorC.delete(e);
   w.registrarC.delete(e);
+  w.auditorC.delete(e);
 
   staff.post = post;
   staff.title = spec === undefined ? post.toUpperCase() : spec.title;
@@ -123,6 +126,15 @@ function attachBehaviour(w: World, e: Entity, post: string, x: number, y: number
         targetY: y,
         timer: 0,
         promoteTo: POST_INSPECTOR,
+      });
+      break;
+    case POST_AUDITOR:
+      w.auditorC.set(e, {
+        phase: 'audit',
+        target: -1,
+        timer: 0,
+        approachTimer: TUNING.post.auditor.reachTimeout,
+        shotTimer: TUNING.post.auditor.shotInterval,
       });
       break;
     case POST_REGISTRAR:
@@ -171,6 +183,7 @@ export function spawnProp(w: World, kind: string, x: number, y: number): Entity 
     title: spec === undefined ? kind.toUpperCase() : spec.title,
     phase: 'idle',
     mass: numbers.mass,
+    audited: false,
     lastHit: -1,
   });
   w.drawC.set(e, {

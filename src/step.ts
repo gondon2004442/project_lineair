@@ -3,6 +3,7 @@ import { flushDoomed, type World } from './ecs';
 import { bulletSystem } from './systems/combat';
 import { internSystem } from './systems/postIntern';
 import { inspectorSystem } from './systems/postInspector';
+import { auditorSystem } from './systems/postAuditor';
 import { registrarSystem } from './systems/postRegistrar';
 import { metronomeSystem, rosterSystem, separationSystem } from './systems/staff';
 import { feedbackSystem, lifecycleSystem, statusSystem } from './systems/lifecycle';
@@ -36,6 +37,7 @@ export function step(w: World): void {
   inspectorSystem(w, STEP, beatStruck);
   internSystem(w, STEP);
   registrarSystem(w, STEP);
+  auditorSystem(w, STEP);
   separationSystem(w, STEP);
   telekinesisSystem(w, STEP);
   propSystem(w, STEP);

@@ -9,6 +9,7 @@ import { PALETTE } from './palette';
 import { DIRS } from './room';
 import { formatSeed } from './rng';
 import { TUNING } from './tuning';
+import { auditInProgress, pendingItems } from './systems/postAuditor';
 import { hasRegistrar, vacancyCount } from './systems/staff';
 import { ammoMax, currentForm, formStat } from './weapon';
 import { clearedCount, currentRoom } from './world';
@@ -41,6 +42,7 @@ export function createHud(
       row('РЫВОК', dashReady ? '<span class="ok">ГОТОВ</span>' : '<span class="warn">ПЕРЕЗАРЯД</span>'),
       row('ШТАТ НА УЧАСТКЕ', String(w.staffC.size)),
       row('ВАКАНСИЙ', vacancyLine(w)),
+      auditRow(w),
       row('ДВЕРИ', w.map.doorsLocked ? '<span class="warn">ЗАПЕРТЫ</span>' : '<span class="ok">ОТКРЫТЫ</span>'),
       weaponRows(w),
       energyRow(w),
@@ -126,6 +128,16 @@ function weaponRows(w: World): string {
     rows.push(row('ЗАРЯД', `<span class="ok">${gauge(Math.round(ratio * 10), 10)}</span>`));
   }
   return rows.join('');
+}
+
+/** Опись Ревизора: пока она идёт, он неуязвим. */
+function auditRow(w: World): string {
+  if (w.auditorC.size === 0) return '';
+  if (!auditInProgress(w)) {
+    return row('ОПИСЬ', '<span class="ok">ЗАКОНЧЕНА · РЕВИЗОР ОТКРЫТ</span>');
+  }
+  const left = pendingItems(w);
+  return row('ОПИСЬ', `<span class="warn">ОСТАЛОСЬ ${left} · НЕУЯЗВИМ</span>`);
 }
 
 /** Телекинез: запас энергии и что сейчас в руках. */

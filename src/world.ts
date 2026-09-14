@@ -46,6 +46,7 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     internC: new Map(),
     inspectorC: new Map(),
     registrarC: new Map(),
+    auditorC: new Map(),
     propC: new Map(),
     bulletC: new Map(),
     drawC: new Map(),
@@ -184,6 +185,7 @@ function clearExceptPlayer(w: World): void {
     w.internC.delete(e);
     w.inspectorC.delete(e);
     w.registrarC.delete(e);
+    w.auditorC.delete(e);
     w.propC.delete(e);
     w.bulletC.delete(e);
     w.drawC.delete(e);
