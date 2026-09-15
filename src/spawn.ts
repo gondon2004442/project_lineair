@@ -1,5 +1,12 @@
 /** Фабрики сущностей: набор компонентов и ничего больше. */
-import { POSTS_BY_ID, POST_AUDITOR, POST_INSPECTOR, POST_INTERN, POST_REGISTRAR } from './data/posts';
+import {
+  POSTS_BY_ID,
+  POST_AUDITOR,
+  POST_CHIEF,
+  POST_INSPECTOR,
+  POST_INTERN,
+  POST_REGISTRAR,
+} from './data/posts';
 import { PROPS_BY_ID, PROP_CABINET, PROP_RUBBLE } from './data/props';
 import { WEAPON_FORMS } from './data/weaponForms';
 import { createEntity, type Entity, type Faction, type Shape, type World } from './ecs';
@@ -20,6 +27,8 @@ export function postNumbers(post: string): PostNumbers {
       return TUNING.post.registrar;
     case POST_AUDITOR:
       return TUNING.post.auditor;
+    case POST_CHIEF:
+      return TUNING.post.chief;
     default:
       return TUNING.post.inspector;
   }
@@ -103,13 +112,22 @@ export function reassign(w: World, e: Entity, post: string): void {
   w.inspectorC.delete(e);
   w.registrarC.delete(e);
   w.auditorC.delete(e);
+  w.chiefC.delete(e);
+
+  // Получил новое назначение — замер. Иначе стажёр доносил бы свой
+  // диагональный разгон в должность, которая ходит только по осям.
+  body.vx = 0;
+  body.vy = 0;
 
   staff.post = post;
   staff.title = spec === undefined ? post.toUpperCase() : spec.title;
   staff.plateMarks = spec === undefined ? 0 : spec.plateMarks;
   staff.plateFlash = 0;
-  health.hp = numbers.hp;
+  // Доля прочности переносится: иначе переназначение работало бы лечением,
+  // и Заведующий чинил бы подчинённых перетасовкой.
+  const ratio = health.max > 0 ? health.hp / health.max : 1;
   health.max = numbers.hp;
+  health.hp = Math.max(1, Math.round(numbers.hp * Math.max(0, Math.min(1, ratio))));
   body.radius = numbers.radius;
   draw.size = numbers.radius;
   draw.hollow = spec !== undefined && spec.fill === 'hollow';
@@ -126,6 +144,14 @@ function attachBehaviour(w: World, e: Entity, post: string, x: number, y: number
         targetY: y,
         timer: 0,
         promoteTo: POST_INSPECTOR,
+      });
+      break;
+    case POST_CHIEF:
+      w.chiefC.set(e, {
+        phase: 'hold',
+        ringTimer: TUNING.post.chief.ringInterval,
+        twist: 0,
+        reshuffleTimer: TUNING.post.chief.reshuffleInterval,
       });
       break;
     case POST_AUDITOR:

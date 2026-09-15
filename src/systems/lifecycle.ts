@@ -26,13 +26,14 @@ export function lifecycleSystem(w: World, dt: number): void {
   }
 }
 
-/** Этаж считается пройденным, когда зачищены все помещения. */
+/**
+ * Этаж кончается приёмной. Ответвления можно не проходить —
+ * их смысл в предметах, а не в обязательной зачистке.
+ */
 export function statusSystem(w: World): void {
   if (w.status !== 'playing') return;
-  for (const room of w.floor.rooms) {
-    if (!room.cleared) return;
-  }
-  w.status = 'cleared';
+  const office = w.floor.rooms[w.floor.end];
+  if (office !== undefined && office.cleared) w.status = 'cleared';
 }
 
 export function feedbackSystem(w: World, dt: number): void {

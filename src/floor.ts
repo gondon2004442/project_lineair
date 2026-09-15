@@ -3,7 +3,7 @@
  * Один основной путь плюс одно-два ответвления. Всё из seeded PRNG.
  */
 import { ROOM_TEMPLATES, TEMPLATE_END, TEMPLATE_START } from './data/roomTemplates';
-import { STAFFING_HEAD, STAFFING_LOBBY, STAFFING_ORDINARY } from './data/staffing';
+import { MINI_BOSS_POSTS, STAFFING_HEAD, STAFFING_LOBBY, STAFFING_ORDINARY } from './data/staffing';
 import type { Rng } from './rng';
 import { DIRS, DIR_STEP, opposite, type Dir } from './room';
 import { TUNING } from './tuning';
@@ -21,6 +21,8 @@ export interface RoomNode {
   neighbors: [number, number, number, number];
   /** Штатное расписание участка: кем занимают ставки при первом входе. */
   staffing: string;
+  /** Старшая ставка, введённая на участок сверх расписания. Пусто — нет. */
+  miniBoss: string;
   cleared: boolean;
   visited: boolean;
 }
@@ -164,6 +166,7 @@ function finish(drafts: Draft[], rng: Rng): Floor {
     kind: d.kind,
     neighbors: d.neighbors,
     staffing: staffingFor(d.kind, rng),
+    miniBoss: miniBossFor(d.kind, rng),
     cleared: d.kind === 'start',
     visited: false,
   }));
@@ -189,6 +192,17 @@ function staffingFor(kind: RoomKind, rng: Rng): string {
   if (kind === 'start') return STAFFING_LOBBY;
   if (kind === 'end') return STAFFING_HEAD;
   return STAFFING_ORDINARY[rng.int(STAFFING_ORDINARY.length)] ?? STAFFING_LOBBY;
+}
+
+/**
+ * Мини-босс: старшая ставка на рядовом участке. Розыгрыш здесь, при
+ * сборке этажа, поэтому он детерминирован от seed вместе со всем остальным.
+ */
+function miniBossFor(kind: RoomKind, rng: Rng): string {
+  if (kind === 'start' || kind === 'end') return '';
+  if (rng.float() >= TUNING.floor.miniBossChance) return '';
+  const post = MINI_BOSS_POSTS[rng.int(MINI_BOSS_POSTS.length)];
+  return post === undefined ? '' : post.post;
 }
 
 function pick(rng: Rng, min: number, max: number): number {

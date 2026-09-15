@@ -118,11 +118,35 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
       OPEN,
     ],
   },
+  {
+    id: 'office',
+    label: 'ПРИЁМНАЯ ЗАВЕДУЮЩЕГО',
+    rows: [
+      OPEN,
+      OPEN,
+      OPEN,
+      '......####............####......',
+      '......####............####......',
+      '......####............####......',
+      OPEN,
+      OPEN,
+      OPEN,
+      OPEN,
+      OPEN,
+      OPEN,
+      '......####............####......',
+      '......####............####......',
+      '......####............####......',
+      OPEN,
+      OPEN,
+      OPEN,
+    ],
+  },
 ];
 
 export const TEMPLATES_BY_ID = new Map(ROOM_TEMPLATES.map((t) => [t.id, t]));
 
 /** Планировка входного помещения — всегда пустой холл. */
 export const TEMPLATE_START = 'hall';
-/** Планировка последнего помещения основного пути. */
-export const TEMPLATE_END = 'atrium';
+/** Планировка приёмной: последнее помещение основного пути. */
+export const TEMPLATE_END = 'office';

@@ -221,15 +221,33 @@ export function randomFloorPoint(
   map: TileMap,
   roll: (n: number) => number,
   attempts: number,
+  radius = 0,
 ): { x: number; y: number } {
   const wall = TUNING.room.wall;
   for (let i = 0; i < attempts; i++) {
     const cx = wall + roll(TUNING.room.cols);
     const cy = wall + roll(TUNING.room.rows);
-    if (map.tiles[cy * map.cols + cx] !== TILE_FLOOR) continue;
-    return { x: (cx + 0.5) * map.size, y: (cy + 0.5) * map.size };
+    const x = (cx + 0.5) * map.size;
+    const y = (cy + 0.5) * map.size;
+    if (!freeFor(map, x, y, radius)) continue;
+    return { x, y };
   }
   return roomCenter(map);
+}
+
+/** Свободны ли все клетки, которые накрывает тело радиуса radius. */
+function freeFor(map: TileMap, x: number, y: number, radius: number): boolean {
+  const left = Math.floor((x - radius) / map.size);
+  const right = Math.floor((x + radius) / map.size);
+  const top = Math.floor((y - radius) / map.size);
+  const bottom = Math.floor((y + radius) / map.size);
+  for (let cy = top; cy <= bottom; cy++) {
+    for (let cx = left; cx <= right; cx++) {
+      if (cx < 0 || cy < 0 || cx >= map.cols || cy >= map.rows) return false;
+      if (map.tiles[cy * map.cols + cx] !== TILE_FLOOR) return false;
+    }
+  }
+  return true;
 }
 
 /** Субъект встал на клетку проёма — значит, уходит в соседнее помещение. */

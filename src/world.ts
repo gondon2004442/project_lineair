@@ -1,6 +1,6 @@
 /** Сборка этажа и вход в помещение. Всё случайное — из seeded PRNG. */
 import type { World } from './ecs';
-import { STAFFING_BY_ID } from './data/staffing';
+import { MINI_BOSS_POSTS, STAFFING_BY_ID } from './data/staffing';
 import { generateFloor, roomDoors, type RoomNode } from './floor';
 import type { InputSnapshot } from './input';
 import { makeRng } from './rng';
@@ -13,7 +13,7 @@ import {
   type TileMap,
 } from './room';
 import { PROPS } from './data/props';
-import { spawnPlayer, spawnProp, spawnStaff } from './spawn';
+import { postNumbers, propNumbers, spawnPlayer, spawnProp, spawnStaff } from './spawn';
 import { TUNING } from './tuning';
 
 export function createWorld(seed: number, input: InputSnapshot): World {
@@ -47,6 +47,7 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     inspectorC: new Map(),
     registrarC: new Map(),
     auditorC: new Map(),
+    chiefC: new Map(),
     propC: new Map(),
     bulletC: new Map(),
     drawC: new Map(),
@@ -100,6 +101,17 @@ function buildRoster(w: World, room: RoomNode): void {
       occupied: 0,
     });
   }
+  const extra = MINI_BOSS_POSTS.find((post) => post.post === room.miniBoss);
+  if (extra !== undefined) {
+    // Старшая ставка вводится одна, множитель квоты её не касается.
+    w.roster.push({
+      post: extra.post,
+      title: extra.title,
+      priority: extra.priority,
+      quota: extra.count,
+      occupied: 0,
+    });
+  }
 }
 
 /** Набор штата по расписанию участка. Случайность — своя на каждое помещение. */
@@ -108,11 +120,19 @@ function staffRoom(w: World, room: RoomNode, entryX: number, entryY: number): vo
   if (staffing === undefined) return;
   const rng = makeRng((w.seed + room.index * TUNING.floor.roomSeedStride) >>> 0);
 
-  const posts = [...staffing.posts].sort((a, b) => a.priority - b.priority);
+  const extra = MINI_BOSS_POSTS.filter((post) => post.post === room.miniBoss);
+  const posts = [...staffing.posts, ...extra].sort((a, b) => a.priority - b.priority);
   for (const post of posts) {
-    const quota = quotaFor(post.count);
+    const quota = post.post === room.miniBoss ? post.count : quotaFor(post.count);
     for (let i = 0; i < quota; i++) {
-      const spot = findSpawnSpot(w.map, rng, entryX, entryY);
+      const spot = findSpawnSpot(
+        w.map,
+        rng,
+        entryX,
+        entryY,
+        TUNING.staff.spawnMinDistance,
+        postNumbers(post.post).radius,
+      );
       spawnStaff(w, post.post, post.priority, spot.x, spot.y);
     }
   }
@@ -129,7 +149,14 @@ function scatterProps(w: World, room: RoomNode, entryX: number, entryY: number):
     for (let i = 0; i < spec.scatter; i++) {
       // Мебели отступ от входа нужен свой, куда меньший, чем штату:
       // иначе поднять при входе будет нечего, захват до неё не достанет.
-      const spot = findSpawnSpot(w.map, rng, entryX, entryY, TUNING.prop.spawnClearance);
+      const spot = findSpawnSpot(
+        w.map,
+        rng,
+        entryX,
+        entryY,
+        TUNING.prop.spawnClearance,
+        propNumbers(spec.id).radius,
+      );
       spawnProp(w, spec.id, spot.x, spot.y);
     }
   }
@@ -139,25 +166,45 @@ function quotaFor(count: number): number {
   return Math.max(1, Math.round(count * TUNING.floor.staffScale));
 }
 
-/** Свободная клетка подальше от точки входа. */
+/**
+ * Свободная точка подальше от входа, куда влезает тело заданного радиуса.
+ * Проверять одну клетку мало: половина клетки — 16 пикселей, и всё, что
+ * толще, торчит в соседнюю. Так Заведующий и шкаф оказывались в бетоне.
+ */
 function findSpawnSpot(
   map: TileMap,
   rng: ReturnType<typeof makeRng>,
   awayX: number,
   awayY: number,
-  clearance: number = TUNING.staff.spawnMinDistance,
+  clearance: number,
+  radius: number,
 ): { x: number; y: number } {
-  let fallback = { x: awayX, y: awayY };
+  let fallback: { x: number; y: number } | null = null;
   for (let attempt = 0; attempt < TUNING.floor.spawnAttempts; attempt++) {
     const cx = TUNING.room.wall + rng.int(TUNING.room.cols);
     const cy = TUNING.room.wall + rng.int(TUNING.room.rows);
-    if (map.tiles[cy * map.cols + cx] !== TILE_FLOOR) continue;
     const x = (cx + 0.5) * map.size;
     const y = (cy + 0.5) * map.size;
-    fallback = { x, y };
+    if (!bodyFits(map, x, y, radius)) continue;
+    if (fallback === null) fallback = { x, y };
     if (Math.hypot(x - awayX, y - awayY) >= clearance) return { x, y };
   }
-  return fallback;
+  return fallback ?? roomCenter(map);
+}
+
+/** Влезает ли тело радиуса radius целиком на свободные клетки. */
+function bodyFits(map: TileMap, x: number, y: number, radius: number): boolean {
+  const left = Math.floor((x - radius) / map.size);
+  const right = Math.floor((x + radius) / map.size);
+  const top = Math.floor((y - radius) / map.size);
+  const bottom = Math.floor((y + radius) / map.size);
+  for (let cy = top; cy <= bottom; cy++) {
+    for (let cx = left; cx <= right; cx++) {
+      if (cx < 0 || cy < 0 || cx >= map.cols || cy >= map.rows) return false;
+      if (map.tiles[cy * map.cols + cx] !== TILE_FLOOR) return false;
+    }
+  }
+  return true;
 }
 
 function placePlayer(w: World, x: number, y: number): void {
@@ -186,6 +233,7 @@ function clearExceptPlayer(w: World): void {
     w.inspectorC.delete(e);
     w.registrarC.delete(e);
     w.auditorC.delete(e);
+    w.chiefC.delete(e);
     w.propC.delete(e);
     w.bulletC.delete(e);
     w.drawC.delete(e);

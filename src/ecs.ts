@@ -126,6 +126,18 @@ export interface RosterEntry {
   occupied: number;
 }
 
+export type ChiefPhase = 'hold' | 'windup';
+
+export interface ChiefC {
+  phase: ChiefPhase;
+  /** Обратный отсчёт до циркуляра. */
+  ringTimer: number;
+  /** На сколько провёрнуто следующее кольцо. */
+  twist: number;
+  /** Обратный отсчёт до переназначения подчинённых. */
+  reshuffleTimer: number;
+}
+
 export type AuditorPhase = 'audit' | 'open' | 'shot';
 
 export interface AuditorC {
@@ -224,6 +236,7 @@ export interface World {
   inspectorC: Map<Entity, InspectorC>;
   registrarC: Map<Entity, RegistrarC>;
   auditorC: Map<Entity, AuditorC>;
+  chiefC: Map<Entity, ChiefC>;
   propC: Map<Entity, PropC>;
   bulletC: Map<Entity, BulletC>;
   drawC: Map<Entity, DrawC>;
@@ -252,6 +265,7 @@ export function flushDoomed(w: World): void {
     w.inspectorC.delete(e);
     w.registrarC.delete(e);
     w.auditorC.delete(e);
+    w.chiefC.delete(e);
     w.propC.delete(e);
     w.bulletC.delete(e);
     w.drawC.delete(e);

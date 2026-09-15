@@ -34,6 +34,11 @@ export function inspectorSystem(w: World, dt: number, beatStruck: boolean): void
       if (Math.abs(along) < cfg.axisSwitchBias && Math.abs(across) >= cfg.axisSwitchBias) {
         inspector.axis = inspector.axis === 0 ? 1 : 0;
       }
+      // Ход по чужой оси гасится сразу: иначе на повороте старая ось
+      // тормозит, пока новая разгоняется, и ладья на пару кадров едет
+      // по диагонали.
+      if (inspector.axis === 0) b.vy = 0;
+      else b.vx = 0;
 
       const dist = Math.hypot(dx, dy);
       const offset = inspector.axis === 0 ? dx : dy;

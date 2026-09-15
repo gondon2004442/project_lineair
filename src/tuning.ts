@@ -161,6 +161,10 @@ export const TUNING = {
     staffScale: 1,
     /** Смещение seed для каждого помещения: порядок обхода не влияет на расстановку. */
     roomSeedStride: 0x9e3779b1,
+    /** Вероятность, что на рядовой участок введут старшую ставку. */
+    miniBossChance: 0.38,
+    /** Смещение seed для розыгрыша мини-босса. */
+    miniBossSeedStride: 0x27d4eb2f,
     /** Смещение seed для расстановки мебели участка. */
     propSeedStride: 0xc2b2ae35,
     /** Смещение seed для выдачи предмета за участок. */
@@ -332,6 +336,34 @@ export const TUNING = {
       shotInterval: 2.6,
       /** Замах перед предписанием. */
       shotTelegraph: 0.5,
+    },
+
+    /**
+     * Заведующий сектором. Сидит в приёмной, дальше этажа нет.
+     * Право переназначения: на ходу меняет должности подчинённых,
+     * так что заученный набор паттернов посреди боя перетасовывается.
+     */
+    chief: {
+      hp: 44,
+      radius: 20,
+      speed: 72,
+      accel: 600,
+      friction: 1400,
+      /** Дистанция, на которой держится от субъекта. */
+      standoff: 210,
+      backoffRatio: 0.7,
+
+      /** Циркуляр: кольцо снарядов во все стороны. */
+      ringCount: 14,
+      ringInterval: 3.2,
+      ringTelegraph: 0.7,
+      /** Каждое следующее кольцо провёрнуто на этот угол. */
+      ringTwistDeg: 13,
+
+      /** Переназначение подчинённых. */
+      reshuffleInterval: 5,
+      reshuffleCount: 2,
+      reshuffleTelegraph: 0.6,
     },
   },
 
@@ -595,6 +627,22 @@ export const PANEL: TuningGroup[] = [
       { path: 'post.auditor.openTime', label: 'ОКНО УЯЗВИМОСТИ', min: 0.5, max: 15, step: 0.5 },
       { path: 'post.auditor.shotInterval', label: 'ИНТЕРВАЛ ПРЕДПИСАНИЙ', min: 0.3, max: 10, step: 0.1 },
       { path: 'post.auditor.shotTelegraph', label: 'ЗАМАХ', min: 0.05, max: 2, step: 0.05 },
+    ],
+  },
+  {
+    title: 'ЗАВЕДУЮЩИЙ',
+    fields: [
+      { path: 'post.chief.hp', label: 'ПРОЧНОСТЬ', min: 1, max: 200, step: 1, onRestart: true },
+      { path: 'post.chief.radius', label: 'ХИТБОКС', min: 8, max: 40, step: 0.5, onRestart: true },
+      { path: 'post.chief.speed', label: 'СКОРОСТЬ', min: 10, max: 300, step: 2 },
+      { path: 'post.chief.standoff', label: 'ДИСТАНЦИЯ БОЯ', min: 60, max: 600, step: 10 },
+      { path: 'post.chief.ringCount', label: 'СНАРЯДОВ В ЦИРКУЛЯРЕ', min: 3, max: 40, step: 1 },
+      { path: 'post.chief.ringInterval', label: 'ИНТЕРВАЛ ЦИРКУЛЯРА', min: 0.5, max: 12, step: 0.1 },
+      { path: 'post.chief.ringTelegraph', label: 'ЗАМАХ ЦИРКУЛЯРА', min: 0.05, max: 3, step: 0.05 },
+      { path: 'post.chief.ringTwistDeg', label: 'ПРОВОРОТ КОЛЬЦА', min: 0, max: 60, step: 1 },
+      { path: 'post.chief.reshuffleInterval', label: 'ИНТЕРВАЛ ПЕРЕНАЗНАЧЕНИЙ', min: 1, max: 20, step: 0.5 },
+      { path: 'post.chief.reshuffleCount', label: 'ПЕРЕНАЗНАЧАЕТ ЗА РАЗ', min: 0, max: 8, step: 1 },
+      { path: 'floor.miniBossChance', label: 'ШАНС МИНИ-БОССА', min: 0, max: 1, step: 0.02, onRestart: true },
     ],
   },
   {

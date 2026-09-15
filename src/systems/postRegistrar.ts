@@ -9,7 +9,7 @@ import { POST_INTERN } from '../data/posts';
 import type { World } from '../ecs';
 import { DEG, TUNING } from '../tuning';
 import { randomFloorPoint } from '../room';
-import { spawnBullet, spawnStaff } from '../spawn';
+import { postNumbers, spawnBullet, spawnStaff } from '../spawn';
 import { approach, topVacancy } from './staff';
 
 export function registrarSystem(w: World, dt: number): void {
@@ -108,10 +108,11 @@ function promoteNearestIntern(w: World, x: number, y: number, post: string): boo
 /** Добор со стороны: новый стажёр приходит подальше от субъекта. */
 function hire(w: World, hired: number, awayX: number, awayY: number): boolean {
   if (hired >= TUNING.post.registrar.hireCap) return false;
-  let spot = randomFloorPoint(w.map, (n) => w.rng.int(n), TUNING.floor.spawnAttempts);
+  const radius = postNumbers(POST_INTERN).radius;
+  let spot = randomFloorPoint(w.map, (n) => w.rng.int(n), TUNING.floor.spawnAttempts, radius);
   for (let i = 0; i < TUNING.floor.spawnAttempts; i++) {
     if (Math.hypot(spot.x - awayX, spot.y - awayY) >= TUNING.staff.spawnMinDistance) break;
-    spot = randomFloorPoint(w.map, (n) => w.rng.int(n), TUNING.floor.spawnAttempts);
+    spot = randomFloorPoint(w.map, (n) => w.rng.int(n), TUNING.floor.spawnAttempts, radius);
   }
   spawnStaff(w, POST_INTERN, TUNING.post.registrar.hirePriority, spot.x, spot.y);
   return true;

@@ -1,7 +1,6 @@
 /** Служебный оверлей: состояние субъекта, схема этажа, отладка, seed. */
 import { TEMPLATES_BY_ID } from './data/roomTemplates';
 import { ITEMS_BY_ID } from './data/items';
-import { POST_REGISTRAR } from './data/posts';
 import { WEAPON_FORMS } from './data/weaponForms';
 import { STAFFING_BY_ID } from './data/staffing';
 import { entityCount, type World } from './ecs';
@@ -10,6 +9,7 @@ import { DIRS } from './room';
 import { formatSeed } from './rng';
 import { TUNING } from './tuning';
 import { auditInProgress, pendingItems } from './systems/postAuditor';
+import { hasChief } from './systems/postChief';
 import { hasRegistrar, vacancyCount } from './systems/staff';
 import { ammoMax, currentForm, formStat } from './weapon';
 import { clearedCount, currentRoom } from './world';
@@ -41,6 +41,7 @@ export function createHud(
       row('СУБЪЕКТ', bar(hp, maxHp)),
       row('РЫВОК', dashReady ? '<span class="ok">ГОТОВ</span>' : '<span class="warn">ПЕРЕЗАРЯД</span>'),
       row('ШТАТ НА УЧАСТКЕ', String(w.staffC.size)),
+      rankRow(w),
       row('ВАКАНСИЙ', vacancyLine(w)),
       auditRow(w),
       row('ДВЕРИ', w.map.doorsLocked ? '<span class="warn">ЗАПЕРТЫ</span>' : '<span class="ok">ОТКРЫТЫ</span>'),
@@ -76,7 +77,7 @@ export function createHud(
       banner.innerHTML = '<b>СУБЪЕКТ ЛИКВИДИРОВАН</b><span>[F2] ПОВТОРИТЬ ИСПЫТАНИЕ</span>';
     } else if (w.status === 'cleared') {
       banner.hidden = false;
-      banner.innerHTML = '<b>ЭТАЖ ЗАЧИЩЕН</b><span>[F2] ПОВТОРИТЬ ИСПЫТАНИЕ</span>';
+      banner.innerHTML = '<b>СЕКТОР СДАН</b><span>ЗАВЕДУЮЩИЙ ОТСТРАНЁН · [F2] ПОВТОРИТЬ</span>';
     } else {
       banner.hidden = true;
     }
@@ -128,6 +129,16 @@ function weaponRows(w: World): string {
     rows.push(row('ЗАРЯД', `<span class="ok">${gauge(Math.round(ratio * 10), 10)}</span>`));
   }
   return rows.join('');
+}
+
+/** Кто на участке старше рядового: мини-босс или сам Заведующий. */
+function rankRow(w: World): string {
+  if (hasChief(w)) return row('НА УЧАСТКЕ', '<span class="warn">ЗАВЕДУЮЩИЙ СЕКТОРОМ</span>');
+  for (const [, staff] of w.staffC) {
+    if (staff.priority > 1) continue;
+    return row('НА УЧАСТКЕ', `<span class="warn">${staff.title}</span>`);
+  }
+  return '';
 }
 
 /** Опись Ревизора: пока она идёт, он неуязвим. */
@@ -218,13 +229,14 @@ function schematic(w: World): string {
     parts.push(
       `<rect x="${x}" y="${y}" width="${cell}" height="${cell}" fill="${fill}" stroke="${stroke}" stroke-width="${TUNING.hud.mapStroke}"/>`,
     );
-    // Посещённый, но не зачищенный участок с кадровым отделом — жёлтая метка.
-    if (room.visited && !room.cleared && !current && hasRegistrarPost(room.staffing)) {
+    // Посещённый, но не зачищенный участок со старшей ставкой — жёлтая метка.
+    if (room.visited && !room.cleared && !current && room.miniBoss !== '') {
       const inset = TUNING.hud.mapEndInset;
       parts.push(
         `<rect x="${x + inset}" y="${y + inset}" width="${cell - inset * 2}" height="${cell - inset * 2}" fill="${hex(PALETTE.yellow)}"/>`,
       );
     }
+    // Приёмная видна на схеме всегда: этаж кончается там.
     if (room.index === w.floor.end && !current) {
       const inset = TUNING.hud.mapEndInset;
       parts.push(
@@ -234,13 +246,6 @@ function schematic(w: World): string {
   }
 
   return `<svg class="hud-schematic" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${parts.join('')}</svg>`;
-}
-
-/** Есть ли в расписании участка ставка Регистратора. */
-function hasRegistrarPost(staffing: string): boolean {
-  const table = STAFFING_BY_ID.get(staffing);
-  if (table === undefined) return false;
-  return table.posts.some((post) => post.post === POST_REGISTRAR);
 }
 
 function hex(color: number): string {
