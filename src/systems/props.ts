@@ -68,6 +68,7 @@ function strike(
     const reach = radius + tb.radius;
     if ((x - tt.x) ** 2 + (y - tt.y) ** 2 > reach * reach) continue;
     applyDamage(w, target, damage);
+    w.sounds.push('impact');
     prop.lastHit = target;
     health.hp -= TUNING.prop.impactSelfDamage;
     return;
@@ -81,6 +82,7 @@ function strike(
     [x, aheadY],
   ]) {
     if (tileAtPoint(w.map, ax, ay) !== TILE_WEAK) continue;
+    w.sounds.push('glass');
     if (damageWall(w.map, ax, ay, damage)) {
       const cell = cellCenter(w.map, ax, ay);
       spawnProp(w, PROP_RUBBLE, cell.x, cell.y);

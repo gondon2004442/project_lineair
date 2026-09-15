@@ -65,6 +65,7 @@ export function playerControlSystem(w: World, dt: number): void {
       p.dashX = hasMove ? w.input.moveX : p.aimX;
       p.dashY = hasMove ? w.input.moveY : p.aimY;
       p.phase = 'dash';
+      w.sounds.push('dash');
       p.dashTime = TUNING.player.dashDuration;
       p.dashCooldown = TUNING.player.dashCooldown;
       h.iframes = Math.max(h.iframes, TUNING.player.dashIFrames);
@@ -111,6 +112,7 @@ export function startReload(w: World, p: PlayerC): boolean {
   if (form === undefined || p.reloading) return false;
   if ((p.ammo[p.form] ?? 0) >= ammoMax(w, form.id)) return false;
   p.reloading = true;
+  w.sounds.push('reload');
   p.reloadTimer = formStat(w, form.id, 'reloadTime');
   // Недобранный заряд и недострелянный залп перезарядка отменяет.
   p.charge = 0;
@@ -148,6 +150,7 @@ function fireSystem(w: World, p: PlayerC, x: number, y: number, dt: number): voi
       const charge = p.charge;
       p.charge = 0;
       if (charge >= formStat(w, 'lance', 'minCharge') && spend(w, p, 'lance')) {
+        w.sounds.push('shot.lance');
         launchLance(w, p, x, y, charge);
       }
     }
@@ -160,16 +163,19 @@ function fireSystem(w: World, p: PlayerC, x: number, y: number, dt: number): voi
     case 'precise':
       if (!spend(w, p, 'precise')) return;
       p.fireCooldown = formStat(w, 'precise', 'interval');
+      w.sounds.push('shot.precise');
       launchPrecise(w, p, x, y);
       break;
     case 'scatter':
       if (!spend(w, p, 'scatter')) return;
       p.fireCooldown = formStat(w, 'scatter', 'interval');
+      w.sounds.push('shot.scatter');
       launchScatter(w, p, x, y);
       break;
     case 'volley':
       if (!spend(w, p, 'volley')) return;
       p.fireCooldown = formStat(w, 'volley', 'interval');
+      w.sounds.push('shot.volley');
       p.queued = Math.max(1, Math.round(formStat(w, 'volley', 'count')));
       p.queueTimer = 0;
       break;

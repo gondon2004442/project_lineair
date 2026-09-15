@@ -16,13 +16,16 @@ export function applyDamage(w: World, target: Entity, amount: number): boolean {
   const killed = h.hp <= 0;
 
   if (isPlayer) {
+    w.sounds.push('hurt.player');
     h.iframes = TUNING.player.hurtIFrames;
     addShake(w, TUNING.feel.shakePlayerHurt);
     addHitstop(w, TUNING.feel.hitstopPlayerHurt);
   } else if (killed) {
+    w.sounds.push('kill.staff');
     addShake(w, TUNING.feel.shakeEnemyKill);
     addHitstop(w, TUNING.feel.hitstopEnemyKill);
   } else {
+    w.sounds.push('hit.staff');
     addShake(w, TUNING.feel.shakeEnemyHit);
     addHitstop(w, TUNING.feel.hitstopEnemyHit);
   }

@@ -48,6 +48,8 @@ export function metronomeSystem(w: World, dt: number): void {
   w.metronome += TUNING.post.inspector.metronomeInterval;
   if (w.metronome <= 0) w.metronome = TUNING.post.inspector.metronomeInterval;
   w.beat += 1;
+  // Метроном слышно: по документу инспектор читается в том числе на слух.
+  w.sounds.push('beat');
 }
 
 /** Расталкивание: сотрудники не слипаются. Регистратор сидит и не двигается. */

@@ -233,6 +233,12 @@ export interface World {
   mapToken: number;
   input: InputSnapshot;
   fx: Feedback;
+  /**
+   * Что прозвучало на этом шаге. Системы складывают сюда имена событий,
+   * точка входа раз в кадр отдаёт их звуку и очищает. Симуляция про
+   * сам звук не знает, поэтому детерминизм им не задет.
+   */
+  sounds: string[];
   status: RunStatus;
   scene: Scene;
   player: Entity;

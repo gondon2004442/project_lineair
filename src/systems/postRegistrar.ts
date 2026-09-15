@@ -35,6 +35,7 @@ export function registrarSystem(w: World, dt: number): void {
     } else if (registrar.phase === 'windup') {
       staff.plateFlash = cfg.fanTelegraph;
       if (registrar.timer <= 0) {
+        w.sounds.push('fan');
         throwFan(w, t.x, t.y, pt.x - t.x, pt.y - t.y, b.radius);
         registrar.phase = 'idle';
         registrar.timer = cfg.fanInterval;

@@ -50,6 +50,7 @@ export function telekinesisSystem(w: World, dt: number): void {
         prop.phase = 'held';
         prop.lastHit = -1;
         p.held = target;
+        w.sounds.push('grab');
         spend(p, cfg.grabCost);
       }
     }
@@ -83,6 +84,7 @@ function release(w: World, p: PlayerC, thrown: boolean): void {
     return;
   }
   const speed = TUNING.telekinesis.throwSpeed * propNumbers(prop.kind).speedFactor;
+  w.sounds.push('throw');
   prop.phase = 'thrown';
   prop.lastHit = -1;
   b.vx = p.aimX * speed;

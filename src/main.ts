@@ -3,6 +3,7 @@
  * рендер идёт своим темпом и интерполирует между шагами.
  */
 import './style.css';
+import { createAudio } from './audio';
 import { createHud } from './hud';
 import { createInput } from './input';
 import { createPanel } from './panel';
@@ -35,6 +36,11 @@ async function boot(): Promise<void> {
   const renderer = await createRenderer(host);
   const input = createInput(renderer.app.canvas);
   const hud = createHud(hudLeft, hudRight, hudMap, hudDossier, hudBanner);
+  const audio = createAudio();
+  // Браузер не даст звучать раньше первого действия пользователя.
+  for (const event of ['pointerdown', 'keydown']) {
+    window.addEventListener(event, () => audio.resume());
+  }
 
   // Панель поднимается первой: она восстанавливает значения прошлого сеанса,
   // и первый же мир должен собираться уже по ним.
@@ -90,6 +96,10 @@ async function boot(): Promise<void> {
       step(world);
       accumulator -= STEP;
     }
+    // Звук снимается после симуляции: системы её не знают, она — звука.
+    for (const id of world.sounds) audio.play(id);
+    world.sounds.length = 0;
+
     renderer.draw(world, accumulator / STEP);
     hud.update(world, ticker.FPS, renderer.showHitboxes, frame);
   });

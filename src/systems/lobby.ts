@@ -10,5 +10,7 @@ export function lobbySystem(w: World): void {
   if (w.scene !== 'lobby') return;
   const t = w.transform.get(w.player);
   if (t === undefined) return;
-  if (isGatePoint(w.map, t.x, t.y)) startRun(w);
+  if (!isGatePoint(w.map, t.x, t.y)) return;
+  w.sounds.push('gate');
+  startRun(w);
 }

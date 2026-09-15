@@ -43,6 +43,7 @@ export function chiefSystem(w: World, dt: number): void {
         staff.plateFlash = cfg.ringTelegraph;
       }
       if (chief.ringTimer <= 0) {
+        w.sounds.push('ring');
         fireRing(w, t.x, t.y, b.radius, chief.twist);
         chief.twist += cfg.ringTwistDeg * DEG;
         chief.ringTimer = cfg.ringInterval;

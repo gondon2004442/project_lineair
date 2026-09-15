@@ -19,6 +19,7 @@ export function bulletSystem(w: World, dt: number): void {
     if (isSolidPoint(w.map, t.x, t.y)) {
       // Перегородка не просто гасит снаряд, она от него крошится.
       if (tileAtPoint(w.map, t.x, t.y) === TILE_WEAK) {
+        w.sounds.push('glass');
         if (damageWall(w.map, t.x, t.y, bullet.damage)) {
           const cell = cellCenter(w.map, t.x, t.y);
           spawnProp(w, PROP_RUBBLE, cell.x, cell.y);

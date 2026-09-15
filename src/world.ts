@@ -33,6 +33,7 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     mapToken: 0,
     input,
     fx: { shake: 0, hitstop: 0 },
+    sounds: [],
     status: 'playing',
     scene: 'lobby',
     player: -1,

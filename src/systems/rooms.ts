@@ -17,6 +17,7 @@ export function roomSystem(w: World): void {
     room.cleared = true;
     w.map.doorsLocked = false;
     w.mapToken += 1;
+    w.sounds.push('door.unlock');
     issueItem(w, room.index);
   }
 

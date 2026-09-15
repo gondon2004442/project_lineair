@@ -177,6 +177,24 @@ export const TUNING = {
     spawnAttempts: 200,
   },
 
+  /**
+   * Звук. Рецепты — данные в src/data/sounds.ts, здесь только общий микс.
+   */
+  audio: {
+    /** Общая громкость. Ноль — тишина, и ни один голос не создаётся. */
+    master: 0.5,
+    /** Сколько звуков за кадр: на залпах иначе получается белый шум. */
+    voicesPerFrame: 4,
+    /** Доля длительности на атаку, если рецепт не задал свою. */
+    attack: 0.06,
+    /** До какого уровня уводится хвост. Нулём нельзя: там экспонента. */
+    tailFloor: 0.0008,
+    /** Срез фильтра шума по умолчанию. */
+    defaultCutoff: 2000,
+    /** Длина заготовки шума в секундах. */
+    noiseSeconds: 1,
+  },
+
   /** Вестибюль: комната-меню, из которой начинается забег. */
   lobby: {
     /** На сколько клеток ниже проёма стоит субъект на старте. */
@@ -840,6 +858,14 @@ export const PANEL: TuningGroup[] = [
       { path: 'enemyBullet.damage', label: 'УРОН', min: 1, max: 5, step: 1 },
       { path: 'enemyBullet.life', label: 'ДАЛЬНОБОЙНОСТЬ', min: 0.5, max: 8, step: 0.25 },
       { path: 'enemyBullet.radius', label: 'РАЗМЕР ПУЛИ', min: 2, max: 16, step: 0.5 },
+    ],
+  },
+  {
+    title: 'ЗВУК',
+    fields: [
+      { path: 'audio.master', label: 'ГРОМКОСТЬ', min: 0, max: 1, step: 0.05 },
+      { path: 'audio.voicesPerFrame', label: 'ГОЛОСОВ ЗА КАДР', min: 1, max: 16, step: 1 },
+      { path: 'audio.attack', label: 'АТАКА', min: 0.01, max: 0.5, step: 0.01 },
     ],
   },
   {
