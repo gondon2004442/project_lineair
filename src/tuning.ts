@@ -161,6 +161,10 @@ export const TUNING = {
     staffScale: 1,
     /** Смещение seed для каждого помещения: порядок обхода не влияет на расстановку. */
     roomSeedStride: 0x9e3779b1,
+    /** Вероятность курьера на рядовом участке. */
+    courierChance: 0.33,
+    /** Смещение seed для розыгрыша курьера. */
+    courierSeedStride: 0x165667b1,
     /** Вероятность, что на рядовой участок введут старшую ставку. */
     miniBossChance: 0.38,
     /** Смещение seed для розыгрыша мини-босса. */
@@ -364,6 +368,31 @@ export const TUNING = {
       reshuffleInterval: 5,
       reshuffleCount: 2,
       reshuffleTelegraph: 0.6,
+    },
+
+    /**
+     * Курьер. Не бьёт вообще. Бежит к ближайшей двери и вызывает
+     * подкрепление из соседнего сектора.
+     *
+     * Нарочно медленный: он должен быть заметой задачей на перехват,
+     * а не внезапным удвоением участка. Субъект быстрее его вчетверо,
+     * так что успеть можно всегда — вопрос только в том, бросишь ли
+     * ты ради этого текущую перестрелку.
+     */
+    courier: {
+      hp: 2,
+      radius: 9,
+      speed: 62,
+      accel: 500,
+      friction: 800,
+      /** На каком расстоянии от двери считается, что добежал. */
+      reach: 44,
+      /** Не дошёл за это время — выбирает другую дверь. */
+      reachTimeout: 7,
+      /** Стоит у двери и вызывает: последнее окно на перехват. */
+      deliverTime: 2.2,
+      /** Сколько человек приводит. */
+      reinforceCount: 2,
     },
   },
 
@@ -643,6 +672,18 @@ export const PANEL: TuningGroup[] = [
       { path: 'post.chief.reshuffleInterval', label: 'ИНТЕРВАЛ ПЕРЕНАЗНАЧЕНИЙ', min: 1, max: 20, step: 0.5 },
       { path: 'post.chief.reshuffleCount', label: 'ПЕРЕНАЗНАЧАЕТ ЗА РАЗ', min: 0, max: 8, step: 1 },
       { path: 'floor.miniBossChance', label: 'ШАНС МИНИ-БОССА', min: 0, max: 1, step: 0.02, onRestart: true },
+    ],
+  },
+  {
+    title: 'КУРЬЕР',
+    fields: [
+      { path: 'post.courier.hp', label: 'ПРОЧНОСТЬ', min: 1, max: 20, step: 1, onRestart: true },
+      { path: 'post.courier.speed', label: 'СКОРОСТЬ', min: 10, max: 300, step: 2 },
+      { path: 'post.courier.deliverTime', label: 'ВЫЗОВ У ДВЕРИ', min: 0.2, max: 10, step: 0.1 },
+      { path: 'post.courier.reinforceCount', label: 'ПРИВОДИТ ЧЕЛОВЕК', min: 0, max: 8, step: 1 },
+      { path: 'post.courier.reach', label: 'ДИСТАНЦИЯ ДО ДВЕРИ', min: 20, max: 150, step: 2 },
+      { path: 'post.courier.reachTimeout', label: 'ТЕРПЕНИЕ НА ПОДХОДЕ', min: 1, max: 30, step: 0.5 },
+      { path: 'floor.courierChance', label: 'ШАНС КУРЬЕРА', min: 0, max: 1, step: 0.02, onRestart: true },
     ],
   },
   {

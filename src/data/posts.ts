@@ -26,6 +26,8 @@ export const POSTS: PostSpec[] = [
   { id: 'registrar', title: 'РЕГИСТРАТОР', fill: 'solid', plateMarks: 2, desk: true },
   { id: 'auditor', title: 'РЕВИЗОР', fill: 'solid', plateMarks: 3, desk: false },
   { id: 'chief', title: 'ЗАВЕДУЮЩИЙ СЕКТОРОМ', fill: 'solid', plateMarks: 4, desk: true },
+  // Полый силуэт с насечками — больше ни у кого: курьера видно сразу.
+  { id: 'courier', title: 'КУРЬЕР', fill: 'hollow', plateMarks: 2, desk: false },
 ];
 
 export const POSTS_BY_ID = new Map(POSTS.map((p) => [p.id, p]));
@@ -35,3 +37,4 @@ export const POST_INSPECTOR = 'inspector';
 export const POST_REGISTRAR = 'registrar';
 export const POST_AUDITOR = 'auditor';
 export const POST_CHIEF = 'chief';
+export const POST_COURIER = 'courier';

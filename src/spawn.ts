@@ -3,6 +3,7 @@ import {
   POSTS_BY_ID,
   POST_AUDITOR,
   POST_CHIEF,
+  POST_COURIER,
   POST_INSPECTOR,
   POST_INTERN,
   POST_REGISTRAR,
@@ -29,6 +30,8 @@ export function postNumbers(post: string): PostNumbers {
       return TUNING.post.auditor;
     case POST_CHIEF:
       return TUNING.post.chief;
+    case POST_COURIER:
+      return TUNING.post.courier;
     default:
       return TUNING.post.inspector;
   }
@@ -113,6 +116,7 @@ export function reassign(w: World, e: Entity, post: string): void {
   w.registrarC.delete(e);
   w.auditorC.delete(e);
   w.chiefC.delete(e);
+  w.courierC.delete(e);
 
   // Получил новое назначение — замер. Иначе стажёр доносил бы свой
   // диагональный разгон в должность, которая ходит только по осям.
@@ -144,6 +148,14 @@ function attachBehaviour(w: World, e: Entity, post: string, x: number, y: number
         targetY: y,
         timer: 0,
         promoteTo: POST_INSPECTOR,
+      });
+      break;
+    case POST_COURIER:
+      w.courierC.set(e, {
+        phase: 'run',
+        door: -1,
+        timer: TUNING.post.courier.deliverTime,
+        approachTimer: TUNING.post.courier.reachTimeout,
       });
       break;
     case POST_CHIEF:

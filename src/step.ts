@@ -5,6 +5,7 @@ import { internSystem } from './systems/postIntern';
 import { inspectorSystem } from './systems/postInspector';
 import { auditorSystem } from './systems/postAuditor';
 import { chiefSystem } from './systems/postChief';
+import { courierSystem } from './systems/postCourier';
 import { registrarSystem } from './systems/postRegistrar';
 import { metronomeSystem, rosterSystem, separationSystem } from './systems/staff';
 import { feedbackSystem, lifecycleSystem, statusSystem } from './systems/lifecycle';
@@ -40,6 +41,7 @@ export function step(w: World): void {
   registrarSystem(w, STEP);
   auditorSystem(w, STEP);
   chiefSystem(w, STEP);
+  courierSystem(w, STEP);
   separationSystem(w, STEP);
   telekinesisSystem(w, STEP);
   propSystem(w, STEP);

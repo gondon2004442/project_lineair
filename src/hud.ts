@@ -10,6 +10,7 @@ import { formatSeed } from './rng';
 import { TUNING } from './tuning';
 import { auditInProgress, pendingItems } from './systems/postAuditor';
 import { hasChief } from './systems/postChief';
+import { courierTarget } from './systems/postCourier';
 import { hasRegistrar, vacancyCount } from './systems/staff';
 import { ammoMax, currentForm, formStat } from './weapon';
 import { clearedCount, currentRoom } from './world';
@@ -42,6 +43,7 @@ export function createHud(
       row('РЫВОК', dashReady ? '<span class="ok">ГОТОВ</span>' : '<span class="warn">ПЕРЕЗАРЯД</span>'),
       row('ШТАТ НА УЧАСТКЕ', String(w.staffC.size)),
       rankRow(w),
+      courierRow(w),
       row('ВАКАНСИЙ', vacancyLine(w)),
       auditRow(w),
       row('ДВЕРИ', w.map.doorsLocked ? '<span class="warn">ЗАПЕРТЫ</span>' : '<span class="ok">ОТКРЫТЫ</span>'),
@@ -139,6 +141,17 @@ function rankRow(w: World): string {
     return row('НА УЧАСТКЕ', `<span class="warn">${staff.title}</span>`);
   }
   return '';
+}
+
+/** Курьер в пути — сигнал бросить перестрелку и бежать на перехват. */
+function courierRow(w: World): string {
+  if (w.courierC.size === 0) return '';
+  const runner = courierTarget(w);
+  const courier = runner === null ? undefined : w.courierC.get(runner.entity);
+  if (courier !== undefined && courier.phase === 'deliver') {
+    return row('КУРЬЕР', '<span class="warn">ВЫЗЫВАЕТ ПОДКРЕПЛЕНИЕ</span>');
+  }
+  return row('КУРЬЕР', '<span class="warn">БЕЖИТ К ДВЕРИ</span>');
 }
 
 /** Опись Ревизора: пока она идёт, он неуязвим. */

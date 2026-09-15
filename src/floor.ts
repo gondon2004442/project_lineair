@@ -23,6 +23,8 @@ export interface RoomNode {
   staffing: string;
   /** Старшая ставка, введённая на участок сверх расписания. Пусто — нет. */
   miniBoss: string;
+  /** Приписан ли к участку курьер. */
+  courier: boolean;
   cleared: boolean;
   visited: boolean;
 }
@@ -167,6 +169,7 @@ function finish(drafts: Draft[], rng: Rng): Floor {
     neighbors: d.neighbors,
     staffing: staffingFor(d.kind, rng),
     miniBoss: miniBossFor(d.kind, rng),
+    courier: d.kind !== 'start' && rng.float() < TUNING.floor.courierChance,
     cleared: d.kind === 'start',
     visited: false,
   }));

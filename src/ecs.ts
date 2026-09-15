@@ -126,6 +126,18 @@ export interface RosterEntry {
   occupied: number;
 }
 
+export type CourierPhase = 'run' | 'deliver';
+
+export interface CourierC {
+  phase: CourierPhase;
+  /** Сторона, к двери которой бежит. -1 — цели нет. */
+  door: number;
+  /** Обратный отсчёт вызова у двери. */
+  timer: number;
+  /** Сколько ещё пытается дойти до выбранной двери. */
+  approachTimer: number;
+}
+
 export type ChiefPhase = 'hold' | 'windup';
 
 export interface ChiefC {
@@ -237,6 +249,7 @@ export interface World {
   registrarC: Map<Entity, RegistrarC>;
   auditorC: Map<Entity, AuditorC>;
   chiefC: Map<Entity, ChiefC>;
+  courierC: Map<Entity, CourierC>;
   propC: Map<Entity, PropC>;
   bulletC: Map<Entity, BulletC>;
   drawC: Map<Entity, DrawC>;
@@ -266,6 +279,7 @@ export function flushDoomed(w: World): void {
     w.registrarC.delete(e);
     w.auditorC.delete(e);
     w.chiefC.delete(e);
+    w.courierC.delete(e);
     w.propC.delete(e);
     w.bulletC.delete(e);
     w.drawC.delete(e);

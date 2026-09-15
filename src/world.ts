@@ -1,6 +1,7 @@
 /** Сборка этажа и вход в помещение. Всё случайное — из seeded PRNG. */
 import type { World } from './ecs';
-import { MINI_BOSS_POSTS, STAFFING_BY_ID } from './data/staffing';
+import { POST_COURIER } from './data/posts';
+import { MINI_BOSS_POSTS, STAFFING_BY_ID, type StaffPost } from './data/staffing';
 import { generateFloor, roomDoors, type RoomNode } from './floor';
 import type { InputSnapshot } from './input';
 import { makeRng } from './rng';
@@ -48,6 +49,7 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     registrarC: new Map(),
     auditorC: new Map(),
     chiefC: new Map(),
+    courierC: new Map(),
     propC: new Map(),
     bulletC: new Map(),
     drawC: new Map(),
@@ -101,6 +103,9 @@ function buildRoster(w: World, room: RoomNode): void {
       occupied: 0,
     });
   }
+  if (room.courier) {
+    w.roster.push({ post: POST_COURIER, title: 'КУРЬЕР', priority: 3, quota: 1, occupied: 0 });
+  }
   const extra = MINI_BOSS_POSTS.find((post) => post.post === room.miniBoss);
   if (extra !== undefined) {
     // Старшая ставка вводится одна, множитель квоты её не касается.
@@ -121,9 +126,13 @@ function staffRoom(w: World, room: RoomNode, entryX: number, entryY: number): vo
   const rng = makeRng((w.seed + room.index * TUNING.floor.roomSeedStride) >>> 0);
 
   const extra = MINI_BOSS_POSTS.filter((post) => post.post === room.miniBoss);
-  const posts = [...staffing.posts, ...extra].sort((a, b) => a.priority - b.priority);
+  const runner: StaffPost[] = room.courier
+    ? [{ post: POST_COURIER, title: 'КУРЬЕР', count: 1, priority: 3 }]
+    : [];
+  const posts = [...staffing.posts, ...extra, ...runner].sort((a, b) => a.priority - b.priority);
   for (const post of posts) {
-    const quota = post.post === room.miniBoss ? post.count : quotaFor(post.count);
+    const single = post.post === room.miniBoss || post.post === POST_COURIER;
+    const quota = single ? post.count : quotaFor(post.count);
     for (let i = 0; i < quota; i++) {
       const spot = findSpawnSpot(
         w.map,
@@ -234,6 +243,7 @@ function clearExceptPlayer(w: World): void {
     w.registrarC.delete(e);
     w.auditorC.delete(e);
     w.chiefC.delete(e);
+    w.courierC.delete(e);
     w.propC.delete(e);
     w.bulletC.delete(e);
     w.drawC.delete(e);
