@@ -12,11 +12,14 @@ import { auditInProgress, pendingItems } from './systems/postAuditor';
 import { hasChief } from './systems/postChief';
 import { courierTarget } from './systems/postCourier';
 import { hasRegistrar, vacancyCount } from './systems/staff';
+import type { Profiler } from './profiler';
 import { ammoMax, currentForm, formStat } from './weapon';
 import { clearedCount, currentRoom } from './world';
 
 export interface Hud {
   update(w: World, fps: number, hitboxes: boolean, dt: number): void;
+  /** Показания профайлера. Рисуются только когда он включён по F3. */
+  profile(p: Profiler): void;
   toggleDossier(): void;
 }
 
@@ -25,6 +28,7 @@ export function createHud(
   right: HTMLElement,
   map: HTMLElement,
   dossier: HTMLElement,
+  profileBlock: HTMLElement,
   banner: HTMLElement,
 ): Hud {
   let cooldown = 0;
@@ -128,6 +132,11 @@ export function createHud(
       if (w.scene === 'lobby') renderLobby(w, fps, hitboxes);
       else render(w, fps, hitboxes);
     },
+    profile(p) {
+      profileBlock.hidden = !p.enabled;
+      if (!p.enabled) return;
+      profileBlock.innerHTML = profileBody(p);
+    },
     toggleDossier() {
       dossierOpen = !dossierOpen;
       dossier.hidden = !dossierOpen;
@@ -167,6 +176,38 @@ function weaponRows(w: World): string {
     rows.push(row('ЗАРЯД', `<span class="ok">${gauge(Math.round(ratio * 10), 10)}</span>`));
   }
   return rows.join('');
+}
+
+/**
+ * Показания профайлера. Ничего не чинит и не советует — только цифры.
+ * Усреднение по окну кадров, иначе строки прыгают и читать нечего.
+ */
+function profileBody(p: Profiler): string {
+  const s = p.stats();
+  const head = [
+    '<div class="subtitle">ПРОФАЙЛЕР · F3</div>',
+    row('КАДР', ms(s.frameMs)),
+    row('ОКНО УСРЕДНЕНИЯ', `${TUNING.debug.profileWindow} КАДРОВ`),
+    row('ШАГОВ СИМУЛЯЦИИ', s.steps.toFixed(2)),
+    row('ВЫЗОВОВ ОТРИСОВКИ', s.drawCalls.toFixed(1)),
+    row('СУЩНОСТЕЙ СОЗДАНО', s.spawned.toFixed(2)),
+    row('СУЩНОСТЕЙ УДАЛЕНО', s.destroyed.toFixed(2)),
+    row('УБОРОК МУСОРА, ВСЕГО', s.heapMb === null ? 'НЕ ВИДНО' : String(s.gc)),
+    row('КУЧА', s.heapMb === null ? 'НЕ ВИДНА' : `${s.heapMb.toFixed(1)} МБ`),
+  ].join('');
+
+  const rows = p
+    .rows()
+    .slice()
+    .sort((a, b) => b.ms - a.ms)
+    .map((r) => row(r.key, `${ms(r.ms)} · ${(r.share * 100).toFixed(0)}%`))
+    .join('');
+
+  return `${head}<div class="profile-split"></div>${rows}`;
+}
+
+function ms(value: number): string {
+  return `${value.toFixed(3)} МС`;
 }
 
 /** Кто на участке старше рядового: мини-босс или сам Заведующий. */

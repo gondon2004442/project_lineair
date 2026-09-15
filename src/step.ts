@@ -15,6 +15,7 @@ import { telekinesisSystem } from './systems/telekinesis';
 import { lobbySystem } from './systems/lobby';
 import { roomSystem } from './systems/rooms';
 import { playerControlSystem } from './systems/playerControl';
+import { profiler } from './profiler';
 import { STEP } from './tuning';
 
 export function step(w: World): void {
@@ -30,8 +31,13 @@ export function step(w: World): void {
     return;
   }
 
-  if (w.status !== 'dead') playerControlSystem(w, STEP);
+  profiler.countStep();
 
+  profiler.begin('СИМ: СУБЪЕКТ');
+  if (w.status !== 'dead') playerControlSystem(w, STEP);
+  profiler.end('СИМ: СУБЪЕКТ');
+
+  profiler.begin('СИМ: ШТАТ');
   rosterSystem(w, STEP);
   const beforeBeat = w.beat;
   metronomeSystem(w, STEP);
@@ -44,11 +50,23 @@ export function step(w: World): void {
   chiefSystem(w, STEP);
   courierSystem(w, STEP);
   separationSystem(w, STEP);
+  profiler.end('СИМ: ШТАТ');
+
+  profiler.begin('СИМ: ТЕЛЕКИНЕЗ');
   telekinesisSystem(w, STEP);
   propSystem(w, STEP);
   propPushSystem(w, STEP);
+  profiler.end('СИМ: ТЕЛЕКИНЕЗ');
+
+  profiler.begin('СИМ: ФИЗИКА');
   physicsSystem(w, STEP);
+  profiler.end('СИМ: ФИЗИКА');
+
+  profiler.begin('СИМ: ПУЛИ');
   bulletSystem(w, STEP);
+  profiler.end('СИМ: ПУЛИ');
+
+  profiler.begin('СИМ: ЦИКЛ ЖИЗНИ');
   lifecycleSystem(w, STEP);
   feedbackSystem(w, STEP);
 
@@ -59,5 +77,6 @@ export function step(w: World): void {
     roomSystem(w);
     statusSystem(w);
   }
+  profiler.end('СИМ: ЦИКЛ ЖИЗНИ');
   w.tick += 1;
 }

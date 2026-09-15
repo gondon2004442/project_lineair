@@ -8,6 +8,7 @@ import type { World } from './ecs';
 import { createAberration, createDust, drawSmoke } from './fx';
 import { PALETTE } from './palette';
 import { makeRng } from './rng';
+import { countDrawCalls, profiler } from './profiler';
 import { vacancyCount } from './systems/staff';
 import { pendingItems } from './systems/postAuditor';
 import { grabCandidate } from './systems/telekinesis';
@@ -33,6 +34,10 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
     preference: 'webgl',
   });
   host.appendChild(app.canvas);
+
+  // Считаем настоящие вызовы отрисовки, а не расспрашиваем Pixi.
+  const gl = (app.renderer as unknown as { gl?: WebGL2RenderingContext }).gl;
+  if (gl !== undefined) countDrawCalls(gl, profiler);
 
   const root = new Container();
   const shakeLayer = new Container();
@@ -93,10 +98,12 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
     },
 
     draw(w, alpha) {
+      profiler.begin('КАДР: ТАЙЛМАП');
       if (w.mapToken !== drawnToken) {
         drawnToken = w.mapToken;
         drawRoom(roomLayer, w.map);
       }
+      profiler.end('КАДР: ТАЙЛМАП');
 
       const frame = app.ticker.deltaMS / 1000;
       fxTime += frame;
@@ -104,18 +111,23 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
       const shake = w.fx.shake;
       shakeLayer.position.set(fxRng.spread(shake), fxRng.spread(shake));
 
+      profiler.begin('КАДР: ПЫЛЬ');
       dust.update(frame);
       dustLayer.clear();
       dust.draw(dustLayer);
+      profiler.end('КАДР: ПЫЛЬ');
 
+      profiler.begin('КАДР: ДЫМ');
       smokeLayer.clear();
       drawSmoke(smokeLayer, w, fxTime);
+      profiler.end('КАДР: ДЫМ');
 
       entityLayer.clear();
       drawEntities(entityLayer, w, alpha);
 
       // Свечение и аберрация на нуле снимаются целиком: слабой машине
       // важно, чтобы выключенный эффект ничего не стоил.
+      profiler.begin('КАДР: СВЕЧЕНИЕ');
       glowLayer.visible = TUNING.fx.bloomAlpha > 0;
       if (glowLayer.visible) {
         glowLayer.clear();
@@ -123,6 +135,7 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
         glowLayer.alpha = TUNING.fx.bloomAlpha;
         bloom.strength = TUNING.fx.bloomBlur;
       }
+      profiler.end('КАДР: СВЕЧЕНИЕ');
 
       const wantAberration = TUNING.fx.aberration > 0;
       if (wantAberration !== aberrationOn) {
@@ -138,8 +151,10 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
           .fill({ color: PALETTE.concrete300, alpha: TUNING.fx.hitstopFlash });
       }
 
+      profiler.begin('КАДР: ХИТБОКСЫ');
       debugLayer.clear();
       if (renderer.showHitboxes) drawHitboxes(debugLayer, w, alpha);
+      profiler.end('КАДР: ХИТБОКСЫ');
     },
   };
 
@@ -356,6 +371,7 @@ function lerp(prev: number, next: number, alpha: number): number {
 
 function drawEntities(g: Graphics, w: World, alpha: number): void {
   const time = w.tick * STEP;
+  profiler.begin('КАДР: ТЕЛЕГРАФЫ');
 
   // Линия огня инспектора: пока табличка горит, видно, откуда уходить.
   for (const [e, inspector] of w.inspectorC) {
@@ -412,9 +428,14 @@ function drawEntities(g: Graphics, w: World, alpha: number): void {
     }
   }
 
+  profiler.end('КАДР: ТЕЛЕГРАФЫ');
+
+  profiler.begin('КАДР: СУЩНОСТИ');
   for (const [e, draw] of w.drawC) {
     // Субъект рисуется последним: красное пятно не должен закрывать никто.
     if (e === w.player) continue;
+    // Снаряды считаются отдельно: их много и они живут по своим правилам.
+    if (w.bulletC.has(e)) continue;
     const t = w.transform.get(e);
     if (t === undefined) continue;
     const x = lerp(t.px, t.x, alpha);
@@ -501,6 +522,50 @@ function drawEntities(g: Graphics, w: World, alpha: number): void {
   }
 
   drawPlayer(g, w, alpha);
+  profiler.end('КАДР: СУЩНОСТИ');
+
+  profiler.begin('КАДР: ПУЛИ');
+  drawBullets(g, w, alpha);
+  profiler.end('КАДР: ПУЛИ');
+}
+
+/** Снаряды: своя пачка, чтобы их цену было видно отдельно. */
+function drawBullets(g: Graphics, w: World, alpha: number): void {
+  for (const [e] of w.bulletC) {
+    const draw = w.drawC.get(e);
+    const t = w.transform.get(e);
+    if (draw === undefined || t === undefined) continue;
+    const x = lerp(t.px, t.x, alpha);
+    const y = lerp(t.py, t.y, alpha);
+
+    if (draw.shape === 'diamond') {
+      g.poly([x, y - draw.size, x + draw.size, y, x, y + draw.size, x - draw.size, y]).fill(draw.color);
+      continue;
+    }
+    if (draw.shape === 'bar') {
+      const body = w.body.get(e);
+      const vx = body === undefined ? 1 : body.vx;
+      const vy = body === undefined ? 0 : body.vy;
+      const len = Math.hypot(vx, vy) || 1;
+      const ux = vx / len;
+      const uy = vy / len;
+      const half = draw.size * TUNING.render.barLengthFactor;
+      const px = -uy * draw.size;
+      const py = ux * draw.size;
+      g.poly([
+        x + ux * half + px,
+        y + uy * half + py,
+        x + ux * half - px,
+        y + uy * half - py,
+        x - ux * half - px,
+        y - uy * half - py,
+        x - ux * half + px,
+        y - uy * half + py,
+      ]).fill(draw.color);
+      continue;
+    }
+    g.rect(x - draw.size, y - draw.size, draw.size * 2, draw.size * 2).fill(draw.color);
+  }
 }
 
 /**

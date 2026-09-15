@@ -7,11 +7,16 @@ import { createAudio } from './audio';
 import { createHud } from './hud';
 import { createInput } from './input';
 import { createPanel } from './panel';
+import { profiler } from './profiler';
 import { createRenderer } from './render';
 import { resolveSeed, seedPinned } from './rng';
 import { step } from './step';
 import { STEP, TUNING } from './tuning';
 import { createWorld, enterLobby, enterRoom } from './world';
+
+/** Приоритеты тикера Pixi: наш проход до отрисовки и замер сразу после неё. */
+const TICKER_BEFORE_RENDER = 0;
+const TICKER_AFTER_RENDER = -100;
 
 async function boot(): Promise<void> {
   const host = document.getElementById('stage');
@@ -19,6 +24,7 @@ async function boot(): Promise<void> {
   const hudRight = document.getElementById('hud-right');
   const hudMap = document.getElementById('hud-map');
   const hudDossier = document.getElementById('hud-dossier');
+  const hudProfile = document.getElementById('hud-profile');
   const hudBanner = document.getElementById('hud-banner');
   const panelHost = document.getElementById('panel');
   if (
@@ -27,6 +33,7 @@ async function boot(): Promise<void> {
     hudRight === null ||
     hudMap === null ||
     hudDossier === null ||
+    hudProfile === null ||
     hudBanner === null ||
     panelHost === null
   ) {
@@ -35,7 +42,7 @@ async function boot(): Promise<void> {
 
   const renderer = await createRenderer(host);
   const input = createInput(renderer.app.canvas);
-  const hud = createHud(hudLeft, hudRight, hudMap, hudDossier, hudBanner);
+  const hud = createHud(hudLeft, hudRight, hudMap, hudDossier, hudProfile, hudBanner);
   const audio = createAudio();
   // Браузер не даст звучать раньше первого действия пользователя.
   for (const event of ['pointerdown', 'keydown']) {
@@ -79,6 +86,9 @@ async function boot(): Promise<void> {
     renderer.showHitboxes = !renderer.showHitboxes;
   });
   input.onToggleDossier(() => hud.toggleDossier());
+  input.onToggleProfiler(() => {
+    profiler.enabled = !profiler.enabled;
+  });
 
   // Отладочный доступ из консоли: ручной прогон симуляции и проверка детерминизма.
   Object.defineProperty(window, 'lineair', {
@@ -89,20 +99,46 @@ async function boot(): Promise<void> {
   window.addEventListener('resize', () => renderer.layout());
 
   let accumulator = 0;
+  let frameStart = performance.now();
+  let buildDone = frameStart;
+
   renderer.app.ticker.add((ticker) => {
+    frameStart = performance.now();
     const frame = Math.min(ticker.deltaMS, TUNING.sim.maxFrameMs) / 1000;
     accumulator += frame;
+
+    profiler.begin('СИМУЛЯЦИЯ');
     while (accumulator >= STEP) {
       step(world);
       accumulator -= STEP;
     }
+    profiler.end('СИМУЛЯЦИЯ');
+
     // Звук снимается после симуляции: системы её не знают, она — звука.
+    profiler.begin('ЗВУК');
     for (const id of world.sounds) audio.play(id);
     world.sounds.length = 0;
+    profiler.end('ЗВУК');
 
+    profiler.begin('СБОРКА КАДРА');
     renderer.draw(world, accumulator / STEP);
+    profiler.end('СБОРКА КАДРА');
+
+    profiler.begin('ОВЕРЛЕЙ');
     hud.update(world, ticker.FPS, renderer.showHitboxes, frame);
-  });
+    hud.profile(profiler);
+    profiler.end('ОВЕРЛЕЙ');
+
+    buildDone = performance.now();
+  }, undefined, TICKER_BEFORE_RENDER);
+
+  // Отдельный проход с самым низким приоритетом: он идёт уже после того,
+  // как Pixi отправил кадр в GPU, поэтому здесь видно цену самой отправки.
+  renderer.app.ticker.add(() => {
+    const now = performance.now();
+    profiler.addSubmit(now - buildDone);
+    profiler.endFrame(now - frameStart);
+  }, undefined, TICKER_AFTER_RENDER);
 }
 
 void boot();

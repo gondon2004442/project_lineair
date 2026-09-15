@@ -375,3 +375,23 @@ body.panel-open #hud-right {
   color: var(--red);
   letter-spacing: 0.16em;
 }
+
+/* --- Профайлер ---------------------------------------------------------- */
+
+#hud-profile {
+  top: auto;
+  right: 10px;
+  bottom: 10px;
+  min-width: 300px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+body.panel-open #hud-profile {
+  right: 356px;
+}
+
+.profile-split {
+  margin: 6px 0;
+  border-top: 1px solid var(--concrete);
+}

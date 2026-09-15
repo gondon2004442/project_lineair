@@ -6,6 +6,7 @@ import type { Floor } from './floor';
 import type { Rng } from './rng';
 import type { TileMap } from './room';
 import type { InputSnapshot } from './input';
+import { profiler } from './profiler';
 
 export type Entity = number;
 export type Faction = 'player' | 'enemy';
@@ -274,6 +275,7 @@ export interface World {
 export function createEntity(w: World): Entity {
   const e = w.nextEntity++;
   w.alive.add(e);
+  profiler.countSpawn(1);
   return e;
 }
 
@@ -283,6 +285,7 @@ export function destroyEntity(w: World, e: Entity): void {
 }
 
 export function flushDoomed(w: World): void {
+  profiler.countDestroy(w.doomed.length);
   for (const e of w.doomed) {
     w.alive.delete(e);
     w.transform.delete(e);

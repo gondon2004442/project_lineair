@@ -31,6 +31,7 @@ export interface InputDevice {
   onToggleHitboxes(handler: () => void): void;
   onToggleDossier(handler: () => void): void;
   onReroll(handler: () => void): void;
+  onToggleProfiler(handler: () => void): void;
 }
 
 const MOVE_KEYS: Record<string, [number, number]> = {
@@ -58,6 +59,7 @@ export function createInput(target: HTMLElement): InputDevice {
   let toggleHitboxes = (): void => {};
   let toggleDossier = (): void => {};
   let reroll = (): void => {};
+  let toggleProfiler = (): void => {};
 
   const recomputeMove = (): void => {
     let mx = 0;
@@ -78,6 +80,11 @@ export function createInput(target: HTMLElement): InputDevice {
     if (ev.code === 'F1') {
       ev.preventDefault();
       toggleHitboxes();
+      return;
+    }
+    if (ev.code === 'F3') {
+      ev.preventDefault();
+      toggleProfiler();
       return;
     }
     if (ev.repeat) return;
@@ -169,6 +176,9 @@ export function createInput(target: HTMLElement): InputDevice {
     },
     onReroll(handler) {
       reroll = handler;
+    },
+    onToggleProfiler(handler) {
+      toggleProfiler = handler;
     },
   };
 }
