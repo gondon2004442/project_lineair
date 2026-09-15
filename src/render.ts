@@ -3,8 +3,9 @@
  * ничего в мире не меняет. Собственный PRNG для тряски,
  * чтобы визуал не съедал случайность симуляции.
  */
-import { Application, Container, Graphics } from 'pixi.js';
+import { Application, BlurFilter, Container, Graphics } from 'pixi.js';
 import type { World } from './ecs';
+import { createAberration, createDust, drawSmoke } from './fx';
 import { PALETTE } from './palette';
 import { makeRng } from './rng';
 import { vacancyCount } from './systems/staff';
@@ -28,19 +29,43 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
     antialias: false,
     resizeTo: host,
     roundPixels: true,
+    // Аберрация написана на GLSL, поэтому просим именно WebGL.
+    preference: 'webgl',
   });
   host.appendChild(app.canvas);
 
   const root = new Container();
   const shakeLayer = new Container();
   const roomLayer = new Graphics();
+  const dustLayer = new Graphics();
+  const smokeLayer = new Graphics();
   const entityLayer = new Graphics();
   const debugLayer = new Graphics();
-  shakeLayer.addChild(roomLayer, entityLayer, debugLayer);
+
+  // Свечение: те же красные силуэты, только размытые и сложенные поверх.
+  const glowLayer = new Graphics();
+  const bloom = new BlurFilter({
+    strength: TUNING.fx.bloomBlur,
+    quality: Math.max(1, Math.round(TUNING.fx.bloomQuality)),
+  });
+  glowLayer.filters = [bloom];
+  glowLayer.blendMode = 'add';
+
+  shakeLayer.addChild(roomLayer, dustLayer, smokeLayer, entityLayer, glowLayer, debugLayer);
   root.addChild(shakeLayer);
   app.stage.addChild(root);
 
+  // Вспышка стоп-кадра живёт в экранных координатах, её тряска не касается.
+  const flashLayer = new Graphics();
+  app.stage.addChild(flashLayer);
+
+  const aberration = createAberration();
+  let aberrationOn = TUNING.fx.aberration > 0;
+  if (aberrationOn) app.stage.filters = [aberration.filter];
+
+  const dust = createDust();
   const fxRng = makeRng(1);
+  let fxTime = 0;
   // Бетон перерисовывается только когда карта сменилась или щёлкнул замок.
   let drawnToken = -1;
 
@@ -73,11 +98,45 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
         drawRoom(roomLayer, w.map);
       }
 
+      const frame = app.ticker.deltaMS / 1000;
+      fxTime += frame;
+
       const shake = w.fx.shake;
       shakeLayer.position.set(fxRng.spread(shake), fxRng.spread(shake));
 
+      dust.update(frame);
+      dustLayer.clear();
+      dust.draw(dustLayer);
+
+      smokeLayer.clear();
+      drawSmoke(smokeLayer, w, fxTime);
+
       entityLayer.clear();
       drawEntities(entityLayer, w, alpha);
+
+      // Свечение и аберрация на нуле снимаются целиком: слабой машине
+      // важно, чтобы выключенный эффект ничего не стоил.
+      glowLayer.visible = TUNING.fx.bloomAlpha > 0;
+      if (glowLayer.visible) {
+        glowLayer.clear();
+        drawGlow(glowLayer, w, alpha);
+        glowLayer.alpha = TUNING.fx.bloomAlpha;
+        bloom.strength = TUNING.fx.bloomBlur;
+      }
+
+      const wantAberration = TUNING.fx.aberration > 0;
+      if (wantAberration !== aberrationOn) {
+        aberrationOn = wantAberration;
+        app.stage.filters = wantAberration ? [aberration.filter] : [];
+      }
+      if (wantAberration) aberration.setAmount(TUNING.fx.aberration);
+
+      flashLayer.clear();
+      if (w.fx.hitstop > 0 && TUNING.fx.hitstopFlash > 0) {
+        flashLayer
+          .rect(0, 0, app.screen.width, app.screen.height)
+          .fill({ color: PALETTE.concreteLight, alpha: TUNING.fx.hitstopFlash });
+      }
 
       debugLayer.clear();
       if (renderer.showHitboxes) drawHitboxes(debugLayer, w, alpha);
@@ -353,6 +412,26 @@ function drawVacancyCount(g: Graphics, x: number, y: number, size: number, open:
     g.rect(cursor, top, mark, mark).fill(PALETTE.yellow);
     cursor += mark + gap;
   }
+}
+
+/**
+ * Слой свечения: только акцентный красный, залитый целиком.
+ * Размытие и сложение делают из него ореол, не трогая сами силуэты.
+ */
+function drawGlow(g: Graphics, w: World, alpha: number): void {
+  for (const [e, draw] of w.drawC) {
+    if (draw.color !== PALETTE.red) continue;
+    const t = w.transform.get(e);
+    if (t === undefined) continue;
+    const x = lerp(t.px, t.x, alpha);
+    const y = lerp(t.py, t.y, alpha);
+    if (draw.shape === 'diamond') {
+      g.poly([x, y - draw.size, x + draw.size, y, x, y + draw.size, x - draw.size, y]);
+    } else {
+      g.rect(x - draw.size, y - draw.size, draw.size * 2, draw.size * 2);
+    }
+  }
+  g.fill(PALETTE.red);
 }
 
 function drawHitboxes(g: Graphics, w: World, alpha: number): void {

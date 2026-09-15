@@ -61,7 +61,7 @@ async function boot(): Promise<void> {
 
   // Отладочный доступ из консоли: ручной прогон симуляции и проверка детерминизма.
   Object.defineProperty(window, 'lineair', {
-    value: { world: () => world, createWorld, enterRoom, step },
+    value: { world: () => world, createWorld, enterRoom, step, tuning: TUNING },
   });
 
   renderer.layout();

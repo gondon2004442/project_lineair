@@ -365,6 +365,45 @@ export const TUNING = {
     blinkRate: 22,
   },
 
+  /**
+   * Визуальный проход. Только рендер: ни один параметр отсюда
+   * не влияет на симуляцию и не трогает её PRNG.
+   */
+  fx: {
+    /**
+     * Свечение акцентного красного: непрозрачность слоя и размытие.
+     * На нуле слой выключается, и размытие не считается.
+     */
+    bloomAlpha: 0.85,
+    bloomBlur: 11,
+    bloomQuality: 3,
+
+    /**
+     * Хроматическая аберрация: в центре нуль, к краям растёт.
+     * На нуле фильтр снимается со сцены совсем, а не считается впустую.
+     */
+    aberration: 0.15,
+
+    /** Слой пыли. */
+    dustCount: 110,
+    dustSize: 1.6,
+    dustSpeed: 11,
+    dustAlpha: 0.22,
+    /** Как быстро пылинку сносит по синусоиде. */
+    dustDrift: 0.6,
+
+    /** Векторный дым вокруг заражённых. */
+    smokePuffs: 3,
+    smokeRadius: 16,
+    smokeSpread: 7,
+    smokeSpin: 0.55,
+    smokeAlpha: 0.3,
+    smokeWidth: 1,
+
+    /** Вспышка на стоп-кадре. */
+    hitstopFlash: 0.14,
+  },
+
   render: {
     /** Вырез внутренней грани бетонного блока — шов между блоками. */
     wallInset: 3,
@@ -652,6 +691,23 @@ export const PANEL: TuningGroup[] = [
       { path: 'enemyBullet.damage', label: 'УРОН', min: 1, max: 5, step: 1 },
       { path: 'enemyBullet.life', label: 'ДАЛЬНОБОЙНОСТЬ', min: 0.5, max: 8, step: 0.25 },
       { path: 'enemyBullet.radius', label: 'РАЗМЕР ПУЛИ', min: 2, max: 16, step: 0.5 },
+    ],
+  },
+  {
+    title: 'ВИЗУАЛ',
+    fields: [
+      { path: 'fx.bloomAlpha', label: 'СВЕЧЕНИЕ КРАСНОГО', min: 0, max: 2, step: 0.05 },
+      { path: 'fx.bloomBlur', label: 'РАЗМЫТИЕ СВЕЧЕНИЯ', min: 0, max: 40, step: 1 },
+      { path: 'fx.aberration', label: 'АБЕРРАЦИЯ ПО КРАЯМ', min: 0, max: 3, step: 0.05 },
+      { path: 'fx.dustCount', label: 'ПЫЛИНОК', min: 0, max: 400, step: 10, onRestart: true },
+      { path: 'fx.dustSize', label: 'РАЗМЕР ПЫЛИНКИ', min: 0.5, max: 6, step: 0.1 },
+      { path: 'fx.dustSpeed', label: 'СКОРОСТЬ ПЫЛИ', min: 0, max: 80, step: 1 },
+      { path: 'fx.dustAlpha', label: 'ПЛОТНОСТЬ ПЫЛИ', min: 0, max: 1, step: 0.02 },
+      { path: 'fx.smokePuffs', label: 'КЛУБОВ ДЫМА', min: 0, max: 8, step: 1 },
+      { path: 'fx.smokeRadius', label: 'РАДИУС ДЫМА', min: 2, max: 60, step: 1 },
+      { path: 'fx.smokeSpin', label: 'ВРАЩЕНИЕ ДЫМА', min: 0, max: 4, step: 0.05 },
+      { path: 'fx.smokeAlpha', label: 'ПЛОТНОСТЬ ДЫМА', min: 0, max: 1, step: 0.02 },
+      { path: 'fx.hitstopFlash', label: 'ВСПЫШКА СТОП-КАДРА', min: 0, max: 0.6, step: 0.01 },
     ],
   },
   {
