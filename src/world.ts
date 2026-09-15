@@ -153,6 +153,7 @@ export function enterRoom(w: World, index: number, fromDir: Dir | null): void {
   if (room === undefined) return;
 
   clearExceptPlayer(w);
+  w.scene = 'run';
   w.room = index;
   room.visited = true;
   w.map = buildRoomMap(room.template, roomDoors(room));

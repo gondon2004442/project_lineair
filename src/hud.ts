@@ -255,7 +255,7 @@ function schematic(w: World): string {
       const ox = other.gx * step + half;
       const oy = other.gy * step + half;
       parts.push(
-        `<line x1="${cx}" y1="${cy}" x2="${ox}" y2="${oy}" stroke="${hex(PALETTE.concreteMid)}" stroke-width="${TUNING.hud.mapLink}"/>`,
+        `<line x1="${cx}" y1="${cy}" x2="${ox}" y2="${oy}" stroke="${hex(PALETTE.concrete500)}" stroke-width="${TUNING.hud.mapLink}"/>`,
       );
     }
   }
@@ -265,13 +265,13 @@ function schematic(w: World): string {
     const y = room.gy * step;
     const current = room.index === w.room;
     let fill = hex(PALETTE.black);
-    let stroke = hex(PALETTE.concrete);
+    let stroke = hex(PALETTE.concrete700);
     if (current) {
       fill = hex(PALETTE.yellow);
       stroke = hex(PALETTE.yellow);
     } else if (room.cleared) {
-      fill = hex(PALETTE.concrete);
-      stroke = hex(PALETTE.concreteMid);
+      fill = hex(PALETTE.concrete700);
+      stroke = hex(PALETTE.concrete500);
     } else if (room.visited) {
       stroke = hex(PALETTE.red);
     }

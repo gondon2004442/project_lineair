@@ -37,6 +37,18 @@ export function postNumbers(post: string): PostNumbers {
   }
 }
 
+/**
+ * Оттенок по остатку кожи. Шкала бетона из дизайн-документа:
+ * чем меньше кожи, тем ближе к бетону, тем выше должность.
+ */
+export function skinShade(skin: number): number {
+  if (skin >= 80) return PALETTE.concrete100;
+  if (skin >= 60) return PALETTE.concrete300;
+  if (skin >= 40) return PALETTE.concrete500;
+  if (skin >= 20) return PALETTE.concrete700;
+  return PALETTE.concrete900;
+}
+
 export function spawnPlayer(w: World, x: number, y: number): Entity {
   const e = createEntity(w);
   w.transform.set(e, { x, y, px: x, py: y });
@@ -66,7 +78,8 @@ export function spawnPlayer(w: World, x: number, y: number): Entity {
   w.drawC.set(e, {
     shape: 'square',
     size: TUNING.player.radius,
-    color: PALETTE.concreteLight,
+    // Красный — только субъект. Это единственное красное пятно на экране.
+    color: PALETTE.red,
     hollow: false,
     desk: false,
   });
@@ -87,13 +100,17 @@ export function spawnStaff(w: World, post: string, priority: number, x: number, 
     title: spec === undefined ? post.toUpperCase() : spec.title,
     priority,
     plateMarks: spec === undefined ? 0 : spec.plateMarks,
+    plates: spec === undefined ? 1 : spec.plates,
+    skin: spec === undefined ? 50 : spec.skin,
+    silhouette: spec === undefined ? 'sunken' : spec.silhouette,
     plateFlash: 0,
   });
   w.drawC.set(e, {
     shape: 'square',
     size: numbers.radius,
-    color: PALETTE.red,
-    hollow: spec !== undefined && spec.fill === 'hollow',
+    // Цвет сотрудника — это его заражение, а не должность как таковая.
+    color: skinShade(spec === undefined ? 50 : spec.skin),
+    hollow: false,
     desk: spec !== undefined && spec.desk,
   });
   attachBehaviour(w, e, post, x, y);
@@ -126,6 +143,9 @@ export function reassign(w: World, e: Entity, post: string): void {
   staff.post = post;
   staff.title = spec === undefined ? post.toUpperCase() : spec.title;
   staff.plateMarks = spec === undefined ? 0 : spec.plateMarks;
+  staff.plates = spec === undefined ? 1 : spec.plates;
+  staff.skin = spec === undefined ? 50 : spec.skin;
+  staff.silhouette = spec === undefined ? 'sunken' : spec.silhouette;
   staff.plateFlash = 0;
   // Доля прочности переносится: иначе переназначение работало бы лечением,
   // и Заведующий чинил бы подчинённых перетасовкой.
@@ -134,7 +154,8 @@ export function reassign(w: World, e: Entity, post: string): void {
   health.hp = Math.max(1, Math.round(numbers.hp * Math.max(0, Math.min(1, ratio))));
   body.radius = numbers.radius;
   draw.size = numbers.radius;
-  draw.hollow = spec !== undefined && spec.fill === 'hollow';
+  draw.color = skinShade(spec === undefined ? 50 : spec.skin);
+  draw.hollow = false;
   draw.desk = spec !== undefined && spec.desk;
   attachBehaviour(w, e, post, t === undefined ? 0 : t.x, t === undefined ? 0 : t.y);
 }
@@ -209,6 +230,18 @@ export function propNumbers(kind: string): PropNumbers {
   }
 }
 
+/** Мебель офисного кита: кресло в обивке, стеллаж из тёмного дуба, обломок бетона. */
+function propShade(kind: string): number {
+  switch (kind) {
+    case PROP_CABINET:
+      return PALETTE.woodDark;
+    case PROP_RUBBLE:
+      return PALETTE.concrete500;
+    default:
+      return PALETTE.fabric;
+  }
+}
+
 export function spawnProp(w: World, kind: string, x: number, y: number): Entity {
   const spec = PROPS_BY_ID.get(kind);
   const numbers = propNumbers(kind);
@@ -227,7 +260,7 @@ export function spawnProp(w: World, kind: string, x: number, y: number): Entity 
   w.drawC.set(e, {
     shape: 'square',
     size: numbers.radius,
-    color: PALETTE.concreteMid,
+    color: propShade(kind),
     hollow: spec !== undefined && spec.hollow,
     desk: false,
   });
@@ -270,7 +303,9 @@ export function spawnBullet(
   w.drawC.set(e, {
     shape: spec.shape ?? (faction === 'player' ? 'dot' : 'diamond'),
     size: spec.radius,
-    color: faction === 'player' ? PALETTE.yellow : PALETTE.red,
+    // Снаряды субъекта красные — это его красный. Со стороны объекта
+    // летят бумаги: картотечные карточки и предписания.
+    color: faction === 'player' ? PALETTE.red : PALETTE.paper,
     hollow: false,
     desk: false,
   });

@@ -74,6 +74,12 @@ export interface StaffC {
   priority: number;
   /** Насечек на табличке. */
   plateMarks: number;
+  /** Сколько табличек на груди. */
+  plates: number;
+  /** Сколько процентов кожи осталось: отсюда оттенок бетона. */
+  skin: number;
+  /** Форма силуэта. */
+  silhouette: string;
   /** Пока > 0 — табличка светится: телеграф. */
   plateFlash: number;
 }

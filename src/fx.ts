@@ -56,7 +56,7 @@ export function createDust(): Dust {
       for (const mote of motes) {
         g.rect(mote.x, mote.y, size, size);
       }
-      g.fill({ color: PALETTE.concreteLight, alpha: TUNING.fx.dustAlpha });
+      g.fill({ color: PALETTE.concrete300, alpha: TUNING.fx.dustAlpha });
     },
   };
 }
@@ -90,7 +90,8 @@ export function drawSmoke(g: Graphics, w: World, time: number): void {
       }
       g.poly(points, false).stroke({
         width: cfg.smokeWidth,
-        color: PALETTE.red,
+        // Дым заражения — бетонная взвесь, а не кровь. Красный занят субъектом.
+        color: PALETTE.concrete500,
         alpha: cfg.smokeAlpha * (1 - i / (puffs + 1)),
       });
     }
