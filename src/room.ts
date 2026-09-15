@@ -2,7 +2,13 @@
  * Помещение — прямоугольная сетка клеток, собранная из шаблона-планировки.
  * Дверь — особая клетка: сплошная, пока помещение не зачищено.
  */
-import { ROOM_TEMPLATES, TEMPLATES_BY_ID, TEMPLATE_START, type RoomTemplate } from './data/roomTemplates';
+import {
+  LOBBY_TEMPLATE,
+  ROOM_TEMPLATES,
+  TEMPLATES_BY_ID,
+  TEMPLATE_START,
+  type RoomTemplate,
+} from './data/roomTemplates';
 import { TUNING } from './tuning';
 
 export const TILE_FLOOR = 0;
@@ -10,6 +16,8 @@ export const TILE_WALL = 1;
 export const TILE_DOOR = 2;
 /** Разрушаемая перегородка: тот же бетон, но с прочностью. */
 export const TILE_WEAK = 3;
+/** Проход в аномалию. Только в вестибюле, проходим насквозь. */
+export const TILE_GATE = 4;
 
 /** Стороны помещения. Порядок задаёт индексы в neighbors и doors. */
 export const NORTH = 0;
@@ -94,6 +102,25 @@ export function buildRoomMap(templateId: string, doors: readonly boolean[]): Til
   return map;
 }
 
+/** Вестибюль: та же сборка, но без дверей — выход здесь один. */
+export function buildLobbyMap(): TileMap {
+  const map: TileMap = {
+    cols: MAP_COLS,
+    rows: MAP_ROWS,
+    size: TUNING.room.tile,
+    tiles: new Uint8Array(MAP_COLS * MAP_ROWS),
+    weakHp: new Uint8Array(MAP_COLS * MAP_ROWS),
+    doorsLocked: false,
+  };
+  paint(map, LOBBY_TEMPLATE);
+  return map;
+}
+
+/** Стоит ли точка на проходе в аномалию. */
+export function isGatePoint(map: TileMap, x: number, y: number): boolean {
+  return tileAtPoint(map, x, y) === TILE_GATE;
+}
+
 function fallbackTemplate(): RoomTemplate {
   const start = TEMPLATES_BY_ID.get(TEMPLATE_START);
   if (start !== undefined) return start;
@@ -110,7 +137,14 @@ function paint(map: TileMap, template: RoomTemplate): void {
       if (!border) {
         const row = template.rows[cy - WALL];
         const glyph = row === undefined ? '.' : row[cx - WALL];
-        tile = glyph === '#' ? TILE_WALL : glyph === '%' ? TILE_WEAK : TILE_FLOOR;
+        tile =
+          glyph === '#'
+            ? TILE_WALL
+            : glyph === '%'
+              ? TILE_WEAK
+              : glyph === '@'
+                ? TILE_GATE
+                : TILE_FLOOR;
       }
       const at = cy * map.cols + cx;
       map.tiles[at] = tile;

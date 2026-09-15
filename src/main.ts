@@ -7,10 +7,10 @@ import { createHud } from './hud';
 import { createInput } from './input';
 import { createPanel } from './panel';
 import { createRenderer } from './render';
-import { resolveSeed } from './rng';
+import { resolveSeed, seedPinned } from './rng';
 import { step } from './step';
 import { STEP, TUNING } from './tuning';
-import { createWorld, enterRoom } from './world';
+import { createWorld, enterLobby, enterRoom } from './world';
 
 async function boot(): Promise<void> {
   const host = document.getElementById('stage');
@@ -39,21 +39,36 @@ async function boot(): Promise<void> {
   // Панель поднимается первой: она восстанавливает значения прошлого сеанса,
   // и первый же мир должен собираться уже по ним.
   const panel = createPanel(panelHost, {
-    restart: () => restartRun(),
+    restart: () => rebuild(),
     resize: () => renderer.layout(),
   });
 
-  const seed = resolveSeed();
+  let seed = resolveSeed();
   let world = createWorld(seed, input.snapshot);
 
-  function restartRun(): void {
-    // Тот же seed — тот же этаж.
+  /** F2 — выход из забега обратно в вестибюль. Этаж остаётся тем же. */
+  function toLobby(): void {
+    enterLobby(world);
+    panel.clearRestartFlag();
+  }
+
+  /** E в вестибюле — перевыдача seed, то есть другой этаж. */
+  function rerollSeed(): void {
+    if (world.scene !== 'lobby' || seedPinned()) return;
+    seed = resolveSeed();
+    world = createWorld(seed, input.snapshot);
+    panel.clearRestartFlag();
+  }
+
+  /** Смена крутилок, читаемых при рождении: пересобираем этаж заново. */
+  function rebuild(): void {
     world = createWorld(seed, input.snapshot);
     panel.clearRestartFlag();
   }
 
   input.setProjection((sx, sy) => renderer.screenToWorld(sx, sy));
-  input.onRestart(restartRun);
+  input.onRestart(toLobby);
+  input.onReroll(rerollSeed);
   input.onToggleHitboxes(() => {
     renderer.showHitboxes = !renderer.showHitboxes;
   });

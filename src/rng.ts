@@ -33,6 +33,11 @@ export function makeRng(seed: number): Rng {
   };
 }
 
+/** Закреплён ли seed адресной строкой: тогда его не перевыдают. */
+export function seedPinned(): boolean {
+  return new URLSearchParams(window.location.search).get('seed') !== null;
+}
+
 /** Seed из адресной строки (?seed=...), иначе новый случайный. */
 export function resolveSeed(): number {
   const raw = new URLSearchParams(window.location.search).get('seed');

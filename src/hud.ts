@@ -30,6 +30,41 @@ export function createHud(
   let cooldown = 0;
   let dossierOpen = false;
 
+  const renderLobby = (w: World, fps: number, hitboxes: boolean): void => {
+    left.innerHTML = [
+      '<div class="title">ОБЪЕКТ / LINEAIR</div>',
+      '<div class="subtitle">ВЕСТИБЮЛЬ. ДОПУСК ОФОРМЛЕН</div>',
+      row('ЭТАЖ', `${w.floor.rooms.length} УЧАСТКОВ`),
+      row('ПРИЁМНАЯ', `УЧАСТОК ${w.floor.end + 1}`),
+      '<div class="call">ШАГНИ В ПРОЁМ, ЧТОБЫ НАЧАТЬ</div>',
+    ].join('');
+
+    right.innerHTML = [
+      row('SEED', formatSeed(w.seed)),
+      row('E', 'ДРУГОЙ SEED'),
+      row('FPS', String(Math.round(fps))),
+      row('F1 ХИТБОКСЫ', hitboxes ? '<span class="ok">ВКЛ</span>' : 'ВЫКЛ'),
+      row('` ', 'КРУТИЛКИ'),
+    ].join('');
+
+    map.innerHTML = [
+      '<div class="subtitle">ПАМЯТКА СОТРУДНИКА</div>',
+      row('WASD', 'ХОД'),
+      row('МЫШЬ', 'ПРИЦЕЛ'),
+      row('ЛКМ', 'ОГОНЬ'),
+      row('КОЛЕСО', 'ФОРМА ОРУЖИЯ'),
+      row('ПКМ', 'ТЕЛЕКИНЕЗ'),
+      row('SHIFT', 'РЫВОК'),
+      row('R', 'ПЕРЕЗАРЯДКА'),
+      row('I', 'ЛИЧНОЕ ДЕЛО'),
+      row('F2', 'ВЕРНУТЬСЯ СЮДА'),
+    ].join('');
+
+    banner.hidden = true;
+    dossier.hidden = !dossierOpen;
+    if (dossierOpen) dossier.innerHTML = dossierBody(w);
+  };
+
   const render = (w: World, fps: number, hitboxes: boolean): void => {
     const health = w.health.get(w.player);
     const player = w.playerC.get(w.player);
@@ -76,10 +111,10 @@ export function createHud(
 
     if (w.status === 'dead') {
       banner.hidden = false;
-      banner.innerHTML = '<b>СУБЪЕКТ ЛИКВИДИРОВАН</b><span>[F2] ПОВТОРИТЬ ИСПЫТАНИЕ</span>';
+      banner.innerHTML = '<b>СУБЪЕКТ ЛИКВИДИРОВАН</b><span>[F2] ВЕРНУТЬСЯ В ВЕСТИБЮЛЬ</span>';
     } else if (w.status === 'cleared') {
       banner.hidden = false;
-      banner.innerHTML = '<b>СЕКТОР СДАН</b><span>ЗАВЕДУЮЩИЙ ОТСТРАНЁН · [F2] ПОВТОРИТЬ</span>';
+      banner.innerHTML = '<b>СЕКТОР СДАН</b><span>ЗАВЕДУЮЩИЙ ОТСТРАНЁН · [F2] В ВЕСТИБЮЛЬ</span>';
     } else {
       banner.hidden = true;
     }
@@ -90,7 +125,8 @@ export function createHud(
       cooldown -= dt;
       if (cooldown > 0) return;
       cooldown = TUNING.debug.overlayInterval;
-      render(w, fps, hitboxes);
+      if (w.scene === 'lobby') renderLobby(w, fps, hitboxes);
+      else render(w, fps, hitboxes);
     },
     toggleDossier() {
       dossierOpen = !dossierOpen;

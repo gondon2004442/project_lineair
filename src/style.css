@@ -354,3 +354,24 @@ body.panel-open #hud-right {
   text-transform: none;
   letter-spacing: 0.04em;
 }
+
+/* --- Вестибюль ---------------------------------------------------------- */
+
+.title {
+  color: var(--yellow);
+  font-size: 18px;
+  letter-spacing: 0.24em;
+}
+
+.subtitle {
+  margin-bottom: 8px;
+  color: var(--concrete-mid);
+}
+
+.call {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--concrete);
+  color: var(--red);
+  letter-spacing: 0.16em;
+}

@@ -206,6 +206,9 @@ export interface DrawC {
 
 export type RunStatus = 'playing' | 'dead' | 'cleared';
 
+/** Где мы: в вестибюле или на этаже. */
+export type Scene = 'lobby' | 'run';
+
 export interface Feedback {
   shake: number;
   hitstop: number;
@@ -225,6 +228,7 @@ export interface World {
   input: InputSnapshot;
   fx: Feedback;
   status: RunStatus;
+  scene: Scene;
   player: Entity;
   /** Штатное расписание текущего участка. */
   roster: RosterEntry[];

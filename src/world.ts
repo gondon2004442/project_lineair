@@ -7,6 +7,7 @@ import type { InputSnapshot } from './input';
 import { makeRng } from './rng';
 import {
   TILE_FLOOR,
+  buildLobbyMap,
   buildRoomMap,
   entryPosition,
   roomCenter,
@@ -14,6 +15,8 @@ import {
   type TileMap,
 } from './room';
 import { PROPS } from './data/props';
+import { WEAPON_FORMS } from './data/weaponForms';
+import { ammoMax } from './weapon';
 import { postNumbers, propNumbers, spawnPlayer, spawnProp, spawnStaff } from './spawn';
 import { TUNING } from './tuning';
 
@@ -31,6 +34,7 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     input,
     fx: { shake: 0, hitstop: 0 },
     status: 'playing',
+    scene: 'lobby',
     player: -1,
     roster: [],
     build: [],
@@ -56,8 +60,88 @@ export function createWorld(seed: number, input: InputSnapshot): World {
   };
 
   w.player = spawnPlayer(w, 0, 0);
-  enterRoom(w, floor.start, null);
+  enterLobby(w);
   return w;
+}
+
+/**
+ * Вестибюль. Забег ещё не начался: этаж уже собран и ждёт,
+ * но пока субъект не шагнул в проём, ничего не происходит.
+ */
+export function enterLobby(w: World): void {
+  clearExceptPlayer(w);
+  w.scene = 'lobby';
+  w.status = 'playing';
+  w.room = w.floor.start;
+  w.map = buildLobbyMap();
+  w.mapToken += 1;
+  w.roster = [];
+  w.metronome = TUNING.post.inspector.metronomeInterval;
+  w.beat = 0;
+
+  const center = roomCenter(w.map);
+  // Ставим субъекта ниже проёма, чтобы забег не начался сам собой.
+  placePlayer(w, center.x, center.y + TUNING.room.tile * TUNING.lobby.spawnOffsetTiles);
+  restorePlayer(w);
+  scatterLobbyProps(w);
+}
+
+/** Забег начинается со входа в первое помещение этажа. */
+export function startRun(w: World): void {
+  w.scene = 'run';
+  w.status = 'playing';
+  w.build = [];
+  restorePlayer(w);
+  enterRoom(w, w.floor.start, null);
+}
+
+/** Полный запас хода, полные обоймы, полная энергия. */
+function restorePlayer(w: World): void {
+  const health = w.health.get(w.player);
+  const player = w.playerC.get(w.player);
+  if (health !== undefined) {
+    health.max = TUNING.player.maxHp;
+    health.hp = health.max;
+    health.iframes = 0;
+    health.flash = 0;
+  }
+  if (player !== undefined) {
+    player.energy = TUNING.telekinesis.energyMax;
+    player.energyDelay = 0;
+    player.held = -1;
+    player.charge = 0;
+    player.queued = 0;
+    player.reloading = false;
+    player.reloadTimer = 0;
+    for (let i = 0; i < WEAPON_FORMS.length; i++) {
+      const form = WEAPON_FORMS[i];
+      if (form !== undefined) player.ammo[i] = ammoMax(w, form.id);
+    }
+  }
+  const body = w.body.get(w.player);
+  if (body !== undefined) {
+    body.vx = 0;
+    body.vy = 0;
+  }
+}
+
+/** Канцелярская обстановка вестибюля: есть что покидать телекинезом. */
+function scatterLobbyProps(w: World): void {
+  const rng = makeRng((w.seed ^ TUNING.floor.propSeedStride) >>> 0);
+  const center = roomCenter(w.map);
+  for (const spec of PROPS) {
+    for (let i = 0; i < spec.scatter; i++) {
+      const spot = findSpawnSpot(
+        w.map,
+        rng,
+        center.x,
+        center.y,
+        TUNING.lobby.gateClearance,
+        propNumbers(spec.id).radius,
+      );
+      spawnProp(w, spec.id, spot.x, spot.y);
+    }
+  }
 }
 
 /**

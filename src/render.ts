@@ -11,7 +11,7 @@ import { makeRng } from './rng';
 import { vacancyCount } from './systems/staff';
 import { pendingItems } from './systems/postAuditor';
 import { grabCandidate } from './systems/telekinesis';
-import { TILE_DOOR, TILE_WALL, TILE_WEAK, type TileMap } from './room';
+import { TILE_DOOR, TILE_GATE, TILE_WALL, TILE_WEAK, type TileMap } from './room';
 import { ROOM_HEIGHT, ROOM_WIDTH, STEP, TUNING } from './tuning';
 
 export interface Renderer {
@@ -184,6 +184,18 @@ function drawRoom(g: Graphics, map: TileMap): void {
           if (spot === undefined) continue;
           g.rect(spot[0], spot[1], side, side).fill(PALETTE.concreteMid);
         }
+        continue;
+      }
+
+      if (tile === TILE_GATE) {
+        // Проём: в полу нет пола. Чёрный провал в красной рамке.
+        const inset = TUNING.render.gateInset;
+        g.rect(x, y, size, size).fill(PALETTE.black);
+        g.rect(x + inset, y + inset, size - inset * 2, size - inset * 2).stroke({
+          width: TUNING.render.gateWidth,
+          color: PALETTE.red,
+          alpha: 0.5,
+        });
         continue;
       }
 

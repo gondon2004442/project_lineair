@@ -12,6 +12,7 @@ import { feedbackSystem, lifecycleSystem, statusSystem } from './systems/lifecyc
 import { physicsSystem } from './systems/physics';
 import { propPushSystem, propSystem } from './systems/props';
 import { telekinesisSystem } from './systems/telekinesis';
+import { lobbySystem } from './systems/lobby';
 import { roomSystem } from './systems/rooms';
 import { playerControlSystem } from './systems/playerControl';
 import { STEP } from './tuning';
@@ -52,7 +53,11 @@ export function step(w: World): void {
   feedbackSystem(w, STEP);
 
   flushDoomed(w);
-  roomSystem(w);
-  statusSystem(w);
+  if (w.scene === 'lobby') {
+    lobbySystem(w);
+  } else {
+    roomSystem(w);
+    statusSystem(w);
+  }
   w.tick += 1;
 }
