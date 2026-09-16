@@ -846,10 +846,25 @@ function drawVacancyCount(g: Graphics, x: number, y: number, size: number, open:
 }
 
 /**
- * Слой свечения: только акцентный красный. По дизайн-документу красное
- * на экране — это субъект и его огонь, поэтому светится ровно он.
+ * Слой свечения. По брифу светиться должен только субъект, но заражённые
+ * с красным ореолом читаются в бою лучше — это правка по игре, а не по
+ * документу, и она сознательная. Ореол сотрудников гасится или снимается
+ * ручками staffGlowAlpha и staffGlowSpread.
  */
 function drawGlow(g: Graphics, w: World, alpha: number): void {
+  // Сотрудники: ореол шире силуэта и тусклее субъекта.
+  for (const [e] of w.staffC) {
+    const draw = w.drawC.get(e);
+    const t = w.transform.get(e);
+    if (draw === undefined || t === undefined) continue;
+    const x = lerp(t.px, t.x, alpha);
+    const y = lerp(t.py, t.y, alpha);
+    const size = draw.size * TUNING.render.staffGlowSpread;
+    g.rect(x - size, y - size, size * 2, size * 2);
+  }
+  g.fill({ color: PALETTE.red, alpha: TUNING.render.staffGlowAlpha });
+
+  // Субъект и всё остальное красное — в полную силу.
   for (const [e, draw] of w.drawC) {
     if (draw.color !== PALETTE.red) continue;
     const t = w.transform.get(e);
