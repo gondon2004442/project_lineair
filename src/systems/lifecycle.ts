@@ -42,4 +42,5 @@ export function feedbackSystem(w: World, dt: number): void {
   // на медленной машине они не станут длиннее.
   w.fx.blankTime = Math.max(0, w.fx.blankTime - dt);
   w.fx.slowMo = Math.max(0, w.fx.slowMo - dt);
+  w.fx.warpTime = Math.max(0, w.fx.warpTime - dt);
 }

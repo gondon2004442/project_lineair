@@ -133,22 +133,61 @@ out vec4 finalColor;
 
 uniform sampler2D uTexture;
 uniform float uAmount;
+// Два источника искажения: кольцо бланка и точка телекинеза. Каждый —
+// это кольцевая волна: смещение максимально на своём радиусе и спадает
+// в обе стороны, поэтому картинка тянется вслед за фронтом, а не плывёт
+// целиком.
+uniform vec4 uWarpA;   // xy — центр в uv, z — радиус, w — сила
+uniform vec4 uWarpB;
+uniform vec2 uWarpWidth;
+uniform float uAspect;
+
+vec2 ripple(vec2 uv, vec4 warp, float width) {
+    if (warp.w <= 0.0001) return vec2(0.0);
+    vec2 d = (uv - warp.xy) * vec2(uAspect, 1.0);
+    float r = length(d);
+    if (r <= 0.0001) return vec2(0.0);
+    float band = exp(-pow((r - warp.z) / max(width, 0.0001), 2.0));
+    return normalize(d) * band * warp.w / vec2(uAspect, 1.0);
+}
 
 void main(void) {
-    vec2 centred = vTextureCoord - 0.5;
+    vec2 push = ripple(vTextureCoord, uWarpA, uWarpWidth.x)
+              + ripple(vTextureCoord, uWarpB, uWarpWidth.y);
+    vec2 uv = vTextureCoord + push;
+
+    vec2 centred = uv - 0.5;
     // В центре ноль, к краям растёт квадратично: рамка кадра «расходится».
-    vec2 offset = centred * dot(centred, centred) * uAmount * 0.1;
-    vec4 base = texture(uTexture, vTextureCoord);
-    float red = texture(uTexture, vTextureCoord + offset).r;
-    float blue = texture(uTexture, vTextureCoord - offset).b;
+    // Плюс местная добавка от волны — там, где пространство тянет, цвет
+    // расходится сильнее всего.
+    vec2 offset = centred * dot(centred, centred) * uAmount * 0.1 + push * 0.5;
+    vec4 base = texture(uTexture, uv);
+    float red = texture(uTexture, uv + offset).r;
+    float blue = texture(uTexture, uv - offset).b;
     finalColor = vec4(red, base.g, blue, base.a);
 }
 `;
 
+export interface WarpSource {
+  /** Центр в координатах экрана, 0..1. */
+  x: number;
+  y: number;
+  /** Радиус фронта в долях высоты экрана. */
+  radius: number;
+  /** Сила смещения. */
+  power: number;
+  /** Ширина фронта. */
+  width: number;
+}
+
 export interface Aberration {
   filter: Filter;
   setAmount(amount: number): void;
+  /** Две волны за кадр: кольцо бланка и точка телекинеза. */
+  setWarp(a: WarpSource | null, b: WarpSource | null, aspect: number): void;
 }
+
+const OFF: WarpSource = { x: 0.5, y: 0.5, radius: 0, power: 0, width: 0.1 };
 
 export function createAberration(): Aberration {
   const filter = new Filter({
@@ -160,17 +199,35 @@ export function createAberration(): Aberration {
     resources: {
       aberrationUniforms: {
         uAmount: { value: TUNING.fx.aberration, type: 'f32' },
+        uWarpA: { value: new Float32Array([0.5, 0.5, 0, 0]), type: 'vec4<f32>' },
+        uWarpB: { value: new Float32Array([0.5, 0.5, 0, 0]), type: 'vec4<f32>' },
+        uWarpWidth: { value: new Float32Array([0.1, 0.1]), type: 'vec2<f32>' },
+        uAspect: { value: 1, type: 'f32' },
       },
     },
   });
 
+  const uniforms = (): Record<string, unknown> | null => {
+    const group = filter.resources['aberrationUniforms'];
+    if (group === undefined || !('uniforms' in group)) return null;
+    return group.uniforms as Record<string, unknown>;
+  };
+
   return {
     filter,
     setAmount(amount) {
-      const group = filter.resources['aberrationUniforms'];
-      if (group !== undefined && 'uniforms' in group) {
-        (group.uniforms as Record<string, number>)['uAmount'] = amount;
-      }
+      const u = uniforms();
+      if (u !== null) u['uAmount'] = amount;
+    },
+    setWarp(a, b, aspect) {
+      const u = uniforms();
+      if (u === null) return;
+      const sa = a ?? OFF;
+      const sb = b ?? OFF;
+      (u['uWarpA'] as Float32Array).set([sa.x, sa.y, sa.radius, sa.power]);
+      (u['uWarpB'] as Float32Array).set([sb.x, sb.y, sb.radius, sb.power]);
+      (u['uWarpWidth'] as Float32Array).set([sa.width, sb.width]);
+      u['uAspect'] = aspect;
     },
   };
 }

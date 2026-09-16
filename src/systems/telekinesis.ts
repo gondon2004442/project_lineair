@@ -52,6 +52,8 @@ export function telekinesisSystem(w: World, dt: number): void {
         p.held = target;
         w.sounds.push('grab');
         spend(p, cfg.grabCost);
+        const gt = w.transform.get(target);
+        if (gt !== undefined) warp(w, gt.x, gt.y, cfg.grabWarp);
       }
     }
   }
@@ -74,6 +76,7 @@ function spend(p: PlayerC, amount: number): void {
 function release(w: World, p: PlayerC, thrown: boolean): void {
   const prop = w.propC.get(p.held);
   const b = w.body.get(p.held);
+  const thrownEntity = p.held;
   p.held = -1;
   if (prop === undefined || b === undefined) return;
 
@@ -85,10 +88,20 @@ function release(w: World, p: PlayerC, thrown: boolean): void {
   }
   const speed = TUNING.telekinesis.throwSpeed * propNumbers(prop.kind).speedFactor;
   w.sounds.push('throw');
+  const tt = w.transform.get(thrownEntity);
+  if (tt !== undefined) warp(w, tt.x, tt.y, TUNING.telekinesis.throwWarp);
   prop.phase = 'thrown';
   prop.lastHit = -1;
   b.vx = p.aimX * speed;
   b.vy = p.aimY * speed;
+}
+
+/** Короткая волна в точке: её рисует фильтр, симуляция только помечает. */
+function warp(w: World, x: number, y: number, power: number): void {
+  w.fx.warpTime = TUNING.telekinesis.warpTime;
+  w.fx.warpX = x;
+  w.fx.warpY = y;
+  w.fx.warpPower = power;
 }
 
 function nearestProp(w: World, x: number, y: number, range: number): Entity {

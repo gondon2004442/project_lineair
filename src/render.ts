@@ -5,7 +5,7 @@
  */
 import { Application, BlurFilter, Container, Graphics } from 'pixi.js';
 import type { World } from './ecs';
-import { createAberration, createDust, drawSmoke } from './fx';
+import { createAberration, createDust, drawSmoke, type WarpSource } from './fx';
 import { PALETTE } from './palette';
 import { makeRng } from './rng';
 import { countDrawCalls, profiler } from './profiler';
@@ -138,12 +138,65 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
       }
       profiler.end('КАДР: СВЕЧЕНИЕ');
 
-      const wantAberration = TUNING.fx.aberration > 0;
+      // Искажение пространства. Считается в экранных долях: фильтр висит
+      // на всей сцене и про мир ничего не знает.
+      const scale = root.scale.x;
+      const toScreen = (wx: number, wy: number): { x: number; y: number } => ({
+        x: (root.x + wx * scale) / app.screen.width,
+        y: (root.y + wy * scale) / app.screen.height,
+      });
+      const perHeight = scale / app.screen.height;
+
+      let warpA: WarpSource | null = null;
+      if (w.fx.blankTime > 0 && TUNING.blank.warpPower > 0) {
+        const full = TUNING.blank.ringTime;
+        const grown = full <= 0 ? 1 : 1 - w.fx.blankTime / full;
+        const at = toScreen(w.fx.blankX, w.fx.blankY);
+        warpA = {
+          x: at.x,
+          y: at.y,
+          radius: TUNING.blank.cancelRadius * grown * perHeight,
+          power: TUNING.blank.warpPower * (1 - grown * grown * grown),
+          width: TUNING.blank.warpWidth,
+        };
+      }
+
+      let warpB: WarpSource | null = null;
+      const tk = TUNING.telekinesis;
+      const heldNow = w.playerC.get(w.player)?.held ?? -1;
+      const heldAt = heldNow >= 0 ? w.transform.get(heldNow) : undefined;
+      if (heldAt !== undefined && tk.holdWarp > 0) {
+        const at = toScreen(lerp(heldAt.px, heldAt.x, alpha), lerp(heldAt.py, heldAt.y, alpha));
+        warpB = {
+          x: at.x,
+          y: at.y,
+          radius: tk.holdRadius,
+          power: tk.holdWarp,
+          width: tk.warpWidth,
+        };
+      } else if (w.fx.warpTime > 0 && w.fx.warpPower > 0) {
+        const done = tk.warpTime <= 0 ? 1 : 1 - w.fx.warpTime / tk.warpTime;
+        const at = toScreen(w.fx.warpX, w.fx.warpY);
+        warpB = {
+          x: at.x,
+          y: at.y,
+          radius: tk.warpRadius * done,
+          power: w.fx.warpPower * (1 - done),
+          width: tk.warpWidth,
+        };
+      }
+
+      // Фильтр нужен, даже если общая аберрация выкручена в ноль: волна
+      // живёт в том же шейдере.
+      const wantAberration = TUNING.fx.aberration > 0 || warpA !== null || warpB !== null;
       if (wantAberration !== aberrationOn) {
         aberrationOn = wantAberration;
         app.stage.filters = wantAberration ? [aberration.filter] : [];
       }
-      if (wantAberration) aberration.setAmount(TUNING.fx.aberration);
+      if (wantAberration) {
+        aberration.setAmount(TUNING.fx.aberration);
+        aberration.setWarp(warpA, warpB, app.screen.width / app.screen.height);
+      }
 
       flashLayer.clear();
       if (w.fx.hitstop > 0 && TUNING.fx.hitstopFlash > 0) {
@@ -533,11 +586,19 @@ function drawEntities(g: Graphics, w: World, alpha: number): void {
       drawSilhouette(g, w, e, staffHere, x, y, draw.size, color);
     } else {
       switch (draw.shape) {
-        case 'square':
-          contactShadow(g, x, y, draw.size, 1);
-          g.rect(x - draw.size, y - draw.size, draw.size * 2, draw.size * 2).fill(color);
-          shadeBlock(g, x - draw.size, y - draw.size, draw.size * 2, draw.size * 2);
+        case 'square': {
+          // Удерживаемое телекинезом висит: тело приподнято и дышит, тень
+          // остаётся на полу и поджимается. Иначе полёт читается как
+          // скольжение по полу.
+          const cfg = TUNING.telekinesis;
+          const held = e === heldEntity;
+          const lift = held ? cfg.liftHeight + Math.sin(time * cfg.liftBobRate) * cfg.liftBob : 0;
+          contactShadow(g, x, y, draw.size, held ? cfg.liftShadowScale : 1);
+          const top = y - lift;
+          g.rect(x - draw.size, top - draw.size, draw.size * 2, draw.size * 2).fill(color);
+          shadeBlock(g, x - draw.size, top - draw.size, draw.size * 2, draw.size * 2);
           break;
+        }
         case 'diamond':
           g.poly([x, y - draw.size, x + draw.size, y, x, y + draw.size, x - draw.size, y]).fill(color);
           break;

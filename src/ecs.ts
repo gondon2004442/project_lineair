@@ -229,6 +229,11 @@ export interface Feedback {
   blankTime: number;
   blankX: number;
   blankY: number;
+  /** Точечная волна телекинеза: захват и бросок. */
+  warpTime: number;
+  warpX: number;
+  warpY: number;
+  warpPower: number;
 }
 
 export interface World {
