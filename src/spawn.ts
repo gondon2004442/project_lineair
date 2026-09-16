@@ -230,15 +230,19 @@ export function propNumbers(kind: string): PropNumbers {
   }
 }
 
-/** Мебель офисного кита: кресло в обивке, стеллаж из тёмного дуба, обломок бетона. */
+/**
+ * Мебель различается светлотой, а не цветом: стеллаж средний, обломок
+ * светлый, кресло тёмное. Три ступени — три разных предмета на глаз,
+ * даже если смотреть на кадр без цвета.
+ */
 function propShade(kind: string): number {
   switch (kind) {
     case PROP_CABINET:
-      return PALETTE.woodDark;
+      return PALETTE.furniture;
     case PROP_RUBBLE:
       return PALETTE.concrete500;
     default:
-      return PALETTE.fabric;
+      return PALETTE.concrete700;
   }
 }
 

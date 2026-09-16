@@ -197,12 +197,12 @@ function drawRoom(g: Graphics, map: TileMap): void {
         continue;
       }
 
-      // Ковролин: плитка и шов по краю. Контраст низкий нарочно —
-      // пол не должен спорить с силуэтами.
-      g.rect(x, y, size, size).fill(PALETTE.carpet);
+      // Пол: плитка и шов по краю. Пол светлее стен — на светлом полу
+      // тёмный силуэт читается, а не тонет.
+      g.rect(x, y, size, size).fill(PALETTE.floor);
       g.rect(x, y, size, TUNING.render.floorGrid)
         .rect(x, y, TUNING.render.floorGrid, size)
-        .fill(PALETTE.carpetDark);
+        .fill(PALETTE.floorSeam);
 
       if (tile !== TILE_DOOR) continue;
       drawDoorway(g, map, cx, cy, x, y, size);
@@ -247,6 +247,14 @@ function drawPlayer(g: Graphics, w: World, alpha: number): void {
   if (!blink) {
     const color = health !== undefined && health.flash > 0 ? PALETTE.concrete100 : PALETTE.red;
     block(g, x - half, y - half, half * 2, half * 2, color);
+    // Кант: красный тёмный, и без канта субъект на полу пропадает,
+    // стоит убрать цвет. Контур — единственный в кадре, силуэт читается
+    // формой, а не оттенком.
+    g.rect(x - half, y - half, half * 2, half * 2).stroke({
+      width: TUNING.render.playerRim,
+      color: PALETTE.concrete100,
+      alignment: 1,
+    });
   }
 
   const ax = player.aimX;
@@ -256,7 +264,7 @@ function drawPlayer(g: Graphics, w: World, alpha: number): void {
     .stroke({ width: TUNING.render.aimWidth, color: PALETTE.red });
 }
 
-/** Стена: бетон, к комнате обращена ореховая панель с латунным профилем. */
+/** Стена: тёмный бетон, к комнате обращена светлая панель с кантом. */
 function drawPanelledWall(
   g: Graphics,
   map: TileMap,
@@ -269,6 +277,8 @@ function drawPanelledWall(
   g.rect(x, y, size, size).fill(PALETTE.wall);
   const inset = TUNING.render.wallInset;
   g.rect(x + inset, y + inset, size - inset * 2, size - inset * 2).fill(PALETTE.concrete700);
+  // Панель и кант — единственное светлое в стене: так видно, где стена
+  // смотрит в комнату, а где уходит в толщу.
 
   const band = TUNING.render.wainscotBand;
   const rail = TUNING.render.brassRail;
@@ -278,11 +288,11 @@ function drawPanelledWall(
     const wood = horizontal
       ? { x, y: dy < 0 ? y : y + size - band, w: size, h: band }
       : { x: dx < 0 ? x : x + size - band, y, w: band, h: size };
-    g.rect(wood.x, wood.y, wood.w, wood.h).fill(PALETTE.wood);
+    g.rect(wood.x, wood.y, wood.w, wood.h).fill(PALETTE.concrete500);
     const brass = horizontal
       ? { x, y: dy < 0 ? y + band : y + size - band - rail, w: size, h: rail }
       : { x: dx < 0 ? x + band : x + size - band - rail, y, w: rail, h: size };
-    g.rect(brass.x, brass.y, brass.w, brass.h).fill(PALETTE.brass);
+    g.rect(brass.x, brass.y, brass.w, brass.h).fill(PALETTE.concrete300);
   }
 }
 
@@ -306,9 +316,9 @@ function drawGlassPartition(
   y: number,
   size: number,
 ): void {
-  g.rect(x, y, size, size).fill(PALETTE.carpet);
+  g.rect(x, y, size, size).fill(PALETTE.floor);
   const sill = TUNING.render.glassSill;
-  g.rect(x, y, size, size).stroke({ width: sill, color: PALETTE.wood, alignment: 1 });
+  g.rect(x, y, size, size).stroke({ width: sill, color: PALETTE.furniture, alignment: 1 });
 
   const maxHp = Math.max(1, TUNING.room.weakWallHp);
   const left = map.weakHp[cy * map.cols + cx] ?? maxHp;
@@ -322,7 +332,7 @@ function drawGlassPartition(
       alpha: TUNING.render.glassAlpha,
     });
   }
-  g.rect(x, y, size, size).stroke({ width: TUNING.render.glassMullion, color: PALETTE.woodDark, alignment: 1 });
+  g.rect(x, y, size, size).stroke({ width: TUNING.render.glassMullion, color: PALETTE.concrete700, alignment: 1 });
 }
 
 /** Проём: тёмный зев, деревянный наличник, жёлтая разметка на полу. */
@@ -353,7 +363,7 @@ function drawDoorway(
   const frame = horizontal
     ? { x, y: cy === 0 ? y : y + size - jamb, w: size, h: jamb }
     : { x: cx === 0 ? x : x + size - jamb, y, w: jamb, h: size };
-  g.rect(frame.x, frame.y, frame.w, frame.h).fill(PALETTE.wood);
+  g.rect(frame.x, frame.y, frame.w, frame.h).fill(PALETTE.furniture);
 
   const t = TUNING.render.doorThreshold;
   for (let i = 0; i < 2; i++) {
