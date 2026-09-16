@@ -187,6 +187,9 @@ function profileBody(p: Profiler): string {
   const head = [
     '<div class="subtitle">ПРОФАЙЛЕР · F3</div>',
     row('КАДР', ms(s.frameMs)),
+    // «ПАНЕЛЬ ЗАМЕРОВ» ниже — цена самого инструмента, а не игры:
+    // без F3 этой строки в кадре нет вовсе. Вычитай её, читая КАДР.
+    row('ИЗ НИХ ПАНЕЛЬ', `${ms(s.panelMs)} · НЕ ИГРА`),
     row('ОКНО УСРЕДНЕНИЯ', `${TUNING.debug.profileWindow} КАДРОВ`),
     row('ШАГОВ СИМУЛЯЦИИ', s.steps.toFixed(2)),
     row('ВЫЗОВОВ ОТРИСОВКИ', s.drawCalls.toFixed(1)),

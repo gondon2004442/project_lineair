@@ -25,6 +25,8 @@ export interface ProfileStats {
   buildMs: number;
   submitMs: number;
   hudMs: number;
+  /** Цена самой панели профайлера. Не игра: без F3 её нет. */
+  panelMs: number;
   drawCalls: number;
   spawned: number;
   destroyed: number;
@@ -88,6 +90,7 @@ export function createProfiler(): Profiler {
     buildMs: 0,
     submitMs: 0,
     hudMs: 0,
+    panelMs: 0,
     drawCalls: 0,
     spawned: 0,
     destroyed: 0,
@@ -177,6 +180,7 @@ export function createProfiler(): Profiler {
         buildMs: pick('СБОРКА КАДРА'),
         submitMs: pick('ОТПРАВКА В GPU'),
         hudMs: pick('ОВЕРЛЕЙ'),
+        panelMs: pick('ПАНЕЛЬ ЗАМЕРОВ'),
         drawCalls: drawCallsTotal / frames,
         spawned: spawnedTotal / frames,
         destroyed: destroyedTotal / frames,

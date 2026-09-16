@@ -126,8 +126,15 @@ async function boot(): Promise<void> {
 
     profiler.begin('ОВЕРЛЕЙ');
     hud.update(world, ticker.FPS, renderer.showHitboxes, frame);
-    hud.profile(profiler);
     profiler.end('ОВЕРЛЕЙ');
+
+    // Панель профайлера считается отдельно от игрового оверлея. В одном
+    // ведре это была смесь измеряемого с измеряющим: игровой оверлей
+    // перестраивается раз в debug.overlayInterval, панель — каждый кадр,
+    // и её цена исчезает вместе с F3.
+    profiler.begin('ПАНЕЛЬ ЗАМЕРОВ');
+    hud.profile(profiler);
+    profiler.end('ПАНЕЛЬ ЗАМЕРОВ');
 
     buildDone = performance.now();
   }, undefined, TICKER_BEFORE_RENDER);
