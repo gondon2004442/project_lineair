@@ -649,58 +649,105 @@ function drawSilhouette(
 
   switch (staff.silhouette) {
     case 'armed': {
-      // Инспектор: одна рука вытянута вбок — видно, откуда прилетит.
+      // Инспектор: узкий корпус, жёсткий воротник-кольцо шире плеч и одна
+      // рука, вытянутая вбок. Воротник торчит наружу с обеих сторон —
+      // поэтому он виден и в чёрном пятне, а не только вблизи.
       const inspector = w.inspectorC.get(e);
       const ax = inspector === undefined ? 1 : inspector.aimX;
       const ay = inspector === undefined ? 0 : inspector.aimY;
       const len = Math.hypot(ax, ay) || 1;
+      const bw = half * TUNING.render.inspectorWidth;
       const reach = half * TUNING.render.armReach;
       const thick = half * TUNING.render.armThickness;
-      block(g, x - half, y - half, half * 2, half * 2, color);
+      block(g, x - bw, y - half, bw * 2, half * 2, color);
       block(g, x + (ax / len) * reach - thick, y + (ay / len) * reach - thick, thick * 2, thick * 2, color);
-      headShadow(g, x, y, half);
+      const collar = half * TUNING.render.collarWidth;
+      const ct = half * TUNING.render.collarThick;
+      block(g, x - collar, y - half - half * TUNING.render.collarLift, collar * 2, ct * 2, color);
+      headShadow(g, x, y, bw);
       break;
     }
     case 'wide': {
-      // Регистратор: вдвое шире, чем выше, плюс боковые руки.
+      // Регистратор: вдвое шире, чем выше, по бокам — картотеки, которые
+      // выше корпуса. Силуэт похож на стол с двумя тумбами.
       const bw = half * 2;
       const bh = half;
       block(g, x - bw, y - bh, bw * 2, bh * 2, color);
       const arm = half * TUNING.render.armThickness;
-      block(g, x - bw - arm, y - arm, arm * 2, arm * 2, color);
-      block(g, x + bw - arm, y - arm, arm * 2, arm * 2, color);
+      const out = half * TUNING.render.registrarArmOut;
+      const tall = bh * TUNING.render.registrarArmTall;
+      block(g, x - bw - out, y - tall, arm * 2, tall * 2, color);
+      block(g, x + bw + out - arm * 2, y - tall, arm * 2, tall * 2, color);
       headShadow(g, x, y, bh);
       break;
     }
     case 'bulk': {
-      // Ревизор: вдвое крупнее субъекта, масса смещена влево,
-      // голова почти поглощена.
+      // Ревизор: массы слева вдвое больше, справа корпус обрублен, головы
+      // в силуэте нет вовсе — она поглощена. Выходит кривая буква,
+      // которую ни с кем не спутать даже чёрным пятном.
       const shift = half * TUNING.render.bulkShift;
-      block(g, x - half - shift, y - half, half * 2, half * 2, color);
-      const head = half * TUNING.render.bulkHead;
-      block(g, x + half - head * 2 - shift, y - half - head, head * 2, head * 2, color);
-      headShadow(g, x - shift, y, half);
+      const tall = half * TUNING.render.bulkTall;
+      const leftW = half * TUNING.render.bulkLeft;
+      block(g, x - half - shift, y - tall, leftW * 2, tall * 2, color);
+      const rightW = half * TUNING.render.bulkRightWidth;
+      const rightH = half * TUNING.render.bulkRightHeight;
+      block(g, x - half - shift + leftW * 2, y + tall - rightH * 2, rightW * 2, rightH * 2, color);
+      headShadow(g, x - half - shift + leftW, y, leftW);
       break;
     }
     case 'desk': {
-      // Заведующий: самый крупный, и это всё, что нужно про него знать.
+      // Заведующий: самый крупный, и вокруг него свита табличек. Свита
+      // висит за габаритом корпуса и медленно обходит его по кругу.
       block(g, x - half, y - half, half * 2, half * 2, color);
       const head = half * TUNING.render.bulkHead;
       block(g, x - head, y - half - head, head * 2, head * 2, color);
       headShadow(g, x, y, half);
+      const count = TUNING.render.chiefRetinue;
+      const ring = half * TUNING.render.chiefRetinueRadius;
+      const mark = half * TUNING.render.chiefRetinueSize;
+      const spin = w.tick * STEP * TUNING.render.chiefRetinueSpin;
+      for (let i = 0; i < count; i++) {
+        const a = spin + (i / count) * Math.PI * 2;
+        g.rect(x + Math.cos(a) * ring - mark, y + Math.sin(a) * ring - mark / 2, mark * 2, mark).fill(PALETTE.yellow);
+      }
       break;
     }
     case 'slim': {
-      // Курьер: узкий и лёгкий, всё время в движении.
-      const bw = half * TUNING.render.slimWidth;
-      block(g, x - bw, y - half, bw * 2, half * 2, color);
-      headShadow(g, x, y, half);
+      // Курьер: вытянут по ходу движения, через плечо — сумка. Она и
+      // показывает, куда он бежит, без всякой подсветки пути.
+      const body = w.body.get(e);
+      const vx = body === undefined ? 0 : body.vx;
+      const vy = body === undefined ? 0 : body.vy;
+      const speed = Math.hypot(vx, vy);
+      const ux = speed > 1 ? vx / speed : 0;
+      const uy = speed > 1 ? vy / speed : 1;
+      const along = half * TUNING.render.courierStretch;
+      const across = half * TUNING.render.slimWidth;
+      g.poly([
+        x + ux * along - uy * across,
+        y + uy * along + ux * across,
+        x + ux * along + uy * across,
+        y + uy * along - ux * across,
+        x - ux * along + uy * across,
+        y - uy * along - ux * across,
+        x - ux * along - uy * across,
+        y - uy * along + ux * across,
+      ]).fill(color);
+      const bag = half * TUNING.render.courierBag;
+      const outw = half * TUNING.render.courierBagOut;
+      block(g, x - uy * outw - bag, y + ux * outw - bag, bag * 2, bag * 2, color);
+      headShadow(g, x, y, across);
       break;
     }
     default: {
-      // Стажёр: голова утоплена в плечи, выступа нет — он никуда не смотрит.
+      // Стажёр: голова утоплена в плечи, выступа вперёд нет — он никуда
+      // не смотрит. Наружу торчит только одно вспухшее плечо.
       const bh = half * TUNING.render.sunkenSquat;
-      block(g, x - half, y - bh, half * 2, bh * 2, color);
+      const bw = half * TUNING.render.internWide;
+      block(g, x - bw, y - bh, bw * 2, bh * 2, color);
+      const lump = half * TUNING.render.internShoulder;
+      const out = half * TUNING.render.internShoulderOut;
+      block(g, x - bw - out, y - bh - out, lump * 2, lump * 2, color);
       break;
     }
   }

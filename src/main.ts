@@ -12,6 +12,7 @@ import { createRenderer } from './render';
 import { resolveSeed, seedPinned } from './rng';
 import { step } from './step';
 import { STEP, TUNING } from './tuning';
+import { spawnStaff } from './spawn';
 import { createWorld, enterLobby, enterRoom } from './world';
 
 /** Приоритеты тикера Pixi: наш проход до отрисовки и замер сразу после неё. */
@@ -92,7 +93,9 @@ async function boot(): Promise<void> {
 
   // Отладочный доступ из консоли: ручной прогон симуляции и проверка детерминизма.
   Object.defineProperty(window, 'lineair', {
-    value: { world: () => world, createWorld, enterRoom, step, tuning: TUNING },
+    // Отладочная ручка. spawnStaff нужен проверке силуэтов: поставить
+    // все должности в ряд иначе нечем — в одной комнате они не встречаются.
+    value: { world: () => world, createWorld, enterRoom, step, spawnStaff, tuning: TUNING },
   });
 
   renderer.layout();
