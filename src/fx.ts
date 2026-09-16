@@ -134,17 +134,22 @@ out vec4 finalColor;
 uniform sampler2D uTexture;
 uniform float uAmount;
 // Два источника искажения: кольцо бланка и точка телекинеза. Каждый —
-// это кольцевая волна: смещение максимально на своём радиусе и спадает
-// в обе стороны, поэтому картинка тянется вслед за фронтом, а не плывёт
-// целиком.
-uniform vec4 uWarpA;   // xy — центр в uv, z — радиус, w — сила
+// кольцевая волна: смещение максимально на своём радиусе и спадает в обе
+// стороны, поэтому картинка тянется вслед за фронтом, а не плывёт целиком.
+uniform vec4 uWarpA;   // xy — центр в долях экрана, z — радиус, w — сила
 uniform vec4 uWarpB;
 uniform vec2 uWarpWidth;
 uniform float uAspect;
+// Эти два Pixi подставляет сам. Координата в текстуре НЕ равна координате
+// на экране: под фильтр выделяется текстура с запасом, и кадр занимает
+// в ней только долю uOutputFrame.zw * uInputSize.zw. Без пересчёта волна
+// вспыхивает правее и ниже, чем позвали, — ровно это и было видно.
+uniform vec4 uInputSize;
+uniform vec4 uOutputFrame;
 
-vec2 ripple(vec2 uv, vec4 warp, float width) {
+vec2 ripple(vec2 screenUv, vec4 warp, float width) {
     if (warp.w <= 0.0001) return vec2(0.0);
-    vec2 d = (uv - warp.xy) * vec2(uAspect, 1.0);
+    vec2 d = (screenUv - warp.xy) * vec2(uAspect, 1.0);
     float r = length(d);
     if (r <= 0.0001) return vec2(0.0);
     float band = exp(-pow((r - warp.z) / max(width, 0.0001), 2.0));
@@ -152,18 +157,23 @@ vec2 ripple(vec2 uv, vec4 warp, float width) {
 }
 
 void main(void) {
-    vec2 push = ripple(vTextureCoord, uWarpA, uWarpWidth.x)
-              + ripple(vTextureCoord, uWarpB, uWarpWidth.y);
-    vec2 uv = vTextureCoord + push;
+    vec2 frame = uOutputFrame.zw * uInputSize.zw;
+    vec2 screenUv = vTextureCoord / frame;
 
-    vec2 centred = uv - 0.5;
+    vec2 push = ripple(screenUv, uWarpA, uWarpWidth.x)
+              + ripple(screenUv, uWarpB, uWarpWidth.y);
+    vec2 shifted = screenUv + push;
+
+    vec2 centred = shifted - 0.5;
     // В центре ноль, к краям растёт квадратично: рамка кадра «расходится».
     // Плюс местная добавка от волны — там, где пространство тянет, цвет
-    // расходится сильнее всего.
-    vec2 offset = centred * dot(centred, centred) * uAmount * 0.1 + push * 0.5;
+    // расходится сильнее.
+    vec2 offset = centred * dot(centred, centred) * uAmount * 0.1 + push * 0.2;
+
+    vec2 uv = shifted * frame;
     vec4 base = texture(uTexture, uv);
-    float red = texture(uTexture, uv + offset).r;
-    float blue = texture(uTexture, uv - offset).b;
+    float red = texture(uTexture, uv + offset * frame).r;
+    float blue = texture(uTexture, uv - offset * frame).b;
     finalColor = vec4(red, base.g, blue, base.a);
 }
 `;

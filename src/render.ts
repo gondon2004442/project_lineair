@@ -63,6 +63,10 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
   // Вспышка стоп-кадра живёт в экранных координатах, её тряска не касается.
   const flashLayer = new Graphics();
   app.stage.addChild(flashLayer);
+  // Область фильтра прибита к экрану. Без этого Pixi берёт её по границам
+  // содержимого сцены, координаты внутри шейдера съезжают вместе с ними,
+  // и волна вспыхивает не там, где её позвали.
+  app.stage.filterArea = app.screen;
 
   const aberration = createAberration();
   let aberrationOn = TUNING.fx.aberration > 0;
@@ -89,6 +93,7 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
     layout() {
       // Контейнер мог сузиться: панель крутилок отъедает правый край.
       app.resize();
+      app.stage.filterArea = app.screen;
       const scale = Math.min(app.screen.width / ROOM_WIDTH, app.screen.height / ROOM_HEIGHT);
       root.scale.set(scale);
       root.position.set(
