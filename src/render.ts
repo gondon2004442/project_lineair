@@ -274,25 +274,37 @@ function drawPanelledWall(
   y: number,
   size: number,
 ): void {
+  // Сплошная заливка без выреза: соседние клетки стены сливаются в одну
+  // массу, и сетки тайлов в стене не видно. Раньше у каждой клетки был
+  // свой шов, и стена читалась как кладка из кубиков.
   g.rect(x, y, size, size).fill(PALETTE.wall);
-  const inset = TUNING.render.wallInset;
-  g.rect(x + inset, y + inset, size - inset * 2, size - inset * 2).fill(PALETTE.concrete700);
-  // Панель и кант — единственное светлое в стене: так видно, где стена
-  // смотрит в комнату, а где уходит в толщу.
 
   const band = TUNING.render.wainscotBand;
   const rail = TUNING.render.brassRail;
   for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]] as const) {
     if (facesConcrete(map, cx + dx, cy + dy)) continue;
+    // Фаска рисуется только на грани, обращённой в комнату, поэтому на
+    // соседних клетках она продолжает сама себя одной линией.
     const horizontal = dx === 0;
-    const wood = horizontal
+    const face = horizontal
       ? { x, y: dy < 0 ? y : y + size - band, w: size, h: band }
       : { x: dx < 0 ? x : x + size - band, y, w: band, h: size };
-    g.rect(wood.x, wood.y, wood.w, wood.h).fill(PALETTE.concrete500);
-    const brass = horizontal
+    g.rect(face.x, face.y, face.w, face.h).fill(PALETTE.concrete500);
+    const edge = horizontal
       ? { x, y: dy < 0 ? y + band : y + size - band - rail, w: size, h: rail }
       : { x: dx < 0 ? x + band : x + size - band - rail, y, w: rail, h: size };
-    g.rect(brass.x, brass.y, brass.w, brass.h).fill(PALETTE.concrete300);
+    g.rect(edge.x, edge.y, edge.w, edge.h).fill(PALETTE.concrete300);
+
+    // Технологический шов опалубки: поперёк стены, раз в несколько
+    // тайлов. Он и сообщает масштаб, который раньше сообщала сетка.
+    const along = horizontal ? cx : cy;
+    if (along % TUNING.render.wallJointStep !== 0) continue;
+    const jw = TUNING.render.wallJointWidth;
+    const depth = size * TUNING.render.wallJointDepth;
+    const joint = horizontal
+      ? { x, y: dy < 0 ? y : y + size - depth, w: jw, h: depth }
+      : { x: dx < 0 ? x : x + size - depth, y, w: depth, h: jw };
+    g.rect(joint.x, joint.y, joint.w, joint.h).fill(PALETTE.concrete900);
   }
 }
 
