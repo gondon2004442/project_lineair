@@ -21,6 +21,16 @@ export interface ProfileRow {
 
 export interface ProfileStats {
   frameMs: number;
+  /**
+   * Ровность хода. Среднее время кадра ничего не говорит о рывках: сто
+   * ровных кадров и один вчетверо длиннее дают то же среднее, а глаз
+   * видит рывок. Поэтому середина, хвост и самый долгий кадр по окну.
+   */
+  frameP50: number;
+  frameP95: number;
+  frameMax: number;
+  /** Кадров длиннее двух серединных — их и видно как рывки. */
+  longFrames: number;
   simMs: number;
   buildMs: number;
   submitMs: number;
@@ -84,8 +94,13 @@ export function createProfiler(): Profiler {
   let heapMb: number | null = null;
 
   let shown: ProfileRow[] = [];
+  let frameTimes: number[] = [];
   let shownStats: ProfileStats = {
     frameMs: 0,
+    frameP50: 0,
+    frameP95: 0,
+    frameMax: 0,
+    longFrames: 0,
     simMs: 0,
     buildMs: 0,
     submitMs: 0,
@@ -143,6 +158,7 @@ export function createProfiler(): Profiler {
       if (!profiler.enabled) return;
       frames += 1;
       frameMsTotal += frameMs;
+      frameTimes.push(frameMs);
       drawCallsTotal += drawCalls;
       spawnedTotal += spawned;
       destroyedTotal += destroyed;
@@ -168,6 +184,11 @@ export function createProfiler(): Profiler {
       if (frames < TUNING.debug.profileWindow) return;
 
       const frameAvg = frameMsTotal / frames;
+      const sorted = frameTimes.slice().sort((a, b) => a - b);
+      const pick50 = sorted[Math.floor(sorted.length * 0.5)] ?? 0;
+      const pick95 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] ?? 0;
+      const longest = sorted[sorted.length - 1] ?? 0;
+      const long = sorted.filter((ms) => ms > pick50 * 2).length;
       const pick = (key: string): number => (totals.get(key) ?? 0) / frames;
       shown = order.map((key) => ({
         key,
@@ -176,6 +197,10 @@ export function createProfiler(): Profiler {
       }));
       shownStats = {
         frameMs: frameAvg,
+        frameP50: pick50,
+        frameP95: pick95,
+        frameMax: longest,
+        longFrames: long,
         simMs: pick('СИМУЛЯЦИЯ'),
         buildMs: pick('СБОРКА КАДРА'),
         submitMs: pick('ОТПРАВКА В GPU'),
@@ -191,6 +216,7 @@ export function createProfiler(): Profiler {
 
       frames = 0;
       frameMsTotal = 0;
+      frameTimes = [];
       drawCallsTotal = 0;
       spawnedTotal = 0;
       destroyedTotal = 0;

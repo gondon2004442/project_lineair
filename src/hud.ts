@@ -189,6 +189,12 @@ function profileBody(p: Profiler): string {
   const head = [
     '<div class="subtitle">ПРОФАЙЛЕР · F3</div>',
     row('КАДР', ms(s.frameMs)),
+    row('СЕРЕДИНА · ХВОСТ', `${ms(s.frameP50)} · ${ms(s.frameP95)}`),
+    row('САМЫЙ ДОЛГИЙ', ms(s.frameMax)),
+    row(
+      'РЫВКОВ В ОКНЕ',
+      s.longFrames > 0 ? `<span class="warn">${s.longFrames}</span>` : '<span class="ok">0</span>',
+    ),
     // «ПАНЕЛЬ ЗАМЕРОВ» ниже — цена самого инструмента, а не игры:
     // без F3 этой строки в кадре нет вовсе. Вычитай её, читая КАДР.
     row('ИЗ НИХ ПАНЕЛЬ', `${ms(s.panelMs)} · НЕ ИГРА`),

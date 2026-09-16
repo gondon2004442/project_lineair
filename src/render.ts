@@ -70,6 +70,9 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
 
   const aberration = createAberration();
   let aberrationOn = TUNING.fx.aberration > 0;
+  let shakeTick = -1;
+  let shakeX = 0;
+  let shakeY = 0;
   if (aberrationOn) app.stage.filters = [aberration.filter];
 
   const dust = createDust();
@@ -113,8 +116,17 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
       const frame = app.ticker.deltaMS / 1000;
       fxTime += frame;
 
+      // Тряска переставляется раз в шаг симуляции, а не раз в кадр. На
+      // быстром мониторе кадров втрое больше шагов, и случайный сдвиг
+      // каждый кадр превращал тряску в мелкую рябь: картинка дрожала
+      // чаще, чем что-либо в ней двигалось.
+      if (w.tick !== shakeTick) {
+        shakeTick = w.tick;
+        shakeX = fxRng.spread(1);
+        shakeY = fxRng.spread(1);
+      }
       const shake = w.fx.shake;
-      shakeLayer.position.set(fxRng.spread(shake), fxRng.spread(shake));
+      shakeLayer.position.set(shakeX * shake, shakeY * shake);
 
       profiler.begin('КАДР: ПЫЛЬ');
       dust.update(frame);
