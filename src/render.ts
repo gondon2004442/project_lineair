@@ -552,6 +552,29 @@ function drawBullets(g: Graphics, w: World, alpha: number): void {
       g.poly([x, y - draw.size, x + draw.size, y, x, y + draw.size, x - draw.size, y]).fill(draw.color);
       continue;
     }
+    if (draw.shape === 'card') {
+      const body = w.body.get(e);
+      const vx = body === undefined ? 1 : body.vx;
+      const vy = body === undefined ? 0 : body.vy;
+      const len = Math.hypot(vx, vy) || 1;
+      const ux = vx / len;
+      const uy = vy / len;
+      const along = draw.size * TUNING.render.cardAlong;
+      const across = draw.size * TUNING.render.cardAcross;
+      const px = -uy * across;
+      const py = ux * across;
+      g.poly([
+        x + ux * along + px,
+        y + uy * along + py,
+        x + ux * along - px,
+        y + uy * along - py,
+        x - ux * along - px,
+        y - uy * along - py,
+        x - ux * along + px,
+        y - uy * along + py,
+      ]).fill(draw.color);
+      continue;
+    }
     if (draw.shape === 'bar') {
       const body = w.body.get(e);
       const vx = body === undefined ? 1 : body.vx;

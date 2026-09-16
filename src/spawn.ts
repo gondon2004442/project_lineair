@@ -305,11 +305,12 @@ export function spawnBullet(
     lastHit: -1,
   });
   w.drawC.set(e, {
-    shape: spec.shape ?? (faction === 'player' ? 'dot' : 'diamond'),
+    shape: spec.shape ?? (faction === 'player' ? 'dot' : 'card'),
     size: spec.radius,
-    // Снаряды субъекта красные — это его красный. Со стороны объекта
-    // летят бумаги: картотечные карточки и предписания.
-    color: faction === 'player' ? PALETTE.red : PALETTE.paper,
+    // Красное в кадре — только субъект целиком, и его огонь к нему не
+    // относится: пули субъекта белые. Со стороны объекта летят бумаги —
+    // жёлтые картотечные карточки, цвет служебной разметки.
+    color: faction === 'player' ? PALETTE.concrete100 : PALETTE.yellow,
     hollow: false,
     desk: false,
   });

@@ -198,7 +198,11 @@ export interface BulletC {
   lastHit: Entity;
 }
 
-export type Shape = 'square' | 'diamond' | 'dot' | 'bar';
+/**
+ * Формы снарядов и силуэтов. 'card' — картотечная карточка: только
+ * снаряды объекта, и ни одна форма субъекта с ней не совпадает.
+ */
+export type Shape = 'square' | 'diamond' | 'dot' | 'bar' | 'card';
 
 export interface DrawC {
   shape: Shape;
