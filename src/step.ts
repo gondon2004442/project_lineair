@@ -1,5 +1,6 @@
 /** Один шаг симуляции. Порядок систем — здесь и больше нигде. */
 import { flushDoomed, type World } from './ecs';
+import { blankSystem } from './systems/blank';
 import { bulletSystem } from './systems/combat';
 import { internSystem } from './systems/postIntern';
 import { inspectorSystem } from './systems/postInspector';
@@ -34,6 +35,9 @@ export function step(w: World): void {
   profiler.countStep();
 
   profiler.begin('СИМ: СУБЪЕКТ');
+  // Бланк идёт до управления: он отменяет то, что уже летит, а не то,
+  // что только появится на этом шаге.
+  blankSystem(w);
   if (w.status !== 'dead') playerControlSystem(w, STEP);
   profiler.end('СИМ: СУБЪЕКТ');
 

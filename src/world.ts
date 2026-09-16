@@ -32,13 +32,14 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     map: buildRoomMap('hall', [false, false, false, false]),
     mapToken: 0,
     input,
-    fx: { shake: 0, hitstop: 0 },
+    fx: { shake: 0, hitstop: 0, slowMo: 0, blankTime: 0, blankX: 0, blankY: 0 },
     sounds: [],
     status: 'playing',
     scene: 'lobby',
     player: -1,
     roster: [],
     build: [],
+    blanks: TUNING.blank.refillTo,
     metronome: TUNING.post.inspector.metronomeInterval,
     beat: 0,
     nextEntity: 1,
@@ -92,6 +93,9 @@ export function startRun(w: World): void {
   w.scene = 'run';
   w.status = 'playing';
   w.build = [];
+  // Бланки пополняются на входе на этаж, но только до потолка: сэкономил
+  // прошлый этаж — запас не копится, потратил весь — получишь полный.
+  w.blanks = Math.max(w.blanks, TUNING.blank.refillTo);
   restorePlayer(w);
   enterRoom(w, w.floor.start, null);
 }

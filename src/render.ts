@@ -120,6 +120,7 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
       profiler.begin('КАДР: ДЫМ');
       smokeLayer.clear();
       drawSmoke(smokeLayer, w, fxTime);
+      drawBlankRing(smokeLayer, w);
       profiler.end('КАДР: ДЫМ');
 
       entityLayer.clear();
@@ -262,6 +263,27 @@ function drawPlayer(g: Graphics, w: World, alpha: number): void {
   g.moveTo(x + ax * half, y + ay * half)
     .lineTo(x + ax * TUNING.render.aimLength, y + ay * TUNING.render.aimLength)
     .stroke({ width: TUNING.render.aimWidth, color: PALETTE.red });
+}
+
+/**
+ * Кольцо аннулирования. Расходится от субъекта до радиуса бланка и гаснет,
+ * так что радиус действия виден целиком, а не угадывается. Цвет светлый:
+ * жёлтый принадлежит должностям, красный — субъекту.
+ */
+function drawBlankRing(g: Graphics, w: World): void {
+  const left = w.fx.blankTime;
+  if (left <= 0) return;
+  const full = TUNING.blank.ringTime;
+  const grown = full <= 0 ? 1 : 1 - left / full;
+  // Гаснет не равномерно, а в самом конце: линейное затухание делало
+  // кольцо ярким, пока оно крошечное, и невидимым, когда оно наконец
+  // показывает радиус. Читать надо как раз последнее.
+  const fade = 1 - grown * grown * grown;
+  g.circle(w.fx.blankX, w.fx.blankY, TUNING.blank.cancelRadius * grown).stroke({
+    width: TUNING.blank.ringWidth,
+    color: PALETTE.concrete100,
+    alpha: TUNING.blank.ringAlpha * fade,
+  });
 }
 
 /** Стена: тёмный бетон, к комнате обращена светлая панель с кантом. */

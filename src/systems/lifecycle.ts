@@ -38,4 +38,8 @@ export function statusSystem(w: World): void {
 
 export function feedbackSystem(w: World, dt: number): void {
   w.fx.shake = Math.max(0, w.fx.shake - TUNING.feel.shakeDecay * dt);
+  // Кольцо бланка и замедление живут шагами симуляции, а не кадрами:
+  // на медленной машине они не станут длиннее.
+  w.fx.blankTime = Math.max(0, w.fx.blankTime - dt);
+  w.fx.slowMo = Math.max(0, w.fx.slowMo - dt);
 }

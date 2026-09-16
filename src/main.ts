@@ -108,7 +108,11 @@ async function boot(): Promise<void> {
   renderer.app.ticker.add((ticker) => {
     frameStart = performance.now();
     const frame = Math.min(ticker.deltaMS, TUNING.sim.maxFrameMs) / 1000;
-    accumulator += frame;
+    // Замедление на бланк: тормозится только подача реального времени в
+    // накопитель. Сам шаг остаётся фиксированным, поэтому симуляция и
+    // её детерминизм не знают, что ход замедлился.
+    const scale = world.fx.slowMo > 0 ? TUNING.blank.slowMoScale : 1;
+    accumulator += frame * scale;
 
     profiler.begin('СИМУЛЯЦИЯ');
     while (accumulator >= STEP) {

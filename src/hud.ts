@@ -60,6 +60,7 @@ export function createHud(
       row('ПКМ', 'ТЕЛЕКИНЕЗ'),
       row('SHIFT', 'РЫВОК'),
       row('R', 'ПЕРЕЗАРЯДКА'),
+      row('Q', 'БЛАНК'),
       row('I', 'ЛИЧНОЕ ДЕЛО'),
       row('F2', 'ВЕРНУТЬСЯ СЮДА'),
     ].join('');
@@ -86,6 +87,7 @@ export function createHud(
       row('ВАКАНСИЙ', vacancyLine(w)),
       auditRow(w),
       row('ДВЕРИ', w.map.doorsLocked ? '<span class="warn">ЗАПЕРТЫ</span>' : '<span class="ok">ОТКРЫТЫ</span>'),
+      row('БЛАНКИ (Q)', blankLine(w)),
       weaponRows(w),
       energyRow(w),
     ].join('');
@@ -269,6 +271,13 @@ function auditRow(w: World): string {
   }
   const left = pendingItems(w);
   return row('ОПИСЬ', `<span class="warn">ОСТАЛОСЬ ${left} · НЕУЯЗВИМ</span>`);
+}
+
+/** Бланки: сколько осталось. Пустая строка — значит подавать нечего. */
+function blankLine(w: World): string {
+  const left = Math.max(0, w.blanks);
+  const max = Math.max(1, TUNING.blank.refillTo);
+  return `<span class="${left > 0 ? 'ok' : 'warn'}">${gauge(left, max)} ${left}</span>`;
 }
 
 /** Телекинез: запас энергии и что сейчас в руках. */

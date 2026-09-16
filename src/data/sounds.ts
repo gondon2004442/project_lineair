@@ -24,6 +24,9 @@ export interface SoundRecipe {
 }
 
 export const SOUNDS: Record<string, SoundRecipe> = {
+  // --- Бланк: короткий сухой росчерк и отмена ---
+  blank: { source: 'tone', freq: 420, freqEnd: 60, duration: 0.34, gain: 0.5, wave: 'triangle', attack: 0.02 },
+
   // --- Оружие субъекта ---
   'shot.precise': { source: 'tone', freq: 780, freqEnd: 240, duration: 0.07, gain: 0.35, wave: 'square' },
   'shot.scatter': { source: 'noise', freq: 0, duration: 0.16, gain: 0.5, cutoff: 2400 },

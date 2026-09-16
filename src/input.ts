@@ -20,6 +20,8 @@ export interface InputSnapshot {
   formStep: number;
   /** Перезарядка запрошена и ещё не отработана. */
   reloadQueued: boolean;
+  /** Бланк подан и ещё не отработан. */
+  blankQueued: boolean;
 }
 
 export interface InputDevice {
@@ -52,6 +54,7 @@ export function createInput(target: HTMLElement): InputDevice {
     dashQueued: false,
     formStep: 0,
     reloadQueued: false,
+    blankQueued: false,
   };
   const held = new Set<string>();
   let project = (sx: number, sy: number): { x: number; y: number } => ({ x: sx, y: sy });
@@ -97,6 +100,10 @@ export function createInput(target: HTMLElement): InputDevice {
       snapshot.reloadQueued = true;
       return;
     }
+    if (ev.code === 'KeyQ') {
+      snapshot.blankQueued = true;
+      return;
+    }
     if (ev.code === 'KeyI') {
       toggleDossier();
       return;
@@ -127,6 +134,7 @@ export function createInput(target: HTMLElement): InputDevice {
     snapshot.grabHeld = false;
     snapshot.formStep = 0;
     snapshot.reloadQueued = false;
+    snapshot.blankQueued = false;
   });
 
   target.addEventListener('pointermove', (ev) => {

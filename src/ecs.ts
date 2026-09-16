@@ -223,6 +223,12 @@ export type Scene = 'lobby' | 'run';
 export interface Feedback {
   shake: number;
   hitstop: number;
+  /** Замедление хода: сколько шагов симуляции ещё идти медленно. */
+  slowMo: number;
+  /** Кольцо аннулирования: остаток жизни и где оно вспыхнуло. */
+  blankTime: number;
+  blankX: number;
+  blankY: number;
 }
 
 export interface World {
@@ -251,6 +257,8 @@ export interface World {
   roster: RosterEntry[];
   /** Выданные предметы: правки к параметрам оружия. */
   build: string[];
+  /** Сколько бланков на руках. Ресурс субъекта, а не сущность. */
+  blanks: number;
   /** Общий метроном участка: по его долям бьют инспекторы. */
   metronome: number;
   /** Такт, на котором сейчас участок. */
