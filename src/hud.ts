@@ -310,30 +310,32 @@ function schematic(w: World): string {
     const current = room.index === w.room;
     let fill = hex(PALETTE.black);
     let stroke = hex(PALETTE.concrete700);
+    // Схема различает участки светлотой, а не цветом: красный и жёлтый
+    // в интерфейсе спорят с красным субъектом и жёлтыми должностями.
     if (current) {
-      fill = hex(PALETTE.yellow);
-      stroke = hex(PALETTE.yellow);
+      fill = hex(PALETTE.concrete100);
+      stroke = hex(PALETTE.concrete100);
     } else if (room.cleared) {
       fill = hex(PALETTE.concrete700);
       stroke = hex(PALETTE.concrete500);
     } else if (room.visited) {
-      stroke = hex(PALETTE.red);
+      stroke = hex(PALETTE.concrete300);
     }
     parts.push(
       `<rect x="${x}" y="${y}" width="${cell}" height="${cell}" fill="${fill}" stroke="${stroke}" stroke-width="${TUNING.hud.mapStroke}"/>`,
     );
-    // Посещённый, но не зачищенный участок со старшей ставкой — жёлтая метка.
+    // Посещённый, но не зачищенный участок со старшей ставкой — серая метка.
     if (room.visited && !room.cleared && !current && room.miniBoss !== '') {
       const inset = TUNING.hud.mapEndInset;
       parts.push(
-        `<rect x="${x + inset}" y="${y + inset}" width="${cell - inset * 2}" height="${cell - inset * 2}" fill="${hex(PALETTE.yellow)}"/>`,
+        `<rect x="${x + inset}" y="${y + inset}" width="${cell - inset * 2}" height="${cell - inset * 2}" fill="${hex(PALETTE.concrete500)}"/>`,
       );
     }
     // Приёмная видна на схеме всегда: этаж кончается там.
     if (room.index === w.floor.end && !current) {
       const inset = TUNING.hud.mapEndInset;
       parts.push(
-        `<rect x="${x + inset}" y="${y + inset}" width="${cell - inset * 2}" height="${cell - inset * 2}" fill="${hex(PALETTE.red)}"/>`,
+        `<rect x="${x + inset}" y="${y + inset}" width="${cell - inset * 2}" height="${cell - inset * 2}" fill="${hex(PALETTE.concrete300)}"/>`,
       );
     }
   }

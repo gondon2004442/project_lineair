@@ -533,6 +533,21 @@ export const TUNING = {
     /** Рамка телеграфа заражённого. */
     telegraphInset: 5,
     telegraphWidth: 2,
+    /**
+     * Телеграф больше не носит жёлтый: жёлтый по брифу принадлежит
+     * должностям и разметке. Носитель — толщина и мигание. За
+     * telegraphNear секунд до выстрела контур толстеет и мигает чаще;
+     * всё остальное время он тонкий и ровный.
+     */
+    telegraphNear: 0.15,
+    telegraphNearFactor: 2.5,
+    telegraphBlinkSlow: 5,
+    telegraphBlinkFast: 16,
+    telegraphAlpha: 1,
+    telegraphAlphaOff: 0.6,
+    /** Служебные лучи: опись Ревизора и нить телекинеза. */
+    serviceRayAlpha: 0.5,
+    holdRayAlpha: 0.35,
     /** Длина луча наведения во время каста. */
     telegraphRay: 220,
     /** Толщина порога в открытом проёме. */

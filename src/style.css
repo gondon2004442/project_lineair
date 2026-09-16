@@ -1,11 +1,15 @@
 /* Служебная типографика: моноширинный шрифт, прямые углы, ничего мягкого. */
 :root {
-  --black: #0d0d0c;
-  --concrete: #2b2b27;
-  --concrete-mid: #45453e;
-  --concrete-light: #a9a89d;
-  --red: #c4122f;
-  --yellow: #e8b21a;
+  /* Один в один шкала из src/palette.ts: оливковых оттенков в базе нет. */
+  --black: #0a0b0d;
+  --concrete: #2a2e33;
+  --concrete-mid: #6b6f75;
+  --concrete-light: #9aa0a6;
+  --concrete-bright: #d8dbde;
+  /* Красный и жёлтый остались только для панели крутилок — она прибор,
+     а не кадр. В служебном оверлее их нет: различаем светлотой. */
+  --red: #c8102e;
+  --yellow: #e8b923;
 }
 
 * {
@@ -78,11 +82,11 @@ body.panel-open #stage {
 }
 
 .ok {
-  color: var(--yellow);
+  color: var(--concrete-mid);
 }
 
 .warn {
-  color: var(--red);
+  color: var(--concrete-bright);
 }
 
 .hud-banner {
@@ -96,13 +100,13 @@ body.panel-open #stage {
   gap: 8px;
   padding: 14px 28px;
   background: var(--black);
-  border: 2px solid var(--red);
+  border: 2px solid var(--concrete-bright);
 }
 
 .hud-banner b {
   font-size: 20px;
   letter-spacing: 0.22em;
-  color: var(--red);
+  color: var(--concrete-bright);
 }
 
 .hud-banner span {
@@ -319,7 +323,7 @@ body.panel-open #hud-right {
   overflow-y: auto;
   padding: 14px 18px;
   background: var(--black);
-  border: 2px solid var(--yellow);
+  border: 2px solid var(--concrete-bright);
   pointer-events: auto;
 }
 
@@ -329,7 +333,7 @@ body.panel-open #hud-right {
 
 .hud-dossier b {
   display: block;
-  color: var(--yellow);
+  color: var(--concrete-bright);
   letter-spacing: 0.22em;
 }
 
@@ -345,7 +349,7 @@ body.panel-open #hud-right {
 }
 
 .dossier-code {
-  color: var(--red);
+  color: var(--concrete-bright);
   letter-spacing: 0.14em;
 }
 
@@ -358,7 +362,7 @@ body.panel-open #hud-right {
 /* --- Вестибюль ---------------------------------------------------------- */
 
 .title {
-  color: var(--yellow);
+  color: var(--concrete-bright);
   font-size: 18px;
   letter-spacing: 0.24em;
 }
@@ -372,7 +376,7 @@ body.panel-open #hud-right {
   margin-top: 10px;
   padding-top: 8px;
   border-top: 1px solid var(--concrete);
-  color: var(--red);
+  color: var(--concrete-bright);
   letter-spacing: 0.16em;
 }
 

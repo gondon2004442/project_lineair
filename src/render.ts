@@ -375,6 +375,23 @@ function drawDoorway(
   }
 }
 
+/**
+ * Перо телеграфа. Цвет один и тот же всегда, сообщение несут толщина и
+ * частота мигания: чем меньше осталось до выстрела, тем толще контур и
+ * тем чаще он мигает. Так телеграф читается и на обесцвеченном кадре, и
+ * не претендует на служебный жёлтый.
+ */
+function telegraphPen(w: World, flash: number): { width: number; color: number; alpha: number } {
+  const near = flash <= TUNING.render.telegraphNear;
+  const rate = near ? TUNING.render.telegraphBlinkFast : TUNING.render.telegraphBlinkSlow;
+  const lit = Math.floor(w.tick * STEP * rate) % 2 === 0;
+  return {
+    width: TUNING.render.telegraphWidth * (near ? TUNING.render.telegraphNearFactor : 1),
+    color: PALETTE.concrete100,
+    alpha: lit ? TUNING.render.telegraphAlpha : TUNING.render.telegraphAlphaOff,
+  };
+}
+
 function lerp(prev: number, next: number, alpha: number): number {
   return prev + (next - prev) * alpha;
 }
@@ -400,7 +417,7 @@ function drawEntities(g: Graphics, w: World, alpha: number): void {
         : { x: dx / len, y: dy / len };
     g.moveTo(x, y)
       .lineTo(x + aim.x * TUNING.render.telegraphRay, y + aim.y * TUNING.render.telegraphRay)
-      .stroke({ width: TUNING.render.telegraphWidth, color: PALETTE.yellow, alpha: 0.55 });
+      .stroke(telegraphPen(w, staff.plateFlash));
   }
 
   // Ревизор: луч на предмет, который он сейчас вносит в опись.
@@ -411,10 +428,15 @@ function drawEntities(g: Graphics, w: World, alpha: number): void {
     if (t === undefined || tt === undefined) continue;
     g.moveTo(lerp(t.px, t.x, alpha), lerp(t.py, t.y, alpha))
       .lineTo(lerp(tt.px, tt.x, alpha), lerp(tt.py, tt.y, alpha))
-      .stroke({ width: TUNING.render.telegraphWidth, color: PALETTE.yellow, alpha: 0.5 });
+      .stroke({
+        width: TUNING.render.telegraphWidth,
+        color: PALETTE.concrete100,
+        alpha: TUNING.render.serviceRayAlpha,
+      });
   }
 
-  // Цель захвата и удерживаемое — жёлтой рамкой.
+  // Цель захвата и удерживаемое — светлой рамкой: жёлтый принадлежит
+  // должностям, а это служебная отметка субъекта, а не объекта.
   const candidate = grabCandidate(w);
   const heldEntity = w.playerC.get(w.player)?.held ?? -1;
   for (const mark of [candidate, heldEntity]) {
@@ -426,7 +448,11 @@ function drawEntities(g: Graphics, w: World, alpha: number): void {
     const y = lerp(t.py, t.y, alpha);
     const inset = TUNING.render.telegraphInset;
     g.rect(x - draw.size - inset, y - draw.size - inset, (draw.size + inset) * 2, (draw.size + inset) * 2)
-      .stroke({ width: TUNING.render.telegraphWidth, color: PALETTE.yellow, alpha: mark === heldEntity ? 1 : 0.45 });
+      .stroke({
+        width: TUNING.render.telegraphWidth,
+        color: PALETTE.concrete100,
+        alpha: mark === heldEntity ? 1 : 0.45,
+      });
   }
   if (heldEntity >= 0) {
     const t = w.transform.get(heldEntity);
@@ -434,7 +460,11 @@ function drawEntities(g: Graphics, w: World, alpha: number): void {
     if (t !== undefined && pt !== undefined) {
       g.moveTo(lerp(pt.px, pt.x, alpha), lerp(pt.py, pt.y, alpha))
         .lineTo(lerp(t.px, t.x, alpha), lerp(t.py, t.y, alpha))
-        .stroke({ width: TUNING.render.telegraphWidth, color: PALETTE.yellow, alpha: 0.35 });
+        .stroke({
+          width: TUNING.render.telegraphWidth,
+          color: PALETTE.concrete100,
+          alpha: TUNING.render.holdRayAlpha,
+        });
     }
   }
 
@@ -512,7 +542,7 @@ function drawEntities(g: Graphics, w: World, alpha: number): void {
     if (staff.plateFlash > 0) {
       const inset = TUNING.render.telegraphInset;
       g.rect(x - draw.size - inset, y - draw.size - inset, (draw.size + inset) * 2, (draw.size + inset) * 2)
-        .stroke({ width: TUNING.render.telegraphWidth, color: PALETTE.yellow });
+        .stroke(telegraphPen(w, staff.plateFlash));
     }
     if (w.registrarC.has(e)) drawVacancyCount(g, x, y, draw.size, vacancyCount(w));
 
