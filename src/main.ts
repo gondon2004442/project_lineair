@@ -136,7 +136,7 @@ async function boot(): Promise<void> {
     // перестраивается раз в debug.overlayInterval, панель — каждый кадр,
     // и её цена исчезает вместе с F3.
     profiler.begin('ПАНЕЛЬ ЗАМЕРОВ');
-    hud.profile(profiler);
+    hud.profile(profiler, world);
     profiler.end('ПАНЕЛЬ ЗАМЕРОВ');
 
     buildDone = performance.now();

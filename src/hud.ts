@@ -7,7 +7,7 @@ import { entityCount, type World } from './ecs';
 import { PALETTE } from './palette';
 import { DIRS } from './room';
 import { formatSeed } from './rng';
-import { TUNING } from './tuning';
+import { STEP, TUNING } from './tuning';
 import { auditInProgress, pendingItems } from './systems/postAuditor';
 import { hasChief } from './systems/postChief';
 import { courierTarget } from './systems/postCourier';
@@ -18,8 +18,8 @@ import { clearedCount, currentRoom } from './world';
 
 export interface Hud {
   update(w: World, fps: number, hitboxes: boolean, dt: number): void;
-  /** Показания профайлера. Рисуются только когда он включён по F3. */
-  profile(p: Profiler): void;
+  /** Показания профайлера и окно неуязвимости. Только при F3. */
+  profile(p: Profiler, w: World): void;
   toggleDossier(): void;
 }
 
@@ -132,10 +132,10 @@ export function createHud(
       if (w.scene === 'lobby') renderLobby(w, fps, hitboxes);
       else render(w, fps, hitboxes);
     },
-    profile(p) {
+    profile(p, w) {
       profileBlock.hidden = !p.enabled;
       if (!p.enabled) return;
-      profileBlock.innerHTML = profileBody(p);
+      profileBlock.innerHTML = profileBody(p) + dashBody(w);
     },
     toggleDossier() {
       dossierOpen = !dossierOpen;
@@ -207,6 +207,33 @@ function profileBody(p: Profiler): string {
     .join('');
 
   return `${head}<div class="profile-split"></div>${rows}`;
+}
+
+/**
+ * Рывок под F3. Окно неуязвимости обязано быть видно числом: на глаз
+ * нельзя отличить «неуязвим весь рывок» от «неуязвим половину», а на
+ * этой разнице держится, ставка рывок или паническая кнопка.
+ */
+function dashBody(w: World): string {
+  const p = w.playerC.get(w.player);
+  const h = w.health.get(w.player);
+  if (p === undefined || h === undefined) return '';
+  const dur = TUNING.player.dashDuration;
+  const iframes = TUNING.player.dashIFrames;
+  const share = dur <= 0 ? 0 : (iframes / dur) * 100;
+  const left = Math.max(0, h.iframes);
+  const filled = iframes <= 0 ? 0 : Math.round((left / iframes) * 10);
+  return [
+    '<div class="profile-split"></div>',
+    '<div class="subtitle">РЫВОК</div>',
+    row('ДЛИТЕЛЬНОСТЬ', `${dur.toFixed(3)} С · ${Math.round(dur / STEP)} ТИКА`),
+    row('НЕУЯЗВИМОСТЬ', `${iframes.toFixed(3)} С · ${Math.round(iframes / STEP)} ТИКОВ`),
+    row('ПОКРЫТИЕ РЫВКА', `${Math.round(share)}%`),
+    row('КУЛДАУН', `${TUNING.player.dashCooldown.toFixed(2)} С`),
+    row('ФАЗА', p.phase === 'dash' ? '<span class="warn">РЫВОК</span>' : 'ОБЫЧНАЯ'),
+    row('ОКНО СЕЙЧАС', `${gauge(filled, 10)} ${left.toFixed(3)} С`),
+    row('ДО СЛЕДУЮЩЕГО', `${p.dashCooldown.toFixed(2)} С`),
+  ].join('');
 }
 
 function ms(value: number): string {
