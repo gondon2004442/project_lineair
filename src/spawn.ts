@@ -62,6 +62,7 @@ export function spawnPlayer(w: World, x: number, y: number): Entity {
     form: 0,
     switchCooldown: 0,
     ammo: WEAPON_FORMS.map((form) => Math.max(1, Math.round(TUNING.weapon[form.id].ammoMax))),
+    reserve: WEAPON_FORMS.map((form) => Math.max(0, Math.round(TUNING.weapon[form.id].reserveMax))),
     reloading: false,
     reloadTimer: 0,
     charge: 0,

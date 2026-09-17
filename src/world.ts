@@ -16,7 +16,7 @@ import {
 } from './room';
 import { PROPS } from './data/props';
 import { WEAPON_FORMS } from './data/weaponForms';
-import { ammoMax } from './weapon';
+import { ammoMax, reserveMax } from './weapon';
 import { postNumbers, propNumbers, spawnPlayer, spawnProp, spawnStaff } from './spawn';
 import { TUNING } from './tuning';
 
@@ -134,7 +134,9 @@ function restorePlayer(w: World): void {
     player.reloadTimer = 0;
     for (let i = 0; i < WEAPON_FORMS.length; i++) {
       const form = WEAPON_FORMS[i];
-      if (form !== undefined) player.ammo[i] = ammoMax(w, form.id);
+      if (form === undefined) continue;
+      player.ammo[i] = ammoMax(w, form.id);
+      player.reserve[i] = reserveMax(w, form.id);
     }
   }
   const body = w.body.get(w.player);

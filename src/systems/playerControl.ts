@@ -103,7 +103,12 @@ function reloadTick(w: World, p: PlayerC, dt: number): void {
   p.reloading = false;
   p.reloadTimer = 0;
   if (form === undefined) return;
-  p.ammo[p.form] = ammoMax(w, form.id);
+  // Перезарядка не создаёт патроны, а переносит их из запаса. Сколько в
+  // запасе есть — столько и уйдёт в обойму.
+  const need = ammoMax(w, form.id) - Math.max(0, p.ammo[p.form] ?? 0);
+  const take = Math.max(0, Math.min(need, Math.floor(p.reserve[p.form] ?? 0)));
+  p.ammo[p.form] = Math.max(0, p.ammo[p.form] ?? 0) + take;
+  p.reserve[p.form] = Math.max(0, (p.reserve[p.form] ?? 0) - take);
 }
 
 /** Начать перезарядку текущей формы. Полная обойма — не повод. */
@@ -111,6 +116,8 @@ export function startReload(w: World, p: PlayerC): boolean {
   const form = WEAPON_FORMS[p.form];
   if (form === undefined || p.reloading) return false;
   if ((p.ammo[p.form] ?? 0) >= ammoMax(w, form.id)) return false;
+  // Пустой запас — перезаряжать нечем. Это и заставляет крутить колесо.
+  if ((p.reserve[p.form] ?? 0) <= 0) return false;
   p.reloading = true;
   w.sounds.push('reload');
   p.reloadTimer = formStat(w, form.id, 'reloadTime');

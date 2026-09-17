@@ -3,11 +3,13 @@
  * За зачистку бросается выдача — предмет в личное дело или бланк.
  */
 import { ITEMS } from '../data/items';
+import { WEAPON_FORMS } from '../data/weaponForms';
 import type { World } from '../ecs';
-import { makeRng } from '../rng';
+import { makeRng, type Rng } from '../rng';
 import { DIRS, opposite, standingInDoor } from '../room';
 import { TUNING } from '../tuning';
 import { enterRoom } from '../world';
+import { formStat, reserveMax } from '../weapon';
 
 export function roomSystem(w: World): void {
   const room = w.floor.rooms[w.room];
@@ -63,8 +65,48 @@ function rollReward(w: World, roomIndex: number): void {
     return;
   }
 
+  if (rng.float() < cfg.ammoShare && giveAmmo(w, rng)) return;
+
   const fresh = ITEMS.filter((item) => !w.build.includes(item.id));
   const pool = fresh.length > 0 ? fresh : ITEMS;
   const item = pool[rng.int(pool.length)];
   if (item !== undefined) w.build.push(item.id);
+}
+
+/**
+ * Выдача боезапаса. Форма выбирается по весу: точная одиночная попадается
+ * часто, залповая — редко. Формы с полным запасом в розыгрыше не
+ * участвуют, иначе выдача уходила бы в потолок.
+ */
+function giveAmmo(w: World, rng: Rng): boolean {
+  const p = w.playerC.get(w.player);
+  if (p === undefined) return false;
+
+  const need: { index: number; weight: number }[] = [];
+  let total = 0;
+  WEAPON_FORMS.forEach((form, index) => {
+    const max = reserveMax(w, form.id);
+    if ((p.reserve[index] ?? 0) >= max) return;
+    const weight = Math.max(0, formStat(w, form.id, 'pickupWeight'));
+    if (weight <= 0) return;
+    need.push({ index, weight });
+    total += weight;
+  });
+  if (total <= 0) return false;
+
+  let roll = rng.float() * total;
+  for (const candidate of need) {
+    roll -= candidate.weight;
+    if (roll > 0) continue;
+    const form = WEAPON_FORMS[candidate.index];
+    if (form === undefined) return false;
+    const add = Math.max(1, Math.round(formStat(w, form.id, 'pickup')));
+    p.reserve[candidate.index] = Math.min(
+      reserveMax(w, form.id),
+      (p.reserve[candidate.index] ?? 0) + add,
+    );
+    w.sounds.push('reload');
+    return true;
+  }
+  return false;
 }

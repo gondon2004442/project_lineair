@@ -49,6 +49,8 @@ export interface PlayerC {
   switchCooldown: number;
   /** Патроны в обойме каждой формы. Обоймы не общие. */
   ammo: number[];
+  /** Запас сверх обоймы: из него идёт перезарядка. Кончился — меняй форму. */
+  reserve: number[];
   /** Идёт ли перезарядка текущей формы и сколько ей осталось. */
   reloading: boolean;
   reloadTimer: number;

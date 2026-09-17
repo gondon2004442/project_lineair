@@ -13,7 +13,7 @@ import { hasChief } from './systems/postChief';
 import { courierTarget } from './systems/postCourier';
 import { hasRegistrar, vacancyCount } from './systems/staff';
 import type { Profiler } from './profiler';
-import { ammoMax, currentForm, formStat } from './weapon';
+import { ammoMax, currentForm, formStat, reserveOf } from './weapon';
 import { clearedCount, currentRoom } from './world';
 
 export interface Hud {
@@ -172,6 +172,10 @@ function weaponRows(w: World): string {
       row('ОБОЙМА (R)', `<span class="${ready ? 'ok' : 'warn'}">${gauge(have, max)} ${have}/${max}</span>`),
     );
   }
+  // Запас конечный, поэтому он в основном блоке, а не под F3: без него
+  // перезаряжаться нечем и форму придётся менять.
+  const left = reserveOf(w, index);
+  rows.push(row('ЗАПАС', `<span class="${left > 0 ? 'ok' : 'warn'}">${left}</span>`));
   if (form.id === 'lance' && !player.reloading) {
     const full = formStat(w, 'lance', 'chargeTime');
     const ratio = full <= 0 ? 1 : Math.min(1, player.charge / full);

@@ -42,3 +42,15 @@ export function statAt(w: World, path: string): number {
 export function ammoMax(w: World, formId: string): number {
   return Math.max(1, Math.round(formStat(w, formId, 'ammoMax')));
 }
+
+/** Потолок запаса сверх обоймы. */
+export function reserveMax(w: World, formId: string): number {
+  return Math.max(0, Math.round(formStat(w, formId, 'reserveMax')));
+}
+
+/** Сколько патронов в запасе формы сейчас. */
+export function reserveOf(w: World, index: number): number {
+  const player = w.playerC.get(w.player);
+  if (player === undefined) return 0;
+  return Math.max(0, Math.floor(player.reserve[index] ?? 0));
+}
