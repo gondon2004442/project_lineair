@@ -241,6 +241,11 @@ function dashBody(w: World): string {
     row('ФАЗА', p.phase === 'dash' ? '<span class="warn">РЫВОК</span>' : 'ОБЫЧНАЯ'),
     row('ОКНО СЕЙЧАС', `${gauge(filled, 10)} ${left.toFixed(3)} С`),
     row('ДО СЛЕДУЮЩЕГО', `${p.dashCooldown.toFixed(2)} С`),
+    '<div class="profile-split"></div>',
+    '<div class="subtitle">ВЫДАЧА</div>',
+    row('ШАНС ЗА УЧАСТОК', `${Math.round(w.reward.chance * 100)}%`),
+    row('УЧАСТКОВ БЕЗ ВЫДАЧИ', String(w.reward.dry)),
+    row('ПОТОЛОК ШАНСА', `${Math.round(TUNING.reward.cap * 100)}%`),
   ].join('');
 }
 

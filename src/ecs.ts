@@ -220,6 +220,14 @@ export type RunStatus = 'playing' | 'dead' | 'cleared';
 /** Где мы: в вестибюле или на этаже. */
 export type Scene = 'lobby' | 'run';
 
+/** Pity-таймер выдачи: невезение обязано кончаться само. */
+export interface RewardState {
+  /** Шанс выдачи за следующий зачищенный участок, 0..1. */
+  chance: number;
+  /** Сколько участков подряд зачищено без выдачи. */
+  dry: number;
+}
+
 export interface Feedback {
   shake: number;
   hitstop: number;
@@ -264,6 +272,8 @@ export interface World {
   build: string[];
   /** Сколько бланков на руках. Ресурс субъекта, а не сущность. */
   blanks: number;
+  /** Состояние выдачи: текущий шанс и сколько участков без неё. */
+  reward: RewardState;
   /** Общий метроном участка: по его долям бьют инспекторы. */
   metronome: number;
   /** Такт, на котором сейчас участок. */

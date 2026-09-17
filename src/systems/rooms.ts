@@ -1,6 +1,6 @@
 /**
  * Двери участка: запираются на входе, открываются по зачистке.
- * За зачистку участка выдаётся предмет — правка к параметрам оружия.
+ * За зачистку бросается выдача — предмет в личное дело или бланк.
  */
 import { ITEMS } from '../data/items';
 import type { World } from '../ecs';
@@ -18,7 +18,7 @@ export function roomSystem(w: World): void {
     w.map.doorsLocked = false;
     w.mapToken += 1;
     w.sounds.push('door.unlock');
-    issueItem(w, room.index);
+    rollReward(w, room.index);
   }
 
   if (w.map.doorsLocked || w.status === 'dead') return;
@@ -34,11 +34,35 @@ export function roomSystem(w: World): void {
 }
 
 /**
- * Выдача по итогам зачистки. Случайность своя на каждый участок,
- * поэтому порядок обхода этажа на выдачу не влияет.
+ * Выдача по итогам зачистки. Случайность своя на каждый участок, поэтому
+ * порядок обхода этажа на бросок не влияет.
+ *
+ * Шанс — не постоянный: за каждый участок без выдачи он растёт на step и
+ * упирается в cap, а как только выдача случилась, падает обратно к base.
+ * Полоса невезения кончается сама, а не когда повезёт.
  */
-function issueItem(w: World, roomIndex: number): void {
+function rollReward(w: World, roomIndex: number): void {
+  const cfg = TUNING.reward;
   const rng = makeRng((w.seed + roomIndex * TUNING.floor.itemSeedStride) >>> 0);
+
+  if (rng.float() >= w.reward.chance) {
+    w.reward.dry += 1;
+    w.reward.chance = Math.min(cfg.cap, w.reward.chance + cfg.step);
+    return;
+  }
+
+  w.reward.dry = 0;
+  w.reward.chance = cfg.base;
+
+  // Бланк выпадает, только если его есть куда положить: иначе выдача
+  // ушла бы в пустоту и pity-таймер обнулился бы зря.
+  const canCarry = w.blanks < TUNING.blank.carryMax;
+  if (canCarry && rng.float() < cfg.blankShare) {
+    w.blanks += 1;
+    w.sounds.push('door.unlock');
+    return;
+  }
+
   const fresh = ITEMS.filter((item) => !w.build.includes(item.id));
   const pool = fresh.length > 0 ? fresh : ITEMS;
   const item = pool[rng.int(pool.length)];

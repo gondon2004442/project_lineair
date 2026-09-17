@@ -51,6 +51,7 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     roster: [],
     build: [],
     blanks: TUNING.blank.refillTo,
+    reward: { chance: TUNING.reward.base, dry: 0 },
     metronome: TUNING.post.inspector.metronomeInterval,
     beat: 0,
     nextEntity: 1,
@@ -107,6 +108,8 @@ export function startRun(w: World): void {
   // Бланки пополняются на входе на этаж, но только до потолка: сэкономил
   // прошлый этаж — запас не копится, потратил весь — получишь полный.
   w.blanks = Math.max(w.blanks, TUNING.blank.refillTo);
+  w.reward.chance = TUNING.reward.base;
+  w.reward.dry = 0;
   restorePlayer(w);
   enterRoom(w, w.floor.start, null);
 }
