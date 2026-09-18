@@ -93,9 +93,17 @@ export function spawnStaff(w: World, post: string, priority: number, x: number, 
   const numbers = postNumbers(post);
   const e = createEntity(w);
 
+  // Внеплановая проверка. Чем выше взыскание, тем чаще она случается;
+  // бросок идёт через тот же единственный PRNG, что и всё остальное.
+  const cfg = TUNING.record;
+  const chance = Math.min(cfg.controlChanceCap, w.record.penalty * cfg.controlChancePerPoint);
+  const control = chance > 0 && w.rng.float() < chance;
+  if (control) w.record.controlHere += 1;
+  const hp = control ? Math.round(numbers.hp * cfg.controlHp + cfg.controlHpAdd) : numbers.hp;
+
   w.transform.set(e, { x, y, px: x, py: y });
   w.body.set(e, { vx: 0, vy: 0, radius: numbers.radius });
-  w.health.set(e, { hp: numbers.hp, max: numbers.hp, iframes: 0, flash: 0 });
+  w.health.set(e, { hp, max: hp, iframes: 0, flash: 0 });
   w.staffC.set(e, {
     post,
     title: spec === undefined ? post.toUpperCase() : spec.title,
@@ -105,6 +113,7 @@ export function spawnStaff(w: World, post: string, priority: number, x: number, 
     skin: spec === undefined ? 50 : spec.skin,
     silhouette: spec === undefined ? 'sunken' : spec.silhouette,
     plateFlash: 0,
+    control,
   });
   w.drawC.set(e, {
     shape: 'square',
@@ -293,13 +302,17 @@ export function spawnBullet(
   y: number,
   dirX: number,
   dirY: number,
+  /** Кто стреляет. Нужен только затем, чтобы проверка била вдвое. */
+  owner?: Entity,
 ): Entity {
   const e = createEntity(w);
+  const shooter = owner === undefined ? undefined : w.staffC.get(owner);
+  const damage = shooter?.control === true ? spec.damage * TUNING.record.controlDamage : spec.damage;
   w.transform.set(e, { x, y, px: x, py: y });
   w.body.set(e, { vx: dirX * spec.speed, vy: dirY * spec.speed, radius: spec.radius });
   w.bulletC.set(e, {
     faction,
-    damage: spec.damage,
+    damage,
     life: spec.life,
     pierce: spec.pierce ?? 0,
     homing: spec.homing ?? 0,

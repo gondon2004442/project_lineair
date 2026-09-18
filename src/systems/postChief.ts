@@ -44,7 +44,7 @@ export function chiefSystem(w: World, dt: number): void {
       }
       if (chief.ringTimer <= 0) {
         w.sounds.push('ring');
-        fireRing(w, t.x, t.y, b.radius, chief.twist);
+        fireRing(w, e, t.x, t.y, b.radius, chief.twist);
         chief.twist += cfg.ringTwistDeg * DEG;
         chief.ringTimer = cfg.ringInterval;
         chief.phase = 'hold';
@@ -66,7 +66,7 @@ export function chiefSystem(w: World, dt: number): void {
   }
 }
 
-function fireRing(w: World, x: number, y: number, radius: number, twist: number): void {
+function fireRing(w: World, owner: Entity, x: number, y: number, radius: number, twist: number): void {
   const cfg = TUNING.post.chief;
   const count = Math.max(3, Math.round(cfg.ringCount));
   for (let i = 0; i < count; i++) {
@@ -74,7 +74,7 @@ function fireRing(w: World, x: number, y: number, radius: number, twist: number)
     const dirX = Math.cos(angle);
     const dirY = Math.sin(angle);
     const muzzle = radius + TUNING.enemyBullet.radius;
-    spawnBullet(w, 'enemy', TUNING.enemyBullet, x + dirX * muzzle, y + dirY * muzzle, dirX, dirY);
+    spawnBullet(w, 'enemy', TUNING.enemyBullet, x + dirX * muzzle, y + dirY * muzzle, dirX, dirY, owner);
   }
 }
 

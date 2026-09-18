@@ -250,7 +250,21 @@ function dashBody(w: World): string {
     row('ШАНС ЗА УЧАСТОК', `${Math.round(w.reward.chance * 100)}%`),
     row('УЧАСТКОВ БЕЗ ВЫДАЧИ', String(w.reward.dry)),
     row('ПОТОЛОК ШАНСА', `${Math.round(TUNING.reward.cap * 100)}%`),
+    '<div class="profile-split"></div>',
+    '<div class="subtitle">ЛИЧНОЕ ДЕЛО</div>',
+    row('ВЗЫСКАНИЕ', String(w.record.penalty)),
+    row('ВЫСЛУГА', String(w.record.service)),
+    row('ИСПОРЧЕНО ИМУЩЕСТВА', `${w.record.broken} · НОРМА ${TUNING.record.breakAllowance}`),
+    row('ШАНС ПРОВЕРКИ', `${Math.round(controlChance(w) * 100)}%`),
+    row('НА КОНТРОЛЕ ЗДЕСЬ', String(w.record.controlHere)),
+    row('УЧАСТОК ЧИСТЫЙ', w.record.roomClean ? '<span class="ok">ДА</span>' : 'НЕТ'),
   ].join('');
+}
+
+/** Текущий шанс, что очередной сотрудник выйдет «на контроле». */
+function controlChance(w: World): number {
+  const cfg = TUNING.record;
+  return Math.min(cfg.controlChanceCap, w.record.penalty * cfg.controlChancePerPoint);
 }
 
 function ms(value: number): string {

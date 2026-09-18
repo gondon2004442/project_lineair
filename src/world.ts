@@ -52,6 +52,7 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     build: [],
     blanks: TUNING.blank.refillTo,
     reward: { chance: TUNING.reward.base, dry: 0 },
+    record: { penalty: 0, service: 0, broken: 0, roomClean: true, controlHere: 0 },
     metronome: TUNING.post.inspector.metronomeInterval,
     beat: 0,
     nextEntity: 1,
@@ -90,6 +91,8 @@ export function enterLobby(w: World): void {
   w.map = buildLobbyMap();
   w.mapToken += 1;
   w.roster = [];
+  w.record.roomClean = true;
+  w.record.controlHere = 0;
   w.metronome = TUNING.post.inspector.metronomeInterval;
   w.beat = 0;
 
@@ -110,6 +113,10 @@ export function startRun(w: World): void {
   w.blanks = Math.max(w.blanks, TUNING.blank.refillTo);
   w.reward.chance = TUNING.reward.base;
   w.reward.dry = 0;
+  w.record.penalty = 0;
+  w.record.service = 0;
+  w.record.broken = 0;
+  w.record.roomClean = true;
   restorePlayer(w);
   enterRoom(w, w.floor.start, null);
 }

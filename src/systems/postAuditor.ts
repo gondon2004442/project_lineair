@@ -98,6 +98,7 @@ export function auditorSystem(w: World, dt: number): void {
           t.y + (dy / len) * muzzle,
           dx / len,
           dy / len,
+          e,
         );
       }
     }

@@ -85,6 +85,8 @@ export interface StaffC {
   silhouette: string;
   /** Пока > 0 — табличка светится: телеграф. */
   plateFlash: number;
+  /** «На контроле»: внеплановая проверка, следствие взыскания. */
+  control: boolean;
 }
 
 export type InternPhase = 'route' | 'promotion';
@@ -222,6 +224,22 @@ export type RunStatus = 'playing' | 'dead' | 'cleared';
 /** Где мы: в вестибюле или на этаже. */
 export type Scene = 'lobby' | 'run';
 
+/**
+ * Скрытые статы. Взыскание — цена за нарушение процедуры, выслуга —
+ * награда за аккуратность. Оба влияют на игру, но в основном оверлее их
+ * нет: игрок должен чувствовать перемену, а не читать её.
+ */
+export interface RecordState {
+  penalty: number;
+  service: number;
+  /** Сколько имущества уже испорчено за забег. */
+  broken: number;
+  /** На текущем участке ещё не получали урона. */
+  roomClean: boolean;
+  /** Сколько сотрудников на текущем участке вышло «на контроле». */
+  controlHere: number;
+}
+
 /** Pity-таймер выдачи: невезение обязано кончаться само. */
 export interface RewardState {
   /** Шанс выдачи за следующий зачищенный участок, 0..1. */
@@ -276,6 +294,8 @@ export interface World {
   blanks: number;
   /** Состояние выдачи: текущий шанс и сколько участков без неё. */
   reward: RewardState;
+  /** Личное дело субъекта: взыскание, выслуга и чем они набраны. */
+  record: RecordState;
   /** Общий метроном участка: по его долям бьют инспекторы. */
   metronome: number;
   /** Такт, на котором сейчас участок. */

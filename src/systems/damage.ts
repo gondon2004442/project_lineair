@@ -16,6 +16,8 @@ export function applyDamage(w: World, target: Entity, amount: number): boolean {
   const killed = h.hp <= 0;
 
   if (isPlayer) {
+    // Участок перестал быть пройденным начисто: выслуги за него не будет.
+    w.record.roomClean = false;
     w.sounds.push('hurt.player');
     h.iframes = TUNING.player.hurtIFrames;
     addShake(w, TUNING.feel.shakePlayerHurt);

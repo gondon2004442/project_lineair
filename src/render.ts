@@ -650,6 +650,18 @@ function drawEntities(g: Graphics, w: World, alpha: number): void {
 
     const staff = staffHere;
     if (staff === undefined) continue;
+
+    // Внеплановая проверка: двойной неподвижный контур. Цвет самый
+    // светлый из палитры — красный занят субъектом.
+    if (staff.control) {
+      const gap = TUNING.render.controlOutlineGap;
+      const width = TUNING.render.controlOutline;
+      for (const pad of [gap, gap * 2]) {
+        g.rect(x - draw.size - pad, y - draw.size - pad, (draw.size + pad) * 2, (draw.size + pad) * 2)
+          .stroke({ width, color: PALETTE.concrete100 });
+      }
+    }
+
     drawPlates(g, x, y, draw.size, staff);
     if (staff.plateFlash > 0) {
       const inset = TUNING.render.telegraphInset;

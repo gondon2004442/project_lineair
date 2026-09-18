@@ -6,7 +6,7 @@
  * Убил его первым — участок перестаёт восполняться.
  */
 import { POST_INTERN } from '../data/posts';
-import type { World } from '../ecs';
+import type { Entity, World } from '../ecs';
 import { DEG, TUNING } from '../tuning';
 import { randomFloorPoint } from '../room';
 import { postNumbers, spawnBullet, spawnStaff } from '../spawn';
@@ -36,7 +36,7 @@ export function registrarSystem(w: World, dt: number): void {
       staff.plateFlash = cfg.fanTelegraph;
       if (registrar.timer <= 0) {
         w.sounds.push('fan');
-        throwFan(w, t.x, t.y, pt.x - t.x, pt.y - t.y, b.radius);
+        throwFan(w, e, t.x, t.y, pt.x - t.x, pt.y - t.y, b.radius);
         registrar.phase = 'idle';
         registrar.timer = cfg.fanInterval;
       }
@@ -62,7 +62,7 @@ export function registrarSystem(w: World, dt: number): void {
   }
 }
 
-function throwFan(w: World, x: number, y: number, dx: number, dy: number, radius: number): void {
+function throwFan(w: World, owner: Entity, x: number, y: number, dx: number, dy: number, radius: number): void {
   const cfg = TUNING.post.registrar;
   const count = Math.max(1, Math.round(cfg.fanCount));
   const base = Math.atan2(dy, dx);
@@ -79,7 +79,7 @@ function throwFan(w: World, x: number, y: number, dx: number, dy: number, radius
     const dirX = Math.cos(angle);
     const dirY = Math.sin(angle);
     const muzzle = radius + cfg.cardRadius;
-    spawnBullet(w, 'enemy', spec, x + dirX * muzzle, y + dirY * muzzle, dirX, dirY);
+    spawnBullet(w, 'enemy', spec, x + dirX * muzzle, y + dirY * muzzle, dirX, dirY, owner);
   }
 }
 

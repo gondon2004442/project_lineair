@@ -78,6 +78,7 @@ export function inspectorSystem(w: World, dt: number, beatStruck: boolean): void
             t.y + dirY * muzzle,
             dirX,
             dirY,
+            e,
           );
           inspector.shotsLeft -= 1;
           inspector.shotTimer = cfg.shotGap;

@@ -67,7 +67,10 @@ export function playerControlSystem(w: World, dt: number): void {
       p.phase = 'dash';
       w.sounds.push('dash');
       p.dashTime = TUNING.player.dashDuration;
-      p.dashCooldown = TUNING.player.dashCooldown;
+      // Выслуга укорачивает кулдаун рывка: контора доверяет проверенным.
+      const rec = TUNING.record;
+      const cut = Math.min(rec.serviceCooldownCap, w.record.service * rec.serviceCooldownStep);
+      p.dashCooldown = TUNING.player.dashCooldown * (1 - cut);
       h.iframes = Math.max(h.iframes, TUNING.player.dashIFrames);
     }
   }

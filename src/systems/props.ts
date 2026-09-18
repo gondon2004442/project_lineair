@@ -96,6 +96,16 @@ function strike(
 
 /** Предмет рассыпался. Шкаф и стул оставляют обломок, обломок — ничего. */
 function breakProp(w: World, e: number, kind: string, x: number, y: number): void {
+  // Порча имущества сверх нормы идёт в личное дело: сначала контора
+  // закрывает глаза на breakAllowance единиц, дальше пишет взыскание.
+  // Обломок ломать уже нечего — он и так следствие.
+  if (kind !== PROP_RUBBLE) {
+    const cfg = TUNING.record;
+    w.record.broken += 1;
+    if (w.record.broken > cfg.breakAllowance) {
+      w.record.penalty = Math.min(cfg.penaltyMax, w.record.penalty + cfg.penaltyPerBreak);
+    }
+  }
   destroyEntity(w, e);
   const p = w.playerC.get(w.player);
   if (p !== undefined && p.held === e) p.held = -1;

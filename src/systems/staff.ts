@@ -90,6 +90,23 @@ export function separationSystem(w: World, dt: number): void {
 }
 
 /** Плавный подгон скорости к желаемой. Общий для всех должностей. */
+/**
+ * Проверка идёт быстрее. Скорость домножается ОДНИМ проходом после всех
+ * поведений: так ни одну систему должности трогать не пришлось, а на
+ * выходе получается ровно то же, что и более быстрый ход.
+ */
+export function controlSystem(w: World): void {
+  const mul = TUNING.record.controlSpeed;
+  if (mul === 1) return;
+  for (const [e, staff] of w.staffC) {
+    if (!staff.control) continue;
+    const b = w.body.get(e);
+    if (b === undefined) continue;
+    b.vx *= mul;
+    b.vy *= mul;
+  }
+}
+
 export function approach(current: number, target: number, maxDelta: number): number {
   const diff = target - current;
   if (Math.abs(diff) <= maxDelta) return target;

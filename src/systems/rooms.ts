@@ -17,6 +17,11 @@ export function roomSystem(w: World): void {
 
   if (!room.cleared && w.staffC.size === 0) {
     room.cleared = true;
+    // Участок, пройденный без единого попадания, идёт в выслугу.
+    if (w.record.roomClean) {
+      const cfg = TUNING.record;
+      w.record.service = Math.min(cfg.serviceMax, w.record.service + cfg.servicePerCleanRoom);
+    }
     w.map.doorsLocked = false;
     w.mapToken += 1;
     w.sounds.push('door.unlock');
@@ -47,14 +52,19 @@ function rollReward(w: World, roomIndex: number): void {
   const cfg = TUNING.reward;
   const rng = makeRng((w.seed + roomIndex * TUNING.floor.itemSeedStride) >>> 0);
 
-  if (rng.float() >= w.reward.chance) {
+  // Проверка на участке — это и риск, и повод: за каждого «на контроле»
+  // шанс выдачи на этом участке выше.
+  const bonus = w.record.controlHere * TUNING.record.controlRewardBonus;
+  const chance = Math.min(cfg.cap, w.reward.chance + bonus);
+
+  if (rng.float() >= chance) {
     w.reward.dry += 1;
     w.reward.chance = Math.min(cfg.cap, w.reward.chance + cfg.step);
     return;
   }
 
   w.reward.dry = 0;
-  w.reward.chance = cfg.base;
+  w.reward.chance = rewardBase(w);
 
   // Бланк выпадает, только если его есть куда положить: иначе выдача
   // ушла бы в пустоту и pity-таймер обнулился бы зря.
@@ -71,6 +81,18 @@ function rollReward(w: World, roomIndex: number): void {
   const pool = fresh.length > 0 ? fresh : ITEMS;
   const item = pool[rng.int(pool.length)];
   if (item !== undefined) w.build.push(item.id);
+}
+
+/**
+ * Базовый шанс выдачи с поправкой на личное дело: выслуга его поднимает,
+ * взыскание опускает. Именно здесь скрытые статы начинают ощущаться,
+ * не будучи показанными.
+ */
+export function rewardBase(w: World): number {
+  const cfg = TUNING.reward;
+  const rec = TUNING.record;
+  const raw = cfg.base + w.record.service * rec.serviceRewardStep - w.record.penalty * rec.penaltyRewardStep;
+  return Math.max(0.02, Math.min(cfg.cap, raw));
 }
 
 /**
