@@ -204,7 +204,7 @@ export interface PropC {
  * Добыча: опечатанный шкаф или ячейка стола выдачи. Шкаф отдаёт
  * случайное, ячейка — то, что в ней названо.
  */
-export type StashKind = 'safe' | 'cell';
+export type StashKind = 'safe' | 'cell' | 'case';
 
 export interface StashC {
   kind: StashKind;
@@ -328,6 +328,15 @@ export interface World {
   record: RecordState;
   /** Благодарности: приёмные, взятые без единого попадания. */
   commendations: number;
+  /**
+   * Забег кончился и ещё не записан в архив. Симуляция только помечает;
+   * пишет точка входа, как и со звуком.
+   */
+  runEnded: '' | 'dead' | 'cleared';
+  /** Найденное дело прошлого экземпляра: строки записки. */
+  note: string[];
+  /** Какое дело с полки открыли. Отрицательное — ничего не открывали. */
+  noteSlot: number;
   /** Общий метроном участка: по его долям бьют инспекторы. */
   metronome: number;
   /** Такт, на котором сейчас участок. */

@@ -95,6 +95,7 @@ export function createHud(
       row('БЛАНКИ (Q)', blankLine(w)),
       row('ДОПУСК', passLine(w)),
       stashRow(w),
+    w.note.length > 0 ? row('АРХИВ', '<span class="ok">ДЕЛО ПРОЧТЕНО · [I]</span>') : '',
       weaponRows(w),
       energyRow(w),
     ].join('');
@@ -402,8 +403,16 @@ function dossierLine(w: World): string {
 /** Личное дело: служебные отчёты по выданным предметам. */
 function dossierBody(w: World): string {
   const head = '<b>ЛИЧНОЕ ДЕЛО СУБЪЕКТА</b><span class="dossier-hint">[I] ЗАКРЫТЬ</span>';
+  // Найденное дело прошлого экземпляра идёт первым: это записка от того,
+  // кто не дошёл, и читать её надо раньше собственных приложений.
+  const note =
+    w.note.length === 0
+      ? ''
+      : `<div class="dossier-item"><div class="dossier-code">АРХИВ</div>${w.note
+          .map((line) => `<div class="dossier-line">${line}</div>`)
+          .join('')}</div>`;
   if (w.build.length === 0) {
-    return `${head}<div class="dossier-item"><div class="dossier-line">ВЫДАЧ НЕ ЗАФИКСИРОВАНО.</div></div>`;
+    return `${head}${note}<div class="dossier-item"><div class="dossier-line">ВЫДАЧ НЕ ЗАФИКСИРОВАНО.</div></div>`;
   }
   const blocks = w.build.map((id) => {
     const item = ITEMS_BY_ID.get(id);
@@ -419,7 +428,7 @@ function dossierBody(w: World): string {
     return `<div class="dossier-item"><div class="dossier-code">${d.number} · ${d.title}</div>${lines}</div>`;
   });
 
-  return head + blocks.join('') + orders.join('');
+  return head + note + blocks.join('') + orders.join('');
 }
 
 function gauge(current: number, max: number): string {

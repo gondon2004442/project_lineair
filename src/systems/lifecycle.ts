@@ -14,6 +14,7 @@ export function lifecycleSystem(w: World, dt: number): void {
     if (e === w.player) {
       if (w.status !== 'dead') {
         w.status = 'dead';
+        w.runEnded = 'dead';
         const b = w.body.get(e);
         if (b !== undefined) {
           b.vx = 0;
@@ -47,7 +48,10 @@ function commend(w: World): void {
 export function statusSystem(w: World): void {
   if (w.status !== 'playing') return;
   const office = w.floor.rooms[w.floor.end];
-  if (office !== undefined && office.cleared) w.status = 'cleared';
+  if (office !== undefined && office.cleared) {
+    w.status = 'cleared';
+    w.runEnded = 'cleared';
+  }
 }
 
 export function feedbackSystem(w: World, dt: number): void {

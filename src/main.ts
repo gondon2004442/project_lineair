@@ -3,6 +3,7 @@
  * рендер идёт своим темпом и интерполирует между шагами.
  */
 import './style.css';
+import { caseNote, fileCase, readArchive } from './archive';
 import { createAudio } from './audio';
 import { createHud } from './hud';
 import { createInput } from './input';
@@ -142,6 +143,28 @@ async function boot(): Promise<void> {
     profiler.end('СИМУЛЯЦИЯ');
 
     // Звук снимается после симуляции: системы её не знают, она — звука.
+    // Архив живёт вне симуляции, как и звук: она только помечает, что
+    // забег кончился или что дело достали с полки.
+    if (world.runEnded !== '') {
+      fileCase({
+        seed: world.seed,
+        room: world.room,
+        rooms: world.floor.rooms.length,
+        reason: world.runEnded === 'dead' ? 'отзыв допуска' : 'сектор сдан',
+        attachments: world.build.length,
+        commendations: world.commendations,
+      });
+      world.runEnded = '';
+    }
+    if (world.noteSlot >= 0) {
+      const shelf = readArchive();
+      world.note =
+        shelf.length === 0
+          ? ['ДЕЛО ИЗЪЯТО. ПРЕДЫДУЩИХ ЭКЗЕМПЛЯРОВ НЕ ЗАФИКСИРОВАНО.']
+          : caseNote(shelf[world.noteSlot % shelf.length] ?? shelf[0]);
+      world.noteSlot = -1;
+    }
+
     profiler.begin('ЗВУК');
     for (const id of world.sounds) audio.play(id);
     world.sounds.length = 0;

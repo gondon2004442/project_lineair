@@ -36,9 +36,11 @@ export function stashInReach(w: World): Entity {
 }
 
 /** Чем можно оформить добычу прямо сейчас. Пусто — нечем. */
-export function issueCost(w: World, target: Entity): 'pass' | 'blank' | '' {
+export function issueCost(w: World, target: Entity): 'pass' | 'blank' | 'free' | '' {
   const stash = w.stashC.get(target);
   if (stash === undefined || stash.opened) return '';
+  // Чужое дело ничего не стоит: его читают, а не оформляют.
+  if (stash.kind === 'case') return 'free';
   if (w.passes > 0) return 'pass';
   // Бланком вскрывается только шкаф: на столе выдачи бланк не примут.
   if (stash.kind === 'safe' && w.blanks > 0) return 'blank';
@@ -58,10 +60,18 @@ export function issueSystem(w: World): void {
   const cost = issueCost(w, target);
   if (cost === '') return;
   if (cost === 'pass') w.passes -= 1;
-  else w.blanks -= 1;
+  else if (cost === 'blank') w.blanks -= 1;
 
   stash.opened = true;
   w.sounds.push('door.unlock');
+
+  if (stash.kind === 'case') {
+    // Симуляция не знает, что лежит в архиве: она помечает, какое дело
+    // открыли, а достаёт его точка входа.
+    w.note = [];
+    w.noteSlot = Number(stash.item);
+    return;
+  }
 
   if (stash.kind === 'cell') {
     if (stash.item !== '' && !w.build.includes(stash.item)) w.build.push(stash.item);

@@ -58,6 +58,9 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     reward: { chance: TUNING.reward.base, dry: 0, lastItem: '', lastOrder: '', lastWeight: 1 },
     record: { penalty: 0, service: 0, broken: 0, roomClean: true, controlHere: 0 },
     commendations: 0,
+    runEnded: '',
+    note: [],
+    noteSlot: -1,
     metronome: TUNING.post.inspector.metronomeInterval,
     beat: 0,
     nextEntity: 1,
@@ -124,6 +127,9 @@ export function startRun(w: World): void {
   w.reward.lastOrder = '';
   w.reward.lastWeight = 1;
   w.commendations = 0;
+  w.note = [];
+  w.noteSlot = -1;
+  w.runEnded = '';
   w.record.penalty = 0;
   w.record.service = 0;
   w.record.broken = 0;
@@ -249,8 +255,20 @@ function coverSpot(
  * seed, поэтому на одном seed добыча всегда одна и та же.
  */
 function placeStash(w: World, room: RoomNode, entryX: number, entryY: number): void {
-  if (!room.safe && !room.desk) return;
   const cfg = TUNING.stash;
+
+  // Чужое дело лежит открыто: платить за него не надо, его надо прочесть.
+  // Бросок делается всегда, даже когда архив пуст, — иначе поток
+  // случайных чисел зависел бы от хранилища, а с ним поехал бы забег.
+  const caseRng = makeRng((w.seed + room.index * TUNING.archive.seedStride) >>> 0);
+  const wantCase = caseRng.float() < TUNING.archive.chance;
+  const slot = caseRng.int(Math.max(1, Math.round(TUNING.archive.keep)));
+  if (wantCase && room.kind !== 'start' && !room.corridor) {
+    const spot = findSpawnSpot(w.map, caseRng, entryX, entryY, cfg.clearance, cfg.cellRadius);
+    spawnStash(w, 'case', String(slot), 'ДЕЛО ПРЕДЫДУЩЕГО ЭКЗЕМПЛЯРА', spot.x, spot.y);
+  }
+
+  if (!room.safe && !room.desk) return;
   const rng = makeRng((w.seed + room.index * cfg.seedStride) >>> 0);
 
   if (room.safe) {
