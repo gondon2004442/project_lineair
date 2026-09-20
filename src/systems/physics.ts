@@ -30,10 +30,16 @@ export function physicsSystem(w: World, dt: number): void {
       continue;
     }
 
+    // Проверка ходит быстрее. Множитель применяется К ПЕРЕМЕЩЕНИЮ, а не к
+    // скорости: скорость поведения выставляют сами, подтягивая её к своей
+    // цели, и если домножать её саму, то на следующем шаге она домножится
+    // опять — разгон получается лавинообразный.
+    const pace = w.staffC.get(e)?.control === true ? TUNING.record.controlSpeed : 1;
+
     // Дробим перемещение: за один разбор нельзя проскочить стену насквозь.
-    const reach = Math.max(Math.abs(b.vx), Math.abs(b.vy)) * dt;
+    const reach = Math.max(Math.abs(b.vx), Math.abs(b.vy)) * dt * pace;
     const parts = Math.max(1, Math.ceil(reach / (w.map.size * TUNING.sim.maxMoveFraction)));
-    const slice = dt / parts;
+    const slice = (dt * pace) / parts;
     for (let i = 0; i < parts; i++) {
       // Скорость читается заново: столкновение могло её обнулить.
       moveX(w.map, t, b, b.vx * slice);
