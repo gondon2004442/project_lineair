@@ -260,6 +260,10 @@ export interface RewardState {
   chance: number;
   /** Сколько участков подряд зачищено без выдачи. */
   dry: number;
+  /** След последней выдачи приложения: что выпало, с каким весом и почему. */
+  lastItem: string;
+  lastOrder: string;
+  lastWeight: number;
 }
 
 export interface Feedback {

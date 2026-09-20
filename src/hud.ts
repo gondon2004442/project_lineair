@@ -12,6 +12,7 @@ import { STEP, TUNING } from './tuning';
 import { auditInProgress, pendingItems } from './systems/postAuditor';
 import { hasChief } from './systems/postChief';
 import { courierTarget } from './systems/postCourier';
+import { synergyFactor } from './paperwork';
 import { issueCost, stashInReach } from './systems/issue';
 import { hasRegistrar, vacancyCount } from './systems/staff';
 import type { Profiler } from './profiler';
@@ -255,6 +256,8 @@ function dashBody(w: World): string {
     row('ШАНС ЗА УЧАСТОК', `${Math.round(w.reward.chance * 100)}%`),
     row('УЧАСТКОВ БЕЗ ВЫДАЧИ', String(w.reward.dry)),
     row('ПОТОЛОК ШАНСА', `${Math.round(TUNING.reward.cap * 100)}%`),
+    row('ДЕЛОПРОИЗВОДСТВО', `×${synergyFactor(w).toFixed(2)}`),
+    row('ПОСЛЕДНЯЯ ВЫДАЧА', lastIssueLine(w)),
     '<div class="profile-split"></div>',
     '<div class="subtitle">ЛИЧНОЕ ДЕЛО</div>',
     row('ВЗЫСКАНИЕ', String(w.record.penalty)),
@@ -264,6 +267,18 @@ function dashBody(w: World): string {
     row('НА КОНТРОЛЕ ЗДЕСЬ', String(w.record.controlHere)),
     row('УЧАСТОК ЧИСТЫЙ', w.record.roomClean ? '<span class="ok">ДА</span>' : 'НЕТ'),
   ].join('');
+}
+
+/**
+ * След последней выдачи приложения: что выпало и получило ли оно вес за
+ * то, что завершает распоряжение. Без этой строки смещение дропа
+ * невозможно отладить — оно по определению незаметно.
+ */
+function lastIssueLine(w: World): string {
+  if (w.reward.lastItem === '') return '—';
+  const weight = `×${w.reward.lastWeight.toFixed(2)}`;
+  if (w.reward.lastOrder === '') return `${w.reward.lastItem} · ${weight}`;
+  return `<span class="ok">${w.reward.lastItem} · ${weight} · ${w.reward.lastOrder}</span>`;
 }
 
 /** Текущий шанс, что очередной сотрудник выйдет «на контроле». */

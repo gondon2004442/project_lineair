@@ -9,7 +9,8 @@ import { createInput } from './input';
 import { createPanel } from './panel';
 import { profiler } from './profiler';
 import { createRenderer } from './render';
-import { resolveSeed, seedPinned } from './rng';
+import { pickItem, synergyFactor } from './paperwork';
+import { makeRng, resolveSeed, seedPinned } from './rng';
 import { step } from './step';
 import { STEP, TUNING } from './tuning';
 import { DIRECTIVES, issuedDirectives } from './data/directives';
@@ -108,6 +109,9 @@ async function boot(): Promise<void> {
       spawnStaff,
       statAt,
       issuedDirectives,
+      pickItem,
+      synergyFactor,
+      makeRng,
       items: ITEMS,
       directives: DIRECTIVES,
       tuning: TUNING,

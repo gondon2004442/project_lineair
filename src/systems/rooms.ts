@@ -2,8 +2,8 @@
  * Двери участка: запираются на входе, открываются по зачистке.
  * За зачистку бросается выдача — предмет в личное дело или бланк.
  */
-import { ITEMS } from '../data/items';
 import { WEAPON_FORMS } from '../data/weaponForms';
+import { pickItem } from '../paperwork';
 import type { World } from '../ecs';
 import { makeRng, type Rng } from '../rng';
 import { DIRS, opposite, standingInDoor } from '../room';
@@ -83,9 +83,7 @@ function rollReward(w: World, roomIndex: number): void {
 
   if (rng.float() < cfg.ammoShare && giveAmmo(w, rng)) return;
 
-  const fresh = ITEMS.filter((item) => !w.build.includes(item.id));
-  const pool = fresh.length > 0 ? fresh : ITEMS;
-  const item = pool[rng.int(pool.length)];
+  const item = pickItem(w, rng);
   if (item !== undefined) w.build.push(item.id);
 }
 

@@ -4,7 +4,8 @@ import { POST_COURIER } from './data/posts';
 import { MINI_BOSS_POSTS, STAFFING_BY_ID, type StaffPost } from './data/staffing';
 import { generateFloor, roomDoors, type RoomNode } from './floor';
 import type { InputSnapshot } from './input';
-import { makeRng } from './rng';
+import { pickItem } from './paperwork';
+import { makeRng, type Rng } from './rng';
 import {
   TILE_FLOOR,
   buildLobbyMap,
@@ -14,7 +15,7 @@ import {
   type Dir,
   type TileMap,
 } from './room';
-import { ITEMS } from './data/items';
+import { ITEMS, type Item } from './data/items';
 import { PROPS } from './data/props';
 import { WEAPON_FORMS } from './data/weaponForms';
 import { ammoMax, reserveMax } from './weapon';
@@ -53,7 +54,7 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     build: [],
     blanks: TUNING.blank.refillTo,
     passes: TUNING.stash.passesStart,
-    reward: { chance: TUNING.reward.base, dry: 0 },
+    reward: { chance: TUNING.reward.base, dry: 0, lastItem: '', lastOrder: '', lastWeight: 1 },
     record: { penalty: 0, service: 0, broken: 0, roomClean: true, controlHere: 0 },
     metronome: TUNING.post.inspector.metronomeInterval,
     beat: 0,
@@ -117,6 +118,9 @@ export function startRun(w: World): void {
   w.passes = Math.max(w.passes, TUNING.stash.passesStart);
   w.reward.chance = TUNING.reward.base;
   w.reward.dry = 0;
+  w.reward.lastItem = '';
+  w.reward.lastOrder = '';
+  w.reward.lastWeight = 1;
   w.record.penalty = 0;
   w.record.service = 0;
   w.record.broken = 0;
@@ -227,14 +231,26 @@ function placeStash(w: World, room: RoomNode, entryX: number, entryY: number): v
   // а не натыкались. Предлагается то, чего в деле ещё нет.
   const centre = roomCenter(w.map);
   const cells = Math.max(1, Math.round(cfg.deskCells));
-  const fresh = ITEMS.filter((item) => !w.build.includes(item.id));
-  const pool = fresh.length >= cells ? fresh.slice() : ITEMS.slice();
+  // Ячейки набираются тем же делопроизводством: одна из трёх почти
+  // всегда оказывается той, что завершает распоряжение.
+  const taken = new Set<string>();
   for (let i = 0; i < cells; i++) {
-    const pick = pool.splice(rng.int(pool.length), 1)[0];
+    const pick = pickCell(w, rng, taken);
     if (pick === undefined) break;
+    taken.add(pick.id);
     const x = centre.x + (i - (cells - 1) / 2) * cfg.deskGap;
     spawnStash(w, 'cell', pick.id, `${pick.code} · ${pick.title}`, x, centre.y);
   }
+}
+
+/** Ячейка стола: то же взвешивание, но без повторов в одном столе. */
+function pickCell(w: World, rng: Rng, taken: Set<string>): Item | undefined {
+  for (let attempt = 0; attempt < TUNING.floor.spawnAttempts; attempt++) {
+    const pick = pickItem(w, rng);
+    if (pick === undefined) return undefined;
+    if (!taken.has(pick.id)) return pick;
+  }
+  return ITEMS.find((item) => !taken.has(item.id));
 }
 
 /** Штатное расписание участка в работе: квота на каждую должность. */

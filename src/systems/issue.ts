@@ -7,9 +7,9 @@
  * тот самый второй рынок бланка: потратить его, чтобы выжить сейчас, или
  * чтобы получить предмет потом.
  */
-import { ITEMS, ITEMS_BY_ID } from '../data/items';
 import { WEAPON_FORMS } from '../data/weaponForms';
 import type { Entity, World } from '../ecs';
+import { pickItem } from '../paperwork';
 import { makeRng } from '../rng';
 import { TUNING } from '../tuning';
 import { formStat, reserveMax } from '../weapon';
@@ -86,8 +86,6 @@ export function issueSystem(w: World): void {
     w.blanks = Math.min(TUNING.blank.carryMax, w.blanks + 1);
     return;
   }
-  const fresh = ITEMS.filter((item) => !w.build.includes(item.id));
-  const pool = fresh.length > 0 ? fresh : ITEMS;
-  const item = pool[rng.int(pool.length)];
-  if (item !== undefined && ITEMS_BY_ID.has(item.id)) w.build.push(item.id);
+  const item = pickItem(w, rng);
+  if (item !== undefined) w.build.push(item.id);
 }
