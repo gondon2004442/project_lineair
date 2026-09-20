@@ -2,7 +2,7 @@
  * Телекинез: ПКМ поднимает ближайший объект, отпускание — бросает.
  * Держать стоит энергии; кончилась — предмет падает.
  */
-import type { Entity, PlayerC, World } from '../ecs';
+import type { Entity, PlayerC, PropC, World } from '../ecs';
 import { propNumbers } from '../spawn';
 import { TUNING } from '../tuning';
 
@@ -31,6 +31,7 @@ export function telekinesisSystem(w: World, dt: number): void {
       if (p.energy <= 0 || !w.input.grabHeld) {
         release(w, p, w.input.grabHeld ? false : true);
       } else {
+        p.grabTime += dt;
         const targetX = pt.x + p.aimX * cfg.holdDistance;
         const targetY = pt.y + p.aimY * cfg.holdDistance;
         // Тянем к точке удержания, а не телепортируем: видно инерцию.
@@ -47,9 +48,12 @@ export function telekinesisSystem(w: World, dt: number): void {
     if (target >= 0) {
       const prop = w.propC.get(target);
       if (prop !== undefined) {
+        // Поднятое набок укрытие снова становится обычным предметом.
+        if (prop.phase === 'cover') uncover(w, target);
         prop.phase = 'held';
         prop.lastHit = -1;
         p.held = target;
+        p.grabTime = 0;
         w.sounds.push('grab');
         spend(p, cfg.grabCost);
         const gt = w.transform.get(target);
@@ -77,8 +81,17 @@ function release(w: World, p: PlayerC, thrown: boolean): void {
   const prop = w.propC.get(p.held);
   const b = w.body.get(p.held);
   const thrownEntity = p.held;
+  const quick = p.grabTime < TUNING.telekinesis.tapTime;
   p.held = -1;
+  p.grabTime = 0;
   if (prop === undefined || b === undefined) return;
+
+  // Короткое нажатие: предмет ложится набок и становится укрытием.
+  // Держал дольше — значит целился, и это бросок.
+  if (thrown && quick) {
+    cover(w, thrownEntity, prop, b);
+    return;
+  }
 
   if (!thrown) {
     prop.phase = 'idle';
@@ -94,6 +107,43 @@ function release(w: World, p: PlayerC, thrown: boolean): void {
   prop.lastHit = -1;
   b.vx = p.aimX * speed;
   b.vy = p.aimY * speed;
+}
+
+/**
+ * Положить набок. Укрытие шире обычного предмета, держит свой запас
+ * попаданий и не сдвигается телами — стоит там, куда поставили.
+ */
+function cover(w: World, e: Entity, prop: PropC, b: { vx: number; vy: number; radius: number }): void {
+  const cfg = TUNING.prop;
+  prop.phase = 'cover';
+  prop.lastHit = -1;
+  b.vx = 0;
+  b.vy = 0;
+  b.radius = propNumbers(prop.kind).radius * cfg.coverWidth;
+  const health = w.health.get(e);
+  if (health !== undefined) {
+    health.max = cfg.coverHits;
+    health.hp = cfg.coverHits;
+  }
+  const draw = w.drawC.get(e);
+  if (draw !== undefined) draw.size = b.radius;
+  w.sounds.push('impact');
+}
+
+/** Поднял укрытие — оно снова обычный предмет со своим габаритом. */
+function uncover(w: World, e: Entity): void {
+  const prop = w.propC.get(e);
+  const b = w.body.get(e);
+  if (prop === undefined || b === undefined) return;
+  const numbers = propNumbers(prop.kind);
+  b.radius = numbers.radius;
+  const draw = w.drawC.get(e);
+  if (draw !== undefined) draw.size = numbers.radius;
+  const health = w.health.get(e);
+  if (health !== undefined) {
+    health.max = numbers.hp;
+    health.hp = Math.min(health.hp, numbers.hp);
+  }
 }
 
 /** Короткая волна в точке: её рисует фильтр, симуляция только помечает. */

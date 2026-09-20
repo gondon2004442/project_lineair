@@ -59,6 +59,8 @@ export interface PlayerC {
   /** Сколько снарядов залпа осталось выпустить и когда следующий. */
   queued: number;
   queueTimer: number;
+  /** Сколько держим ПКМ с момента захвата: по нему короткое нажатие отличается от удержания. */
+  grabTime: number;
   /** Телекинез: запас энергии, пауза до восполнения и что сейчас держим. */
   energy: number;
   energyDelay: number;
@@ -176,7 +178,11 @@ export interface AuditorC {
   shotTimer: number;
 }
 
-export type PropPhase = 'idle' | 'held' | 'thrown';
+/**
+ * 'cover' — предмет положен набок и работает укрытием: шире, прочнее и
+ * не сдвигается телами.
+ */
+export type PropPhase = 'idle' | 'held' | 'thrown' | 'cover';
 
 /** Физический объект участка: стул, шкаф, бетонный обломок. */
 export interface PropC {

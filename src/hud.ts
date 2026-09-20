@@ -61,6 +61,7 @@ export function createHud(
       row('ЛКМ', 'ОГОНЬ'),
       row('КОЛЕСО', 'ФОРМА ОРУЖИЯ'),
       row('ПКМ', 'ТЕЛЕКИНЕЗ'),
+      row('ПКМ КОРОТКО', 'ПОЛОЖИТЬ НАБОК'),
       row('SHIFT', 'РЫВОК'),
       row('R', 'ПЕРЕЗАРЯДКА'),
       row('Q', 'БЛАНК'),
@@ -377,7 +378,9 @@ function energyRow(w: World): string {
   const held = w.propC.get(player.held);
   return (
     row('ЭНЕРГИЯ (ПКМ)', `<span class="${enough ? 'ok' : 'warn'}">${gauge(Math.round(ratio * 10), 10)}</span>`) +
-    (held === undefined ? '' : row('В ЗАХВАТЕ', `<span class="ok">${held.title}</span>`))
+    (held === undefined
+      ? ''
+      : row('В ЗАХВАТЕ', `<span class="ok">${held.title} · КОРОТКО — НАБОК</span>`))
   );
 }
 

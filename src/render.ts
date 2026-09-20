@@ -616,6 +616,22 @@ function drawEntities(g: Graphics, w: World, alpha: number): void {
     } else {
       switch (draw.shape) {
         case 'square': {
+          // Положенное набок укрытие рисуется плитой: ниже, шире и с
+          // светлой кромкой по верхнему краю — видно, что оно лежит.
+          if (w.propC.get(e)?.phase === 'cover') {
+            contactShadow(g, x, y, draw.size, 1);
+            block(g, x - draw.size, y - draw.size, draw.size * 2, draw.size * 2, color);
+            g.rect(x - draw.size, y - draw.size, draw.size * 2, TUNING.render.coverLip).fill(
+              PALETTE.concrete300,
+            );
+            g.rect(x - draw.size, y - draw.size, draw.size * 2, draw.size * 2).stroke({
+              width: TUNING.render.coverEdge,
+              color: PALETTE.concrete500,
+              alignment: 1,
+            });
+            break;
+          }
+
           // Удерживаемое телекинезом висит: тело приподнято и дышит, тень
           // остаётся на полу и поджимается. Иначе полёт читается как
           // скольжение по полу.
