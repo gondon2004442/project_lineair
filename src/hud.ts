@@ -1,5 +1,6 @@
 /** Служебный оверлей: состояние субъекта, схема этажа, отладка, seed. */
 import { TEMPLATES_BY_ID } from './data/roomTemplates';
+import { issuedDirectives } from './data/directives';
 import { ITEMS_BY_ID } from './data/items';
 import { WEAPON_FORMS } from './data/weaponForms';
 import { STAFFING_BY_ID } from './data/staffing';
@@ -99,7 +100,7 @@ export function createHud(
       row('ШАГ', String(w.tick)),
       row('F1 ХИТБОКСЫ', hitboxes ? '<span class="ok">ВКЛ</span>' : 'ВЫКЛ'),
       row('F2', 'ПОВТОР'),
-      row('I ЛИЧНОЕ ДЕЛО', `${w.build.length} ПРЕДМЕТОВ`),
+      row('I ЛИЧНОЕ ДЕЛО', dossierLine(w)),
     ].join('');
 
     dossier.hidden = !dossierOpen;
@@ -323,6 +324,13 @@ function energyRow(w: World): string {
   );
 }
 
+/** Коротко о деле: приложений и выпущенных по ним распоряжений. */
+function dossierLine(w: World): string {
+  const orders = issuedDirectives(w.build).length;
+  if (orders === 0) return `${w.build.length} ПРИЛОЖЕНИЙ`;
+  return `${w.build.length} ПРИЛОЖЕНИЙ · <span class="ok">${orders} РАСПОРЯЖЕНИЙ</span>`;
+}
+
 /** Личное дело: служебные отчёты по выданным предметам. */
 function dossierBody(w: World): string {
   const head = '<b>ЛИЧНОЕ ДЕЛО СУБЪЕКТА</b><span class="dossier-hint">[I] ЗАКРЫТЬ</span>';
@@ -335,7 +343,15 @@ function dossierBody(w: World): string {
     const lines = item.report.map((line) => `<div class="dossier-line">${line}</div>`).join('');
     return `<div class="dossier-item"><div class="dossier-code">${item.code} · ${item.title}</div>${lines}</div>`;
   });
-  return head + blocks.join('');
+
+  // Распоряжения идут после приложений: сначала что нашли, потом что
+  // контора из этого вывела.
+  const orders = issuedDirectives(w.build).map((d) => {
+    const lines = d.text.map((line) => `<div class="dossier-line">${line}</div>`).join('');
+    return `<div class="dossier-item"><div class="dossier-code">${d.number} · ${d.title}</div>${lines}</div>`;
+  });
+
+  return head + blocks.join('') + orders.join('');
 }
 
 function gauge(current: number, max: number): string {

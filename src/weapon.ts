@@ -5,7 +5,8 @@
  * как (база + add) * mul, поэтому порядок предметов в билде
  * на результат не влияет.
  */
-import { ITEMS_BY_ID } from './data/items';
+import { issuedDirectives } from './data/directives';
+import { ITEMS_BY_ID, type ItemMod } from './data/items';
 import { WEAPON_FORMS, type WeaponForm } from './data/weaponForms';
 import type { World } from './ecs';
 import { getTuning } from './tuning';
@@ -26,15 +27,23 @@ export function formStat(w: World, formId: string, key: string): number {
 export function statAt(w: World, path: string): number {
   let add = 0;
   let mul = 1;
-  for (const id of w.build) {
-    const item = ITEMS_BY_ID.get(id);
-    if (item === undefined) continue;
-    for (const mod of item.mods) {
+  const apply = (mods: readonly ItemMod[]): void => {
+    for (const mod of mods) {
       if (mod.path !== path) continue;
       if (mod.add !== undefined) add += mod.add;
       if (mod.mul !== undefined) mul *= mod.mul;
     }
+  };
+
+  for (const id of w.build) {
+    const item = ITEMS_BY_ID.get(id);
+    if (item !== undefined) apply(item.mods);
   }
+  // Распоряжение — такая же правка, как приложение, просто выпущена
+  // конторой в ответ на состав дела. Считается тем же порядком, поэтому
+  // результат по-прежнему не зависит от того, что нашли раньше.
+  for (const directive of issuedDirectives(w.build)) apply(directive.mods);
+
   return (getTuning(path) + add) * mul;
 }
 
