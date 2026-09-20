@@ -107,6 +107,9 @@ export function createHud(
       row('F1 ХИТБОКСЫ', hitboxes ? '<span class="ok">ВКЛ</span>' : 'ВЫКЛ'),
       row('F2', 'ПОВТОР'),
       row('I ЛИЧНОЕ ДЕЛО', dossierLine(w)),
+      w.commendations > 0
+        ? row('БЛАГОДАРНОСТЕЙ', `<span class="ok">${w.commendations}</span>`)
+        : '',
     ].join('');
 
     dossier.hidden = !dossierOpen;
@@ -310,7 +313,12 @@ function ms(value: number): string {
 
 /** Кто на участке старше рядового: мини-босс или сам Заведующий. */
 function rankRow(w: World): string {
-  if (hasChief(w)) return row('НА УЧАСТКЕ', '<span class="warn">ЗАВЕДУЮЩИЙ СЕКТОРОМ</span>');
+  if (hasChief(w)) {
+    for (const [, chief] of w.chiefC) {
+      const clean = w.record.roomClean ? ' · БЕЗУПРЕЧНО' : '';
+      return row('ЗАВЕДУЮЩИЙ', `<span class="warn">ФАЗА ${chief.stage}/3${clean}</span>`);
+    }
+  }
   for (const [, staff] of w.staffC) {
     if (staff.priority > 1) continue;
     return row('НА УЧАСТКЕ', `<span class="warn">${staff.title}</span>`);

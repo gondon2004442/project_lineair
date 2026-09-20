@@ -21,9 +21,23 @@ export function lifecycleSystem(w: World, dt: number): void {
         }
       }
     } else {
+      // Приёмная, взятая без единого попадания, — благодарность в дело:
+      // перманентный контейнер здоровья на забег. Награда не за победу,
+      // а за качество победы.
+      if (w.chiefC.has(e) && w.record.roomClean) commend(w);
       destroyEntity(w, e);
     }
   }
+}
+
+/** Благодарность: контейнер здоровья, который остаётся до конца забега. */
+function commend(w: World): void {
+  const health = w.health.get(w.player);
+  if (health === undefined) return;
+  w.commendations += 1;
+  health.max += TUNING.post.chief.commendationHp;
+  health.hp = Math.min(health.max, health.hp + TUNING.post.chief.commendationHp);
+  w.sounds.push('door.unlock');
 }
 
 /**

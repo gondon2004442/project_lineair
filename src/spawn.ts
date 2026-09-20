@@ -193,6 +193,8 @@ function attachBehaviour(w: World, e: Entity, post: string, x: number, y: number
     case POST_CHIEF:
       w.chiefC.set(e, {
         phase: 'hold',
+        stage: 1,
+        breakTimer: 0,
         ringTimer: TUNING.post.chief.ringInterval,
         twist: 0,
         reshuffleTimer: TUNING.post.chief.reshuffleInterval,

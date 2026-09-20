@@ -155,6 +155,10 @@ export type ChiefPhase = 'hold' | 'windup';
 
 export interface ChiefC {
   phase: ChiefPhase;
+  /** Какая из трёх фаз идёт сейчас. */
+  stage: 1 | 2 | 3;
+  /** Пока больше нуля — перелом фазы: он замер и не стреляет. */
+  breakTimer: number;
   /** Обратный отсчёт до циркуляра. */
   ringTimer: number;
   /** На сколько провёрнуто следующее кольцо. */
@@ -322,6 +326,8 @@ export interface World {
   reward: RewardState;
   /** Личное дело субъекта: взыскание, выслуга и чем они набраны. */
   record: RecordState;
+  /** Благодарности: приёмные, взятые без единого попадания. */
+  commendations: number;
   /** Общий метроном участка: по его долям бьют инспекторы. */
   metronome: number;
   /** Такт, на котором сейчас участок. */

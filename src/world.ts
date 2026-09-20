@@ -57,6 +57,7 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     passes: TUNING.stash.passesStart,
     reward: { chance: TUNING.reward.base, dry: 0, lastItem: '', lastOrder: '', lastWeight: 1 },
     record: { penalty: 0, service: 0, broken: 0, roomClean: true, controlHere: 0 },
+    commendations: 0,
     metronome: TUNING.post.inspector.metronomeInterval,
     beat: 0,
     nextEntity: 1,
@@ -122,6 +123,7 @@ export function startRun(w: World): void {
   w.reward.lastItem = '';
   w.reward.lastOrder = '';
   w.reward.lastWeight = 1;
+  w.commendations = 0;
   w.record.penalty = 0;
   w.record.service = 0;
   w.record.broken = 0;

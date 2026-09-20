@@ -26,6 +26,27 @@ export function chiefSystem(w: World, dt: number): void {
     let desiredVx = 0;
     let desiredVy = 0;
 
+    // --- Перелом фазы ---
+    const health = w.health.get(e);
+    const left = health === undefined || health.max <= 0 ? 1 : health.hp / health.max;
+    const want: 1 | 2 | 3 = left <= cfg.phaseThreeAt ? 3 : left <= cfg.phaseTwoAt ? 2 : 1;
+    if (want > chief.stage) {
+      // Смена фазы: замирает, разом перетасовывает подчинённых и на
+      // мгновение перестаёт отвечать. Это единственное честное окно.
+      chief.stage = want;
+      chief.breakTimer = cfg.phaseBreak;
+      chief.ringTimer = cfg.phaseBreak + ringInterval(cfg, chief.stage);
+      staff.plateFlash = cfg.phaseBreak;
+      w.sounds.push('ring');
+      reshuffle(w, Math.max(0, Math.round(cfg.phaseBreakShuffle)));
+    }
+    if (chief.breakTimer > 0) {
+      chief.breakTimer -= dt;
+      b.vx = approach(b.vx, 0, cfg.friction * dt);
+      b.vy = approach(b.vy, 0, cfg.friction * dt);
+      continue;
+    }
+
     if (alive && pt !== undefined) {
       const dx = pt.x - t.x;
       const dy = pt.y - t.y;
@@ -44,9 +65,9 @@ export function chiefSystem(w: World, dt: number): void {
       }
       if (chief.ringTimer <= 0) {
         w.sounds.push('ring');
-        fireRing(w, e, t.x, t.y, b.radius, chief.twist);
+        fireRing(w, e, t.x, t.y, b.radius, chief.twist, chief.stage);
         chief.twist += cfg.ringTwistDeg * DEG;
-        chief.ringTimer = cfg.ringInterval;
+        chief.ringTimer = ringInterval(cfg, chief.stage);
         chief.phase = 'hold';
       }
 
@@ -54,7 +75,8 @@ export function chiefSystem(w: World, dt: number): void {
       chief.reshuffleTimer -= dt;
       if (chief.reshuffleTimer <= cfg.reshuffleTelegraph) staff.plateFlash = cfg.reshuffleTelegraph;
       if (chief.reshuffleTimer <= 0) {
-        chief.reshuffleTimer = cfg.reshuffleInterval;
+        chief.reshuffleTimer =
+          chief.stage >= 3 ? cfg.reshuffleInterval * cfg.phaseThreeReshuffle : cfg.reshuffleInterval;
         reshuffle(w, Math.max(0, Math.round(cfg.reshuffleCount)));
       }
     }
@@ -66,9 +88,25 @@ export function chiefSystem(w: World, dt: number): void {
   }
 }
 
-function fireRing(w: World, owner: Entity, x: number, y: number, radius: number, twist: number): void {
+/** Интервал циркуляра в этой фазе: чем ниже прочность, тем чаще. */
+function ringInterval(cfg: typeof TUNING.post.chief, stage: 1 | 2 | 3): number {
+  if (stage >= 3) return cfg.ringInterval * cfg.phaseThreeRate;
+  if (stage === 2) return cfg.ringInterval * cfg.phaseTwoRate;
+  return cfg.ringInterval;
+}
+
+function fireRing(
+  w: World,
+  owner: Entity,
+  x: number,
+  y: number,
+  radius: number,
+  twist: number,
+  stage: 1 | 2 | 3,
+): void {
   const cfg = TUNING.post.chief;
-  const count = Math.max(3, Math.round(cfg.ringCount));
+  // Каждая следующая фаза кладёт в кольцо больше снарядов.
+  const count = Math.max(3, Math.round(cfg.ringCount + (stage - 1) * cfg.phaseRingAdd));
   for (let i = 0; i < count; i++) {
     const angle = twist + (i / count) * Math.PI * 2;
     const dirX = Math.cos(angle);
