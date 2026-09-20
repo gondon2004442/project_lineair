@@ -2,7 +2,7 @@
  * Этаж — дерево помещений на целочисленной сетке.
  * Один основной путь плюс одно-два ответвления. Всё из seeded PRNG.
  */
-import { ROOM_TEMPLATES, TEMPLATE_END, TEMPLATE_START } from './data/roomTemplates';
+import { ROOM_TEMPLATES, TEMPLATES_BY_ID, TEMPLATE_END, TEMPLATE_START } from './data/roomTemplates';
 import { MINI_BOSS_POSTS, STAFFING_HEAD, STAFFING_LOBBY, STAFFING_ORDINARY } from './data/staffing';
 import type { Rng } from './rng';
 import { DIRS, DIR_STEP, opposite, type Dir } from './room';
@@ -164,21 +164,26 @@ function finish(drafts: Draft[], rng: Rng): Floor {
     maxY = Math.max(maxY, d.gy);
   }
 
-  const rooms: RoomNode[] = drafts.map((d, index) => ({
+  const rooms: RoomNode[] = drafts.map((d, index) => {
+    // Глубина участка на этаже: ближе к приёмной планировки сложнее.
+    const depth = drafts.length <= 1 ? 1 : index / (drafts.length - 1);
+    const template = chooseTemplate(rng, d.kind, depth);
+    return {
     index,
     gx: d.gx - minX,
     gy: d.gy - minY,
-    template: chooseTemplate(rng, d.kind),
+    template,
     kind: d.kind,
     neighbors: d.neighbors,
-    staffing: staffingFor(d.kind, rng),
+    staffing: staffingFor(d.kind, rng, template),
     miniBoss: miniBossFor(d.kind, rng),
     courier: d.kind !== 'start' && rng.float() < TUNING.floor.courierChance,
     safe: d.kind !== 'start' && d.kind !== 'end' && rng.float() < TUNING.stash.safeChance,
     desk: false,
     cleared: d.kind === 'start',
     visited: false,
-  }));
+    };
+  });
 
   // Стол выдачи на этаже ровно один и не в приёмной: иначе до него можно
   // не дойти вовсе. Там, где он стоит, шкафа не будет — два источника
@@ -200,17 +205,42 @@ function finish(drafts: Draft[], rng: Rng): Floor {
   };
 }
 
-function chooseTemplate(rng: Rng, kind: RoomKind): string {
+/**
+ * Планировка участка. Выбирается по весу среди тех, чья сложность не выше
+ * глубины участка: в начале этажа открытые залы, ближе к приёмной —
+ * кубиклы и стекло. Приёмная и вестибюль заданы жёстко.
+ */
+function chooseTemplate(rng: Rng, kind: RoomKind, depth: number): string {
   if (kind === 'start') return TEMPLATE_START;
   if (kind === 'end') return TEMPLATE_END;
-  const template = ROOM_TEMPLATES[rng.int(ROOM_TEMPLATES.length)];
-  return template === undefined ? TEMPLATE_START : template.id;
+
+  const want = depth < TUNING.floor.difficultyMid ? 1 : depth < TUNING.floor.difficultyDeep ? 2 : 3;
+  const fits = ROOM_TEMPLATES.filter((t) => t.id !== TEMPLATE_END && t.difficulty <= want && t.weight > 0);
+  const pool = fits.length > 0 ? fits : ROOM_TEMPLATES.filter((t) => t.id !== TEMPLATE_END);
+  let total = 0;
+  for (const t of pool) total += t.weight;
+  if (total <= 0) return TEMPLATE_START;
+
+  let roll = rng.float() * total;
+  for (const t of pool) {
+    roll -= t.weight;
+    if (roll <= 0) return t.id;
+  }
+  return pool[pool.length - 1]?.id ?? TEMPLATE_START;
 }
 
-function staffingFor(kind: RoomKind, rng: Rng): string {
+/**
+ * Расписание участка. Планировка имеет право голоса: в кубиклах уместен
+ * картотечный участок, в коридоре — обход. Если планировка не настаивает,
+ * берётся любое обычное.
+ */
+function staffingFor(kind: RoomKind, rng: Rng, templateId: string): string {
   if (kind === 'start') return STAFFING_LOBBY;
   if (kind === 'end') return STAFFING_HEAD;
-  return STAFFING_ORDINARY[rng.int(STAFFING_ORDINARY.length)] ?? STAFFING_LOBBY;
+  const template = TEMPLATES_BY_ID.get(templateId);
+  const wanted = template === undefined ? [] : template.staffing.filter((id) => id !== STAFFING_HEAD);
+  const pool = wanted.length > 0 ? wanted : STAFFING_ORDINARY;
+  return pool[rng.int(pool.length)] ?? STAFFING_LOBBY;
 }
 
 /**

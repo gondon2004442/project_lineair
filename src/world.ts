@@ -17,6 +17,7 @@ import {
 } from './room';
 import { ITEMS, type Item } from './data/items';
 import { PROPS } from './data/props';
+import { TEMPLATES_BY_ID, type CoverSlot } from './data/roomTemplates';
 import { WEAPON_FORMS } from './data/weaponForms';
 import { ammoMax, reserveMax } from './weapon';
 import { postNumbers, propNumbers, spawnPlayer, spawnProp, spawnStaff, spawnStash } from './spawn';
@@ -212,6 +213,35 @@ export function enterRoom(w: World, index: number, fromDir: Dir | null): void {
 }
 
 /**
+ * Точка для слота мебели: середина клетки плюс разброс. Если выпавшее
+ * место занято бетоном или слишком близко ко входу, слот пробует ещё
+ * раз, а не ставит шкаф в стену.
+ */
+function coverSpot(
+  map: TileMap,
+  rng: Rng,
+  slot: CoverSlot,
+  radius: number,
+  entryX: number,
+  entryY: number,
+): { x: number; y: number } | null {
+  const tile = TUNING.room.tile;
+  const wall = TUNING.room.wall;
+  const clear = TUNING.prop.spawnClearance;
+  for (let attempt = 0; attempt < TUNING.floor.spawnAttempts; attempt++) {
+    const jitter = slot.jitter;
+    const col = slot.col + (jitter > 0 ? rng.range(-jitter, jitter) : 0);
+    const row = slot.row + (jitter > 0 ? rng.range(-jitter, jitter) : 0);
+    const x = (wall + col + 0.5) * tile;
+    const y = (wall + row + 0.5) * tile;
+    if (!bodyFits(map, x, y, radius)) continue;
+    if (Math.hypot(x - entryX, y - entryY) < clear) continue;
+    return { x, y };
+  }
+  return null;
+}
+
+/**
  * Добыча участка. Шкаф стоит там, где выпал; стол выдачи — три ячейки в
  * ряд, каждая с названным приложением. Что именно лежит, решает тот же
  * seed, поэтому на одном seed добыча всегда одна и та же.
@@ -318,6 +348,22 @@ function staffRoom(w: World, room: RoomNode, entryX: number, entryY: number): vo
 function scatterProps(w: World, room: RoomNode, entryX: number, entryY: number): void {
   if (room.kind === 'start') return;
   const rng = makeRng((w.seed + room.index * TUNING.floor.propSeedStride) >>> 0);
+
+  // Мебель по слотам планировки: рука дизайнера в самой комнате, а
+  // случайность — внутри слота. Одна и та же планировка не должна
+  // играться дважды одинаково, но и не должна играться как попало.
+  const template = TEMPLATES_BY_ID.get(room.template);
+  if (template !== undefined && template.cover.length > 0) {
+    for (const slot of template.cover) {
+      if (slot.chance !== undefined && rng.float() >= slot.chance) continue;
+      const radius = propNumbers(slot.kind).radius;
+      const spot = coverSpot(w.map, rng, slot, radius, entryX, entryY);
+      if (spot === null) continue;
+      spawnProp(w, slot.kind, spot.x, spot.y);
+    }
+    return;
+  }
+
   for (const spec of PROPS) {
     for (let i = 0; i < spec.scatter; i++) {
       // Мебели отступ от входа нужен свой, куда меньший, чем штату:
