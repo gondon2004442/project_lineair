@@ -259,6 +259,10 @@ function dashBody(w: World): string {
     row('ДЕЛОПРОИЗВОДСТВО', `×${synergyFactor(w).toFixed(2)}`),
     row('ПОСЛЕДНЯЯ ВЫДАЧА', lastIssueLine(w)),
     '<div class="profile-split"></div>',
+    '<div class="subtitle">ЭТАЖ</div>',
+    row('СХЕМА', SCHEME_LABEL[w.floor.scheme] ?? w.floor.scheme),
+    row('УЗЛОВ · ПЕРЕХОДОВ', nodeLine(w)),
+    '<div class="profile-split"></div>',
     '<div class="subtitle">ЛИЧНОЕ ДЕЛО</div>',
     row('ВЗЫСКАНИЕ', String(w.record.penalty)),
     row('ВЫСЛУГА', String(w.record.service)),
@@ -279,6 +283,18 @@ function lastIssueLine(w: World): string {
   const weight = `×${w.reward.lastWeight.toFixed(2)}`;
   if (w.reward.lastOrder === '') return `${w.reward.lastItem} · ${weight}`;
   return `<span class="ok">${w.reward.lastItem} · ${weight} · ${w.reward.lastOrder}</span>`;
+}
+
+const SCHEME_LABEL: Record<string, string> = {
+  line: 'ЛИНИЯ С ОТВЕТВЛЕНИЯМИ',
+  ring: 'КОЛЬЦО',
+  fork: 'ВЕТВЛЕНИЕ НА ТРИ',
+};
+
+/** Сколько на этаже настоящих участков и сколько переходов между ними. */
+function nodeLine(w: World): string {
+  const passages = w.floor.rooms.filter((r) => r.corridor).length;
+  return `${w.floor.rooms.length - passages} · ${passages}`;
 }
 
 /** Текущий шанс, что очередной сотрудник выйдет «на контроле». */

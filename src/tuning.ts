@@ -230,6 +230,16 @@ export const TUNING = {
      */
     difficultyMid: 0.34,
     difficultyDeep: 0.7,
+    /** Кольцо: стороны периметра в участках. */
+    ringWidthMin: 3,
+    ringWidthMax: 4,
+    ringHeightMin: 3,
+    ringHeightMax: 4,
+    /** Ветвление на три: длина ствола и рукавов. */
+    forkStemMin: 2,
+    forkStemMax: 3,
+    forkArmMin: 2,
+    forkArmMax: 3,
   },
 
   /**

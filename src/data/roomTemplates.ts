@@ -325,3 +325,5 @@ export const TEMPLATES_BY_ID = new Map(ROOM_TEMPLATES.map((t) => [t.id, t]));
 export const TEMPLATE_START = 'hall';
 /** Планировка приёмной: последнее помещение основного пути. */
 export const TEMPLATE_END = 'office';
+/** Планировка перехода между узлами. */
+export const TEMPLATE_CORRIDOR = 'corridor';

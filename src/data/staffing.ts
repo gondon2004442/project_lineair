@@ -39,6 +39,14 @@ export const STAFFING: Staffing[] = [
     ],
   },
   {
+    id: 'passage',
+    label: 'ПЕРЕХОД. ПОСТ ОДИН',
+    posts: [
+      { post: 'inspector', title: 'ИНСПЕКТОР', count: 1, priority: 2 },
+      { post: 'intern', title: 'СТАЖЁР', count: 1, priority: 3 },
+    ],
+  },
+  {
     id: 'registry',
     label: 'КАРТОТЕЧНЫЙ УЧАСТОК',
     posts: [
@@ -61,6 +69,8 @@ export const STAFFING_BY_ID = new Map(STAFFING.map((s) => [s.id, s]));
 
 export const STAFFING_LOBBY = 'lobby';
 export const STAFFING_HEAD = 'head_office';
+/** Переход между узлами: штат вдвое меньше, чем на участке. */
+export const STAFFING_PASSAGE = 'passage';
 /** Расписания, которые генератор раздаёт рядовым помещениям. */
 export const STAFFING_ORDINARY = ['patrol', 'registry'];
 
