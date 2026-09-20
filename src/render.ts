@@ -57,7 +57,10 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
   glowLayer.filters = [bloom];
   glowLayer.blendMode = 'add';
 
-  shakeLayer.addChild(roomLayer, dustLayer, smokeLayer, entityLayer, glowLayer, debugLayer);
+  // Свечение идёт ПОД сущностями. Сверху оно складывалось с телами и
+  // красило их в бордовый: сотрудник переставал быть бетонным, а красный
+  // переставал принадлежать субъекту. Снизу ореол остаётся ореолом.
+  shakeLayer.addChild(roomLayer, dustLayer, smokeLayer, glowLayer, entityLayer, debugLayer);
   root.addChild(shakeLayer);
   app.stage.addChild(root);
 
