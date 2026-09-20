@@ -11,6 +11,7 @@ import { makeRng } from './rng';
 import { countDrawCalls, profiler } from './profiler';
 import { vacancyCount } from './systems/staff';
 import { pendingItems } from './systems/postAuditor';
+import { stashInReach } from './systems/issue';
 import { grabCandidate } from './systems/telekinesis';
 import { TILE_DOOR, TILE_GATE, TILE_WALL, TILE_WEAK, type TileMap } from './room';
 import { ROOM_HEIGHT, ROOM_WIDTH, STEP, TUNING } from './tuning';
@@ -543,6 +544,7 @@ function drawEntities(g: Graphics, w: World, alpha: number): void {
   // должностям, а это служебная отметка субъекта, а не объекта.
   const candidate = grabCandidate(w);
   const heldEntity = w.playerC.get(w.player)?.held ?? -1;
+  const reachStash = stashInReach(w);
   for (const mark of [candidate, heldEntity]) {
     if (mark < 0) continue;
     const t = w.transform.get(mark);
@@ -584,6 +586,13 @@ function drawEntities(g: Graphics, w: World, alpha: number): void {
     if (t === undefined) continue;
     const x = lerp(t.px, t.x, alpha);
     const y = lerp(t.py, t.y, alpha);
+
+    // Добыча рисуется своим: её не ломают и не таскают, к ней подходят.
+    const stash = w.stashC.get(e);
+    if (stash !== undefined) {
+      drawStash(g, x, y, draw.size, stash.kind === 'safe', stash.opened, e === reachStash);
+      continue;
+    }
 
     const health = w.health.get(e);
     let color = draw.color;
@@ -906,6 +915,50 @@ function contactShadow(g: Graphics, x: number, y: number, half: number, scale: n
     half * TUNING.render.contactWidth * scale,
     half * TUNING.render.contactHeight * scale,
   ).fill({ color: PALETTE.black, alpha: TUNING.render.contactAlpha });
+}
+
+/**
+ * Опечатанный шкаф и ячейка выдачи. Жёлтая полоса на них — служебная
+ * разметка, а не подсветка: по правилам палитры жёлтым красят печати и
+ * пломбы. Вскрытое гаснет и теряет пломбу, чтобы не звать второй раз.
+ */
+function drawStash(
+  g: Graphics,
+  x: number,
+  y: number,
+  half: number,
+  safe: boolean,
+  opened: boolean,
+  near: boolean,
+): void {
+  contactShadow(g, x, y, half, 1);
+  const body = opened ? PALETTE.concrete700 : PALETTE.furniture;
+  block(g, x - half, y - half, half * 2, half * 2, body);
+  g.rect(x - half, y - half, half * 2, half * 2).stroke({
+    width: TUNING.render.stashEdge,
+    color: opened ? PALETTE.concrete500 : PALETTE.concrete300,
+    alignment: 1,
+  });
+
+  if (!opened) {
+    // Пломба: у шкафа поперёк дверцы, у ячейки — ярлык сверху.
+    const seal = TUNING.render.stashSeal;
+    if (safe) {
+      g.rect(x - half, y - seal / 2, half * 2, seal).fill(PALETTE.yellow);
+    } else {
+      g.rect(x - half, y - half - seal, half * 2, seal).fill(PALETTE.yellow);
+    }
+  }
+
+  // В зоне оформления — светлый контур. Он не мигает: мигание занято
+  // телеграфом, а это приглашение, а не угроза.
+  if (near && !opened) {
+    const pad = TUNING.render.stashReachPad;
+    g.rect(x - half - pad, y - half - pad, (half + pad) * 2, (half + pad) * 2).stroke({
+      width: TUNING.render.stashEdge,
+      color: PALETTE.concrete100,
+    });
+  }
 }
 
 /** Таблички на груди. Регистратор занимает две должности — у него их две. */

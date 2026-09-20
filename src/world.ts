@@ -14,10 +14,11 @@ import {
   type Dir,
   type TileMap,
 } from './room';
+import { ITEMS } from './data/items';
 import { PROPS } from './data/props';
 import { WEAPON_FORMS } from './data/weaponForms';
 import { ammoMax, reserveMax } from './weapon';
-import { postNumbers, propNumbers, spawnPlayer, spawnProp, spawnStaff } from './spawn';
+import { postNumbers, propNumbers, spawnPlayer, spawnProp, spawnStaff, spawnStash } from './spawn';
 import { TUNING } from './tuning';
 
 export function createWorld(seed: number, input: InputSnapshot): World {
@@ -51,6 +52,7 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     roster: [],
     build: [],
     blanks: TUNING.blank.refillTo,
+    passes: TUNING.stash.passesStart,
     reward: { chance: TUNING.reward.base, dry: 0 },
     record: { penalty: 0, service: 0, broken: 0, roomClean: true, controlHere: 0 },
     metronome: TUNING.post.inspector.metronomeInterval,
@@ -70,6 +72,7 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     chiefC: new Map(),
     courierC: new Map(),
     propC: new Map(),
+    stashC: new Map(),
     bulletC: new Map(),
     drawC: new Map(),
   };
@@ -111,6 +114,7 @@ export function startRun(w: World): void {
   // Бланки пополняются на входе на этаж, но только до потолка: сэкономил
   // прошлый этаж — запас не копится, потратил весь — получишь полный.
   w.blanks = Math.max(w.blanks, TUNING.blank.refillTo);
+  w.passes = Math.max(w.passes, TUNING.stash.passesStart);
   w.reward.chance = TUNING.reward.base;
   w.reward.dry = 0;
   w.record.penalty = 0;
@@ -195,10 +199,41 @@ export function enterRoom(w: World, index: number, fromDir: Dir | null): void {
   placePlayer(w, spot.x, spot.y);
   buildRoster(w, room);
   scatterProps(w, room, spot.x, spot.y);
+  placeStash(w, room, spot.x, spot.y);
   if (!room.cleared) staffRoom(w, room, spot.x, spot.y);
   if (w.staffC.size === 0 && !room.cleared) {
     room.cleared = true;
     w.map.doorsLocked = false;
+  }
+}
+
+/**
+ * Добыча участка. Шкаф стоит там, где выпал; стол выдачи — три ячейки в
+ * ряд, каждая с названным приложением. Что именно лежит, решает тот же
+ * seed, поэтому на одном seed добыча всегда одна и та же.
+ */
+function placeStash(w: World, room: RoomNode, entryX: number, entryY: number): void {
+  if (!room.safe && !room.desk) return;
+  const cfg = TUNING.stash;
+  const rng = makeRng((w.seed + room.index * cfg.seedStride) >>> 0);
+
+  if (room.safe) {
+    const spot = findSpawnSpot(w.map, rng, entryX, entryY, cfg.clearance, cfg.safeRadius);
+    spawnStash(w, 'safe', '', 'ОПЕЧАТАННЫЙ ШКАФ', spot.x, spot.y);
+    return;
+  }
+
+  // Стол выдачи: ячейки в ряд по центру участка, чтобы к ним подходили,
+  // а не натыкались. Предлагается то, чего в деле ещё нет.
+  const centre = roomCenter(w.map);
+  const cells = Math.max(1, Math.round(cfg.deskCells));
+  const fresh = ITEMS.filter((item) => !w.build.includes(item.id));
+  const pool = fresh.length >= cells ? fresh.slice() : ITEMS.slice();
+  for (let i = 0; i < cells; i++) {
+    const pick = pool.splice(rng.int(pool.length), 1)[0];
+    if (pick === undefined) break;
+    const x = centre.x + (i - (cells - 1) / 2) * cfg.deskGap;
+    spawnStash(w, 'cell', pick.id, `${pick.code} · ${pick.title}`, x, centre.y);
   }
 }
 
@@ -358,6 +393,7 @@ function clearExceptPlayer(w: World): void {
     w.chiefC.delete(e);
     w.courierC.delete(e);
     w.propC.delete(e);
+    w.stashC.delete(e);
     w.bulletC.delete(e);
     w.drawC.delete(e);
   }

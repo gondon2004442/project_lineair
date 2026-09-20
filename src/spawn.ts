@@ -10,7 +10,7 @@ import {
 } from './data/posts';
 import { PROPS_BY_ID, PROP_CABINET, PROP_RUBBLE } from './data/props';
 import { WEAPON_FORMS } from './data/weaponForms';
-import { createEntity, type Entity, type Faction, type Shape, type World } from './ecs';
+import { createEntity, type Entity, type Faction, type Shape, type StashKind, type World } from './ecs';
 import { PALETTE } from './palette';
 import { TUNING } from './tuning';
 
@@ -276,6 +276,35 @@ export function spawnProp(w: World, kind: string, x: number, y: number): Entity 
     size: numbers.radius,
     color: propShade(kind),
     hollow: spec !== undefined && spec.hollow,
+    desk: false,
+  });
+  return e;
+}
+
+/**
+ * Добыча: опечатанный шкаф или ячейка стола выдачи. Здоровья у неё нет
+ * намеренно — её не ломают, её оформляют. Телекинез такие тела тоже не
+ * берёт: иначе шкаф можно было бы просто унести.
+ */
+export function spawnStash(
+  w: World,
+  kind: StashKind,
+  item: string,
+  title: string,
+  x: number,
+  y: number,
+): Entity {
+  const cfg = TUNING.stash;
+  const radius = kind === 'safe' ? cfg.safeRadius : cfg.cellRadius;
+  const e = createEntity(w);
+  w.transform.set(e, { x, y, px: x, py: y });
+  w.body.set(e, { vx: 0, vy: 0, radius });
+  w.stashC.set(e, { kind, item, title, opened: false });
+  w.drawC.set(e, {
+    shape: 'square',
+    size: radius,
+    color: PALETTE.furniture,
+    hollow: true,
     desk: false,
   });
   return e;

@@ -25,6 +25,10 @@ export interface RoomNode {
   miniBoss: string;
   /** Приписан ли к участку курьер. */
   courier: boolean;
+  /** Опечатанный шкаф на участке. */
+  safe: boolean;
+  /** Стол выдачи. На этаже он один. */
+  desk: boolean;
   cleared: boolean;
   visited: boolean;
 }
@@ -170,9 +174,21 @@ function finish(drafts: Draft[], rng: Rng): Floor {
     staffing: staffingFor(d.kind, rng),
     miniBoss: miniBossFor(d.kind, rng),
     courier: d.kind !== 'start' && rng.float() < TUNING.floor.courierChance,
+    safe: d.kind !== 'start' && d.kind !== 'end' && rng.float() < TUNING.stash.safeChance,
+    desk: false,
     cleared: d.kind === 'start',
     visited: false,
   }));
+
+  // Стол выдачи на этаже ровно один и не в приёмной: иначе до него можно
+  // не дойти вовсе. Там, где он стоит, шкафа не будет — два источника
+  // добычи на одном участке обесценивают выбор между ними.
+  const plain = rooms.filter((r) => r.kind === 'normal' || r.kind === 'branch');
+  const deskRoom = plain[rng.int(Math.max(1, plain.length))];
+  if (deskRoom !== undefined) {
+    deskRoom.desk = true;
+    deskRoom.safe = false;
+  }
 
   const end = rooms.findIndex((r) => r.kind === 'end');
   return {

@@ -190,6 +190,20 @@ export interface PropC {
   lastHit: Entity;
 }
 
+/**
+ * Добыча: опечатанный шкаф или ячейка стола выдачи. Шкаф отдаёт
+ * случайное, ячейка — то, что в ней названо.
+ */
+export type StashKind = 'safe' | 'cell';
+
+export interface StashC {
+  kind: StashKind;
+  /** Что лежит в ячейке. У шкафа пусто: содержимое решается при вскрытии. */
+  item: string;
+  title: string;
+  opened: boolean;
+}
+
 export interface BulletC {
   faction: Faction;
   damage: number;
@@ -292,6 +306,8 @@ export interface World {
   build: string[];
   /** Сколько бланков на руках. Ресурс субъекта, а не сущность. */
   blanks: number;
+  /** Допуски: ими вскрывают шкафы и получают по описи со стола выдачи. */
+  passes: number;
   /** Состояние выдачи: текущий шанс и сколько участков без неё. */
   reward: RewardState;
   /** Личное дело субъекта: взыскание, выслуга и чем они набраны. */
@@ -317,6 +333,7 @@ export interface World {
   chiefC: Map<Entity, ChiefC>;
   courierC: Map<Entity, CourierC>;
   propC: Map<Entity, PropC>;
+  stashC: Map<Entity, StashC>;
   bulletC: Map<Entity, BulletC>;
   drawC: Map<Entity, DrawC>;
 }
@@ -349,6 +366,7 @@ export function flushDoomed(w: World): void {
     w.chiefC.delete(e);
     w.courierC.delete(e);
     w.propC.delete(e);
+    w.stashC.delete(e);
     w.bulletC.delete(e);
     w.drawC.delete(e);
   }

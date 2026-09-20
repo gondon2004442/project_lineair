@@ -75,6 +75,12 @@ function rollReward(w: World, roomIndex: number): void {
     return;
   }
 
+  if (w.passes < TUNING.stash.passesMax && rng.float() < cfg.passShare) {
+    w.passes += 1;
+    w.sounds.push('door.unlock');
+    return;
+  }
+
   if (rng.float() < cfg.ammoShare && giveAmmo(w, rng)) return;
 
   const fresh = ITEMS.filter((item) => !w.build.includes(item.id));

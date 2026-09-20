@@ -12,6 +12,7 @@ import { STEP, TUNING } from './tuning';
 import { auditInProgress, pendingItems } from './systems/postAuditor';
 import { hasChief } from './systems/postChief';
 import { courierTarget } from './systems/postCourier';
+import { issueCost, stashInReach } from './systems/issue';
 import { hasRegistrar, vacancyCount } from './systems/staff';
 import type { Profiler } from './profiler';
 import { ammoMax, currentForm, formStat, reserveOf } from './weapon';
@@ -62,6 +63,7 @@ export function createHud(
       row('SHIFT', 'РЫВОК'),
       row('R', 'ПЕРЕЗАРЯДКА'),
       row('Q', 'БЛАНК'),
+      row('F', 'ОФОРМИТЬ'),
       row('I', 'ЛИЧНОЕ ДЕЛО'),
       row('F2', 'ВЕРНУТЬСЯ СЮДА'),
     ].join('');
@@ -89,6 +91,8 @@ export function createHud(
       auditRow(w),
       row('ДВЕРИ', w.map.doorsLocked ? '<span class="warn">ЗАПЕРТЫ</span>' : '<span class="ok">ОТКРЫТЫ</span>'),
       row('БЛАНКИ (Q)', blankLine(w)),
+      row('ДОПУСК', passLine(w)),
+      stashRow(w),
       weaponRows(w),
       energyRow(w),
     ].join('');
@@ -308,6 +312,28 @@ function blankLine(w: World): string {
   const left = Math.max(0, w.blanks);
   const max = Math.max(1, TUNING.blank.refillTo);
   return `<span class="${left > 0 ? 'ok' : 'warn'}">${gauge(left, max)} ${left}</span>`;
+}
+
+/** Допуски: ими вскрывают шкафы и получают со стола выдачи. */
+function passLine(w: World): string {
+  const left = Math.max(0, w.passes);
+  const max = Math.max(1, TUNING.stash.passesMax);
+  return `<span class="${left > 0 ? 'ok' : 'warn'}">${gauge(left, max)} ${left}</span>`;
+}
+
+/**
+ * Приглашение к оформлению. Строка появляется только у шкафа или ячейки
+ * и сразу говорит, чем платить: иначе игрок жмёт F наугад.
+ */
+function stashRow(w: World): string {
+  const target = stashInReach(w);
+  if (target < 0) return '';
+  const stash = w.stashC.get(target);
+  if (stash === undefined || stash.opened) return '';
+  const cost = issueCost(w, target);
+  if (cost === 'pass') return row('F · ОФОРМИТЬ', `<span class="ok">${stash.title}</span>`);
+  if (cost === 'blank') return row('F · ВСКРЫТЬ БЛАНКОМ', `<span class="ok">${stash.title}</span>`);
+  return row('НЕЧЕМ ОФОРМИТЬ', `<span class="warn">${stash.title}</span>`);
 }
 
 /** Телекинез: запас энергии и что сейчас в руках. */
