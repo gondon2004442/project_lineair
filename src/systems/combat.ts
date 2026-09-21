@@ -58,6 +58,18 @@ export function bulletSystem(w: World, dt: number): void {
     if (blocked) continue;
 
     if (bullet.faction === 'player') {
+      // Кладовщик не воюет и урона не получает. Но выстрел в его сторону
+      // он не пропустит: стол закрывается, а в дело идёт взыскание.
+      let offended = false;
+      for (const [clerk, clerkC] of w.clerkC) {
+        if (!hit(w, e, b.radius, clerk)) continue;
+        offendClerk(w, clerkC);
+        destroyEntity(w, e);
+        offended = true;
+        break;
+      }
+      if (offended) continue;
+
       for (const [target] of w.staffC) {
         if (target === bullet.lastHit || !hit(w, e, b.radius, target)) continue;
         applyDamage(w, target, bullet.damage);
@@ -73,6 +85,22 @@ export function bulletSystem(w: World, dt: number): void {
       if (applyDamage(w, w.player, bullet.damage)) destroyEntity(w, e);
     }
   }
+}
+
+/**
+ * Кладовщик оформляет протокол: стол закрыт до конца забега, в деле
+ * взыскание. Стрелять в того, кто тебя обслуживает, — нарушение
+ * процедуры, и контора это заметит.
+ */
+function offendClerk(w: World, clerk: { offended: boolean; noteTime: number }): void {
+  clerk.noteTime = TUNING.clerk.noteTime;
+  if (clerk.offended) return;
+  clerk.offended = true;
+  w.record.penalty = Math.min(
+    TUNING.record.penaltyMax,
+    w.record.penalty + Math.max(0, Math.round(TUNING.clerk.offencePenalty)),
+  );
+  w.sounds.push('fan');
 }
 
 /** Доворот на ближайшего сотрудника, не быстрее заданного угла за шаг. */

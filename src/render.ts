@@ -742,7 +742,15 @@ function drawEntities(g: Graphics, w: World, alpha: number): void {
     // Добыча рисуется своим: её не ломают и не таскают, к ней подходят.
     const stash = w.stashC.get(e);
     if (stash !== undefined) {
-      drawStash(g, x, y, draw.size, stash.kind === 'safe', stash.opened, e === reachStash);
+      drawStash(g, x, y, draw.size, stash.kind, stash.opened, e === reachStash);
+      continue;
+    }
+
+    // Кладовщик: своя отрисовка. Он за столом, в бою не участвует, и
+    // силуэт у него должен читаться как «не цель».
+    const clerk = w.clerkC.get(e);
+    if (clerk !== undefined) {
+      drawClerk(g, x, y, draw.size, clerk.offended, clerk.noteTime > 0);
       continue;
     }
 
@@ -1092,6 +1100,38 @@ function headShadow(g: Graphics, x: number, y: number, half: number): void {
 }
 
 /**
+ * Кладовщик. Тело за прилавком: широкая столешница под ним, сам он
+ * узкий и светлый. Оружия нет, таблички четыре насечки — это должность,
+ * а не угроза. Обиженный гаснет и отворачивается: стол закрыт.
+ */
+function drawClerk(
+  g: Graphics,
+  x: number,
+  y: number,
+  half: number,
+  offended: boolean,
+  writing: boolean,
+): void {
+  const cfg = TUNING.render;
+  const extra = cfg.deskExtra;
+  // Прилавок под ним — шире тела, светлее пола.
+  g.rect(x - half - extra, y - half - extra, (half + extra) * 2, (half + extra) * 2).fill(
+    PALETTE.concrete700,
+  );
+  contactShadow(g, x, y, half, 1);
+  const body = offended ? PALETTE.concrete700 : PALETTE.concrete300;
+  block(g, x - half, y - half, half * 2, half * 2, body);
+  g.rect(x - half, y - half, half * 2, half * 2).stroke({
+    width: cfg.stashEdge,
+    color: offended ? PALETTE.concrete500 : PALETTE.concrete100,
+    alignment: 1,
+  });
+  if (!offended || writing) {
+    drawPlate(g, x, y - half - cfg.counterPlateLift, half, TUNING.clerk.plateMarks);
+  }
+}
+
+/**
  * Стойка. Тумба шире, чем глубже, со светлой столешницей и служебной
  * табличкой над ней: по числу насечек стойки различаются между собой,
  * как и должности. Отработанное окошко гаснет и теряет табличку —
@@ -1169,10 +1209,11 @@ function drawStash(
   x: number,
   y: number,
   half: number,
-  safe: boolean,
+  kind: string,
   opened: boolean,
   near: boolean,
 ): void {
+  const safe = kind === 'safe';
   contactShadow(g, x, y, half, 1);
   const body = opened ? PALETTE.concrete700 : PALETTE.furniture;
   block(g, x - half, y - half, half * 2, half * 2, body);
@@ -1183,10 +1224,14 @@ function drawStash(
   });
 
   if (!opened) {
-    // Пломба: у шкафа поперёк дверцы, у ячейки — ярлык сверху.
+    // Пломба: у шкафа поперёк дверцы, у ячейки — ярлык сверху, у особой
+    // выдачи крест-накрест: её видно через всю комнату, и не зря.
     const seal = TUNING.render.stashSeal;
     if (safe) {
       g.rect(x - half, y - seal / 2, half * 2, seal).fill(PALETTE.yellow);
+    } else if (kind === 'special') {
+      g.rect(x - half, y - seal / 2, half * 2, seal).fill(PALETTE.yellow);
+      g.rect(x - seal / 2, y - half, seal, half * 2).fill(PALETTE.yellow);
     } else {
       g.rect(x - half, y - half - seal, half * 2, seal).fill(PALETTE.yellow);
     }

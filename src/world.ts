@@ -21,7 +21,16 @@ import { TEMPLATES_BY_ID, type CoverSlot } from './data/roomTemplates';
 import { WEAPON_FORMS } from './data/weaponForms';
 import { ammoMax, reserveMax } from './weapon';
 import { COUNTERS, type CounterSpec } from './data/counters';
-import { postNumbers, propNumbers, spawnCounter, spawnPlayer, spawnProp, spawnStaff, spawnStash } from './spawn';
+import {
+  postNumbers,
+  propNumbers,
+  spawnClerk,
+  spawnCounter,
+  spawnPlayer,
+  spawnProp,
+  spawnStaff,
+  spawnStash,
+} from './spawn';
 import { TUNING } from './tuning';
 
 export function createWorld(seed: number, input: InputSnapshot): World {
@@ -83,6 +92,7 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     stashC: new Map(),
     ticketC: new Map(),
     counterC: new Map(),
+    clerkC: new Map(),
     bulletC: new Map(),
     drawC: new Map(),
   };
@@ -297,6 +307,13 @@ function placeStash(w: World, room: RoomNode, entryX: number, entryY: number): v
     const x = centre.x + (i - (cells - 1) / 2) * cfg.deskGap;
     spawnStash(w, 'cell', pick.id, `${pick.code} · ${pick.title}`, x, centre.y);
   }
+
+  // Особая выдача: крайняя ячейка справа, платят за неё благодарностью.
+  const special = centre.x + ((cells + 1) - (cells - 1) / 2 - 1) * cfg.deskGap;
+  spawnStash(w, 'special', '', 'ОСОБАЯ ВЫДАЧА', special, centre.y);
+
+  // Кладовщик стоит позади ряда: к столу подходят, а не натыкаются.
+  spawnClerk(w, centre.x, centre.y - TUNING.clerk.standBack);
 }
 
 /**
@@ -342,8 +359,29 @@ function placeCounter(w: World, room: RoomNode, entryX: number, entryY: number):
   if (spec === undefined) return;
   const cfg = TUNING.counter;
   const rng = makeRng((w.seed + room.index * cfg.seedStride) >>> 0);
-  const spot = findSpawnSpot(w.map, rng, entryX, entryY, cfg.clearance, cfg.radius);
+  // Стойка не должна встать вплотную к добыче: два приглашения в одной
+  // точке спорят за F, и шкаф оказывается недоступен.
+  let spot = findSpawnSpot(w.map, rng, entryX, entryY, cfg.clearance, cfg.radius);
+  for (let attempt = 0; attempt < TUNING.floor.spawnAttempts && crowded(w, spot); attempt++) {
+    spot = findSpawnSpot(w.map, rng, entryX, entryY, cfg.clearance, cfg.radius);
+  }
   spawnCounter(w, spec, spot.x, spot.y);
+}
+
+/** Занято ли место рядом добычей или кладовщиком. */
+function crowded(w: World, spot: { x: number; y: number }): boolean {
+  const gap = TUNING.counter.radius + TUNING.stash.safeRadius;
+  for (const [e] of w.stashC) {
+    const t = w.transform.get(e);
+    if (t === undefined) continue;
+    if (Math.hypot(t.x - spot.x, t.y - spot.y) < gap) return true;
+  }
+  for (const [e] of w.clerkC) {
+    const t = w.transform.get(e);
+    if (t === undefined) continue;
+    if (Math.hypot(t.x - spot.x, t.y - spot.y) < gap) return true;
+  }
+  return false;
 }
 
 /** Ячейка стола: то же взвешивание, но без повторов в одном столе. */
@@ -531,6 +569,7 @@ function clearExceptPlayer(w: World): void {
     w.stashC.delete(e);
     w.ticketC.delete(e);
     w.counterC.delete(e);
+    w.clerkC.delete(e);
     w.bulletC.delete(e);
     w.drawC.delete(e);
   }

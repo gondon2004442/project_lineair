@@ -4,6 +4,10 @@ import { dropTickets } from './tickets';
 import { TUNING } from '../tuning';
 
 export function lifecycleSystem(w: World, dt: number): void {
+  // Кладовщик отписывается: пока табличка горит, видно, что он занят
+  // протоколом, а не выдачей.
+  for (const [, clerk] of w.clerkC) clerk.noteTime = Math.max(0, clerk.noteTime - dt);
+
   for (const [e, h] of w.health) {
     h.iframes = Math.max(0, h.iframes - dt);
     h.flash = Math.max(0, h.flash - dt);

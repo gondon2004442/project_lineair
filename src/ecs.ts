@@ -204,7 +204,7 @@ export interface PropC {
  * Добыча: опечатанный шкаф или ячейка стола выдачи. Шкаф отдаёт
  * случайное, ячейка — то, что в ней названо.
  */
-export type StashKind = 'safe' | 'cell' | 'case';
+export type StashKind = 'safe' | 'cell' | 'case' | 'special';
 
 export interface StashC {
   kind: StashKind;
@@ -231,6 +231,19 @@ export interface BulletC {
  * снаряды объекта, и ни одна форма субъекта с ней не совпадает.
  */
 export type Shape = 'square' | 'diamond' | 'dot' | 'bar' | 'card';
+
+/**
+ * Кладовщик: сотрудник стола выдачи. Не заражён, в бою не участвует и
+ * в штат не входит — двери из-за него не запираются и вакансий он не
+ * занимает. Стоит за ячейками и оформляет выдачу.
+ */
+export interface ClerkC {
+  title: string;
+  /** Пока false — стол работает. Выстрел в кладовщика закрывает стол. */
+  offended: boolean;
+  /** Пока > 0 — кладовщик отписывается: табличка горит. */
+  noteTime: number;
+}
 
 /** Стойка: одноразовое окошко, где забег можно поправить. */
 export interface CounterC {
@@ -379,6 +392,7 @@ export interface World {
   stashC: Map<Entity, StashC>;
   ticketC: Map<Entity, TicketC>;
   counterC: Map<Entity, CounterC>;
+  clerkC: Map<Entity, ClerkC>;
   bulletC: Map<Entity, BulletC>;
   drawC: Map<Entity, DrawC>;
 }
@@ -414,6 +428,7 @@ export function flushDoomed(w: World): void {
     w.stashC.delete(e);
     w.ticketC.delete(e);
     w.counterC.delete(e);
+    w.clerkC.delete(e);
     w.bulletC.delete(e);
     w.drawC.delete(e);
   }

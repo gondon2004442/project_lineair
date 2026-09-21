@@ -35,16 +35,72 @@ export function stashInReach(w: World): Entity {
   return best;
 }
 
+/** Закрыт ли стол выдачи: кладовщик обслуживает не всякого. */
+export function deskClosed(w: World): boolean {
+  for (const [, clerk] of w.clerkC) {
+    if (clerk.offended) return true;
+  }
+  return false;
+}
+
 /** Чем можно оформить добычу прямо сейчас. Пусто — нечем. */
-export function issueCost(w: World, target: Entity): 'pass' | 'blank' | 'free' | '' {
+export function issueCost(
+  w: World,
+  target: Entity,
+): 'pass' | 'blank' | 'free' | 'ticket' | 'commendation' | '' {
   const stash = w.stashC.get(target);
   if (stash === undefined || stash.opened) return '';
   // Чужое дело ничего не стоит: его читают, а не оформляют.
   if (stash.kind === 'case') return 'free';
+
+  // Стол выдачи: платят талонами, и только пока кладовщик обслуживает.
+  if (stash.kind === 'cell' || stash.kind === 'special') {
+    if (deskClosed(w)) return '';
+    if (stash.kind === 'special') {
+      const need = Math.max(1, Math.round(TUNING.clerk.specialCommendations));
+      return w.commendations >= need ? 'commendation' : '';
+    }
+    return w.tickets >= Math.max(0, Math.round(TUNING.clerk.cellPrice)) ? 'ticket' : '';
+  }
+
   if (w.passes > 0) return 'pass';
   // Бланком вскрывается только шкаф: на столе выдачи бланк не примут.
   if (stash.kind === 'safe' && w.blanks > 0) return 'blank';
   return '';
+}
+
+/** Что написать у добычи: чем платят и хватает ли. */
+export function issueOffer(w: World, target: Entity): { text: string; ok: boolean } {
+  const stash = w.stashC.get(target);
+  if (stash === undefined || stash.opened) return { text: '', ok: false };
+  const cost = issueCost(w, target);
+  if (cost !== '') {
+    if (cost === 'ticket') return { text: `${Math.round(TUNING.clerk.cellPrice)} ТАЛОНОВ`, ok: true };
+    if (cost === 'commendation') return { text: 'БЛАГОДАРНОСТЬ', ok: true };
+    if (cost === 'blank') return { text: 'БЛАНК', ok: true };
+    if (cost === 'pass') return { text: 'ДОПУСК', ok: true };
+    return { text: 'БЕСПЛАТНО', ok: true };
+  }
+  if ((stash.kind === 'cell' || stash.kind === 'special') && deskClosed(w)) {
+    return { text: 'СТОЛ ЗАКРЫТ', ok: false };
+  }
+  if (stash.kind === 'special') return { text: 'НУЖНА БЛАГОДАРНОСТЬ', ok: false };
+  if (stash.kind === 'cell') return { text: `НУЖНО ${Math.round(TUNING.clerk.cellPrice)} ТАЛОНОВ`, ok: false };
+  return { text: 'НЕЧЕМ ОФОРМИТЬ', ok: false };
+}
+
+/**
+ * Благодарность как валюта: отдавая её, субъект отдаёт и тот контейнер
+ * здоровья, который она дала. Иначе особая выдача была бы бесплатной.
+ */
+function spendCommendation(w: World): void {
+  const need = Math.max(1, Math.round(TUNING.clerk.specialCommendations));
+  w.commendations = Math.max(0, w.commendations - need);
+  const health = w.health.get(w.player);
+  if (health === undefined) return;
+  const container = TUNING.post.chief.commendationHp * need;
+  health.max = Math.max(1, health.max - container);
+  health.hp = Math.min(health.hp, health.max);
 }
 
 export function issueSystem(w: World): void {
@@ -61,6 +117,8 @@ export function issueSystem(w: World): void {
   if (cost === '') return;
   if (cost === 'pass') w.passes -= 1;
   else if (cost === 'blank') w.blanks -= 1;
+  else if (cost === 'ticket') w.tickets -= Math.max(0, Math.round(TUNING.clerk.cellPrice));
+  else if (cost === 'commendation') spendCommendation(w);
 
   stash.opened = true;
   w.sounds.push('door.unlock');
@@ -75,6 +133,19 @@ export function issueSystem(w: World): void {
 
   if (stash.kind === 'cell') {
     if (stash.item !== '' && !w.build.includes(stash.item)) w.build.push(stash.item);
+    return;
+  }
+
+  // Особая выдача: благодарность меняется на приложения. Контейнер
+  // здоровья уходит вместе с ней — тем она и особая.
+  if (stash.kind === 'special') {
+    const rng = makeRng((w.seed + w.room * TUNING.stash.seedStride + target) >>> 0);
+    const count = Math.max(1, Math.round(TUNING.clerk.specialItems));
+    for (let i = 0; i < count; i++) {
+      const item = pickItem(w, rng);
+      if (item === undefined) break;
+      if (!w.build.includes(item.id)) w.build.push(item.id);
+    }
     return;
   }
 

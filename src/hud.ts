@@ -13,7 +13,7 @@ import { auditInProgress, pendingItems } from './systems/postAuditor';
 import { hasChief } from './systems/postChief';
 import { courierTarget } from './systems/postCourier';
 import { synergyFactor } from './paperwork';
-import { issueCost, stashInReach } from './systems/issue';
+import { issueOffer, stashInReach } from './systems/issue';
 import { counterInReach, counterOffer } from './systems/counter';
 import { hasRegistrar, vacancyCount } from './systems/staff';
 import type { Profiler } from './profiler';
@@ -420,10 +420,9 @@ function stashRow(w: World): string {
   if (target < 0) return '';
   const stash = w.stashC.get(target);
   if (stash === undefined || stash.opened) return '';
-  const cost = issueCost(w, target);
-  if (cost === 'pass') return row('F · ОФОРМИТЬ', `<span class="ok">${stash.title}</span>`);
-  if (cost === 'blank') return row('F · ВСКРЫТЬ БЛАНКОМ', `<span class="ok">${stash.title}</span>`);
-  return row('НЕЧЕМ ОФОРМИТЬ', `<span class="warn">${stash.title}</span>`);
+  const offer = issueOffer(w, target);
+  if (!offer.ok) return row(stash.title, `<span class="warn">${offer.text}</span>`);
+  return row(`F · ${stash.title}`, `<span class="ok">${offer.text}</span>`);
 }
 
 /**

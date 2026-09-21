@@ -314,6 +314,28 @@ export function spawnStash(
   return e;
 }
 
+/**
+ * Кладовщик. Тело есть, здоровье есть, а ставки нет: в штат он не
+ * входит, двери из-за него не запираются и вакансий он не занимает.
+ */
+export function spawnClerk(w: World, x: number, y: number): Entity {
+  const cfg = TUNING.clerk;
+  const e = createEntity(w);
+  w.transform.set(e, { x, y, px: x, py: y });
+  w.body.set(e, { vx: 0, vy: 0, radius: cfg.radius });
+  // Здоровья у кладовщика нет намеренно: он не цель, и ни один путь
+  // урона не должен уметь его тронуть.
+  w.clerkC.set(e, { title: 'КЛАДОВЩИК', offended: false, noteTime: 0 });
+  w.drawC.set(e, {
+    shape: 'square',
+    size: cfg.radius,
+    color: PALETTE.concrete500,
+    hollow: false,
+    desk: true,
+  });
+  return e;
+}
+
 /** Стойка: тумба с табличкой, к которой подходят и подают. */
 export function spawnCounter(w: World, spec: CounterSpec, x: number, y: number): Entity {
   const radius = TUNING.counter.radius;
