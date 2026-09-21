@@ -141,7 +141,7 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
       profiler.begin('КАДР: ДЫМ');
       smokeLayer.clear();
       drawSmoke(smokeLayer, w, fxTime);
-      drawBlankRing(smokeLayer, w);
+      drawBlankRing(smokeLayer, w, alpha);
       profiler.end('КАДР: ДЫМ');
 
       entityLayer.clear();
@@ -169,9 +169,10 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
       const perHeight = scale / app.screen.height;
 
       let warpA: WarpSource | null = null;
-      if (w.fx.blankTime > 0 && TUNING.blank.warpPower > 0) {
+      const blankLeft = fxLeft(w.fx.blankTime, alpha);
+      if (blankLeft > 0 && TUNING.blank.warpPower > 0) {
         const full = TUNING.blank.ringTime;
-        const grown = full <= 0 ? 1 : 1 - w.fx.blankTime / full;
+        const grown = full <= 0 ? 1 : 1 - blankLeft / full;
         const at = toScreen(w.fx.blankX, w.fx.blankY);
         warpA = {
           x: at.x,
@@ -195,8 +196,8 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
           power: tk.holdWarp,
           width: tk.warpWidth,
         };
-      } else if (w.fx.warpTime > 0 && w.fx.warpPower > 0) {
-        const done = tk.warpTime <= 0 ? 1 : 1 - w.fx.warpTime / tk.warpTime;
+      } else if (fxLeft(w.fx.warpTime, alpha) > 0 && w.fx.warpPower > 0) {
+        const done = tk.warpTime <= 0 ? 1 : 1 - fxLeft(w.fx.warpTime, alpha) / tk.warpTime;
         const at = toScreen(w.fx.warpX, w.fx.warpY);
         warpB = {
           x: at.x,
@@ -357,36 +358,54 @@ function playerPose(w: World, x: number, y: number): Pose {
 
   const frames = Math.max(1, Math.round(cfg.walkFrames));
   const stride = Math.max(1e-6, cfg.walkStride);
-  const frame = Math.floor((walkDist / stride) * frames) % frames;
-  const squash = cfg.walkSquash;
 
-  // Вес переносится с ноги на ногу: на опорном кадре он весь на одной
-  // стороне, на проходном — на полпути к другой. Отсюда четыре разные
-  // позы, а не две: без этого проходные кадры совпадают.
-  const shift = WALK_SHIFT[frame] ?? 0;
+  // Фаза цикла непрерывная, и между ключами поза перетекает. Ключей
+  // по-прежнему четыре, но щелчка между ними больше нет: при шаге
+  // 290 px/с ключ держится несколько кадров, и дискретная смена
+  // читалась не как походка, а как тряска.
+  const phase = (walkDist / stride) * frames;
+  const key = Math.floor(phase);
+  const t01 = phase - key;
+  // Сглаживание на входе и выходе ключа: линейная склейка оставляет на
+  // самом ключе излом, и его видно.
+  const ease = t01 * t01 * (3 - 2 * t01);
+  const a = ((key % frames) + frames) % frames;
+  const b = (a + 1) % frames;
+
+  // Размах набирается с разгоном: иначе поза прыгает в полный размер на
+  // первом же кадре движения и обратно на последнем.
+  const amp = Math.min(1, Math.max(0, (speed - cfg.walkMinSpeed) / Math.max(1e-6, cfg.walkEase)));
+
+  // Опорный ключ: тело ниже и шире, вес на ноге. Проходной: тело выше,
+  // уже и оторвано от пола. Одна формула на оба — знак решает.
+  const squash = mix(WALK_SQUASH[a], WALK_SQUASH[b], ease) * cfg.walkSquash * amp;
+  const lift = mix(WALK_LIFT[a], WALK_LIFT[b], ease) * cfg.walkBob * amp;
+  const shift = mix(WALK_SHIFT[a], WALK_SHIFT[b], ease) * cfg.walkLean * amp;
+
+  pose.hx = half * (1 + squash);
+  pose.hy = half * (1 - squash);
+  // Низ остаётся на полу: при сжатии тело оседает ровно на столько, на
+  // сколько потеряло в высоте.
+  pose.dy = half * squash - lift;
   // Вбок — это поперёк хода: сверху «вбок» зависит от того, куда идёшь.
-  const lean = cfg.walkLean * shift;
-  pose.dx = (-vy / speed) * lean;
-  pose.dy = (vx / speed) * lean;
-
-  if (frame % 2 === 0) {
-    // Опорный кадр: вес на ноге, тело ниже и шире.
-    pose.hx = half * (1 + squash);
-    pose.hy = half * (1 - squash);
-    pose.dy += half * squash;
-    return pose;
-  }
-
-  // Проходной кадр: тело вытянуто и оторвано от пола.
-  pose.hx = half * (1 - squash / 2);
-  pose.hy = half * (1 + squash / 2);
-  pose.dy += -cfg.walkBob - (half * squash) / 2;
-  pose.shadow = half <= 0 ? 1 : half / (half + cfg.walkBob);
+  pose.dx = (-vy / speed) * shift;
+  pose.dy += (vx / speed) * shift;
+  pose.shadow = half <= 0 ? 1 : half / (half + Math.max(0, lift));
   return pose;
 }
 
-/** Перенос веса по кадрам цикла: опора, полпути, другая опора, полпути. */
+function mix(from: number, to: number, t: number): number {
+  return from + (to - from) * t;
+}
+
+/**
+ * Четыре ключа цикла: опора, проходной, другая опора, проходной.
+ * Вес переносится с ноги на ногу, опорные ключи сплющивают тело,
+ * проходные вытягивают и отрывают от пола.
+ */
 const WALK_SHIFT = [-1, -0.5, 1, 0.5];
+const WALK_SQUASH = [1, -0.5, 1, -0.5];
+const WALK_LIFT = [0, 1, 0, 1];
 
 /**
  * Субъект. Единственное красное на экране и потому верхний слой:
@@ -460,8 +479,8 @@ function drawPlayer(g: Graphics, w: World, alpha: number): void {
  * так что радиус действия виден целиком, а не угадывается. Цвет светлый:
  * жёлтый принадлежит должностям, красный — субъекту.
  */
-function drawBlankRing(g: Graphics, w: World): void {
-  const left = w.fx.blankTime;
+function drawBlankRing(g: Graphics, w: World, alpha: number): void {
+  const left = fxLeft(w.fx.blankTime, alpha);
   if (left <= 0) return;
   const full = TUNING.blank.ringTime;
   const grown = full <= 0 ? 1 : 1 - left / full;
@@ -618,6 +637,17 @@ function telegraphPen(w: World, flash: number): { width: number; color: number; 
 
 function lerp(prev: number, next: number, alpha: number): number {
   return prev + (next - prev) * alpha;
+}
+
+/**
+ * Сколько эффекту осталось НА МОМЕНТ КАДРА. Таймеры убывают шагами
+ * симуляции, а кадров между шагами сколько угодно: на замедлении шаг
+ * идёт 20 раз в секунду против 60 кадров, и эффект, снятый прямо с
+ * таймера, стоит по три кадра, а потом прыгает. Тела от этого спасает
+ * интерполяция по alpha — эффектам нужна такая же.
+ */
+function fxLeft(left: number, alpha: number): number {
+  return Math.max(0, left - alpha * STEP);
 }
 
 function drawEntities(g: Graphics, w: World, alpha: number): void {
