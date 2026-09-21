@@ -1,5 +1,6 @@
 /** Таймеры тел, смерть и состояние забега. */
 import { destroyEntity, type World } from '../ecs';
+import { dropTickets } from './tickets';
 import { TUNING } from '../tuning';
 
 export function lifecycleSystem(w: World, dt: number): void {
@@ -26,6 +27,8 @@ export function lifecycleSystem(w: World, dt: number): void {
       // перманентный контейнер здоровья на забег. Награда не за победу,
       // а за качество победы.
       if (w.chiefC.has(e) && w.record.roomClean) commend(w);
+      // Талоны сыплются до удаления: место ставки ещё известно.
+      dropTickets(w, e);
       destroyEntity(w, e);
     }
   }

@@ -232,6 +232,14 @@ export interface BulletC {
  */
 export type Shape = 'square' | 'diamond' | 'dot' | 'bar' | 'card';
 
+/** Талон на полу: служебная мелочь, оставшаяся от ставки. */
+export interface TicketC {
+  /** Сколько талонов засчитает этот листок. */
+  value: number;
+  /** Пауза перед притяжением: иначе талон влетает в субъекта на вылете. */
+  delay: number;
+}
+
 export interface DrawC {
   shape: Shape;
   /** Половина стороны / радиус отрисовки. */
@@ -326,6 +334,8 @@ export interface World {
   reward: RewardState;
   /** Личное дело субъекта: взыскание, выслуга и чем они набраны. */
   record: RecordState;
+  /** Талоны: служебная мелочь со штата, копится за забег. */
+  tickets: number;
   /** Благодарности: приёмные, взятые без единого попадания. */
   commendations: number;
   /**
@@ -359,6 +369,7 @@ export interface World {
   courierC: Map<Entity, CourierC>;
   propC: Map<Entity, PropC>;
   stashC: Map<Entity, StashC>;
+  ticketC: Map<Entity, TicketC>;
   bulletC: Map<Entity, BulletC>;
   drawC: Map<Entity, DrawC>;
 }
@@ -392,6 +403,7 @@ export function flushDoomed(w: World): void {
     w.courierC.delete(e);
     w.propC.delete(e);
     w.stashC.delete(e);
+    w.ticketC.delete(e);
     w.bulletC.delete(e);
     w.drawC.delete(e);
   }

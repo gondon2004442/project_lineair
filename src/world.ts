@@ -57,6 +57,7 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     passes: TUNING.stash.passesStart,
     reward: { chance: TUNING.reward.base, dry: 0, lastItem: '', lastOrder: '', lastWeight: 1 },
     record: { penalty: 0, service: 0, broken: 0, roomClean: true, controlHere: 0 },
+    tickets: 0,
     commendations: 0,
     runEnded: '',
     note: [],
@@ -79,6 +80,7 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     courierC: new Map(),
     propC: new Map(),
     stashC: new Map(),
+    ticketC: new Map(),
     bulletC: new Map(),
     drawC: new Map(),
   };
@@ -126,6 +128,7 @@ export function startRun(w: World): void {
   w.reward.lastItem = '';
   w.reward.lastOrder = '';
   w.reward.lastWeight = 1;
+  w.tickets = 0;
   w.commendations = 0;
   w.note = [];
   w.noteSlot = -1;
@@ -476,6 +479,7 @@ function clearExceptPlayer(w: World): void {
     w.courierC.delete(e);
     w.propC.delete(e);
     w.stashC.delete(e);
+    w.ticketC.delete(e);
     w.bulletC.delete(e);
     w.drawC.delete(e);
   }

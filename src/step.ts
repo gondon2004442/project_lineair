@@ -14,6 +14,7 @@ import { feedbackSystem, lifecycleSystem, statusSystem } from './systems/lifecyc
 import { physicsSystem } from './systems/physics';
 import { propPushSystem, propSystem } from './systems/props';
 import { telekinesisSystem } from './systems/telekinesis';
+import { ticketSystem } from './systems/tickets';
 import { lobbySystem } from './systems/lobby';
 import { roomSystem } from './systems/rooms';
 import { playerControlSystem } from './systems/playerControl';
@@ -65,6 +66,8 @@ export function step(w: World): void {
   profiler.end('СИМ: ТЕЛЕКИНЕЗ');
 
   profiler.begin('СИМ: ФИЗИКА');
+  // Талоны считаются до физики: она же и развозит их по полу.
+  ticketSystem(w, STEP);
   physicsSystem(w, STEP);
   profiler.end('СИМ: ФИЗИКА');
 

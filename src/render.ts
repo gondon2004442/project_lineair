@@ -713,6 +713,13 @@ function drawEntities(g: Graphics, w: World, alpha: number): void {
       continue;
     }
 
+    // Талон рисуется своим: бумажная полоска на полу, без объёма и без
+    // тени. Объём у мелочи крал бы внимание у тел.
+    if (w.ticketC.has(e)) {
+      drawTicket(g, x, y, draw.size, draw.color);
+      continue;
+    }
+
     const health = w.health.get(e);
     let color = draw.color;
     if (health !== undefined) {
@@ -1039,6 +1046,23 @@ function headShadow(g: Graphics, x: number, y: number, half: number): void {
   g.rect(x - w, y - half, w * 2, half * TUNING.render.headShadowDepth).fill({
     color: PALETTE.black,
     alpha: TUNING.render.headShadowAlpha,
+  });
+}
+
+/**
+ * Талон: светлая бумажная полоска с просечкой посередине. Просечка
+ * нужна, чтобы талон не читался как пуля субъекта: та тоже светлая и
+ * мелкая, но сплошная и круглая.
+ */
+function drawTicket(g: Graphics, x: number, y: number, size: number, color: number): void {
+  const half = size * TUNING.render.ticketWide;
+  g.rect(x - half, y - size, half * 2, size * 2).fill(color);
+  const notch = half * TUNING.render.ticketNotch;
+  g.rect(x - notch, y - size, notch * 2, size * 2).fill(PALETTE.concrete700);
+  g.rect(x - half, y - size, half * 2, size * 2).stroke({
+    width: TUNING.render.ticketEdge,
+    color: PALETTE.concrete700,
+    alignment: 1,
   });
 }
 

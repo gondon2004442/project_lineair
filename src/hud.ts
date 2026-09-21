@@ -94,7 +94,7 @@ export function createHud(
       weaponRows(w),
       energyRow(w),
       row('ВАКАНСИЙ', vacancyLine(w)),
-      row('Q БЛАНК · ДОПУСК', suppliesLine(w)),
+      row('Q БЛАНК · ДОПУСК · ТАЛОН', suppliesLine(w)),
       promptRow(w),
     ].join('');
 
@@ -191,7 +191,8 @@ function suppliesLine(w: World): string {
   const pMax = Math.max(1, TUNING.stash.passesMax);
   return (
     `<span class="${blanks > 0 ? 'ok' : 'warn'}">${gauge(blanks, bMax)} ${blanks}</span> · ` +
-    `<span class="${passes > 0 ? 'ok' : 'warn'}">${gauge(passes, pMax)} ${passes}</span>`
+    `<span class="${passes > 0 ? 'ok' : 'warn'}">${gauge(passes, pMax)} ${passes}</span> · ` +
+    `<span class="${w.tickets > 0 ? 'ok' : 'warn'}">${w.tickets}</span>`
   );
 }
 

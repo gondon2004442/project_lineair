@@ -53,6 +53,9 @@ export const SOUNDS: Record<string, SoundRecipe> = {
   impact: { source: 'noise', freq: 0, duration: 0.13, gain: 0.5, cutoff: 700 },
   glass: { source: 'noise', freq: 0, duration: 0.26, gain: 0.45, cutoff: 6000 },
 
+  /** Талон подобран: сухой бумажный щелчок, почти на пределе слышимости. */
+  ticket: { source: 'noise', freq: 0, duration: 0.05, gain: 0.16, cutoff: 5200 },
+
   /** Шаг в проём: забег начался. */
   gate: { source: 'tone', freq: 70, freqEnd: 40, duration: 0.7, gain: 0.55, wave: 'sine', attack: 0.3 },
 };
