@@ -286,6 +286,109 @@ function drawRoom(g: Graphics, map: TileMap): void {
 }
 
 /**
+ * Поза субъекта: во сколько раз растянуто тело, на сколько поднято и
+ * насколько сжата под ним тень.
+ */
+interface Pose {
+  hx: number;
+  hy: number;
+  dx: number;
+  dy: number;
+  shadow: number;
+}
+
+// Пройденный путь копится на стороне отрисовки: шаг — это картинка, и
+// в симуляции его быть не должно, иначе он попадёт в детерминизм.
+let walkDist = 0;
+let walkLastX = 0;
+let walkLastY = 0;
+let walkSeen = false;
+
+/**
+ * Куб не умеет переставлять ноги, поэтому шаг сделан тем, что у куба
+ * есть: четыре кадра меняют ширину, высоту, подъём и перенос веса
+ * вбок. Кадры дискретные, без интерполяции, — это ритм, а не
+ * колебание. Цикл считается по пройденному пути, а не по времени:
+ * иначе на замедлении и на разгоне ноги едут отдельно от пола.
+ */
+function playerPose(w: World, x: number, y: number): Pose {
+  const cfg = TUNING.render;
+  const player = w.playerC.get(w.player);
+  const draw = w.drawC.get(w.player);
+  const body = w.body.get(w.player);
+  const half = draw === undefined ? 0 : draw.size * cfg.playerSizeFactor;
+  const pose: Pose = { hx: half, hy: half, dx: 0, dy: 0, shadow: 1 };
+  if (player === undefined) return pose;
+
+  const step = walkSeen ? Math.hypot(x - walkLastX, y - walkLastY) : 0;
+  walkLastX = x;
+  walkLastY = y;
+  walkSeen = true;
+  if (step < cfg.walkJumpCut) walkDist += step;
+
+  if (player.phase === 'dash') {
+    // Растяжение по оси рывка и сжатие поперёк: тело то же, а скорость
+    // читается с одного кадра.
+    const k = cfg.dashStretch - 1;
+    const inv = 1 - 1 / cfg.dashStretch;
+    const ax = Math.abs(player.dashX);
+    const ay = Math.abs(player.dashY);
+    pose.hx = half * (1 + k * ax - inv * ay);
+    pose.hy = half * (1 + k * ay - inv * ax);
+    pose.shadow = cfg.contactDashScale;
+    return pose;
+  }
+
+  const vx = body === undefined ? 0 : body.vx;
+  const vy = body === undefined ? 0 : body.vy;
+  const speed = Math.hypot(vx, vy);
+
+  if (speed < cfg.walkMinSpeed) {
+    // Стоит: два кадра дыхания, полный цикл idleBreathTime.
+    const beat = Math.max(1e-6, cfg.idleBreathTime) / 2;
+    if (Math.floor((w.tick * STEP) / beat) % 2 === 1) {
+      pose.hx = half * (1 - cfg.idleBreath);
+      pose.hy = half * (1 + cfg.idleBreath);
+      // Низ остаётся на месте: дышит грудь, а не подошвы.
+      pose.dy = -half * cfg.idleBreath;
+    }
+    return pose;
+  }
+
+  const frames = Math.max(1, Math.round(cfg.walkFrames));
+  const stride = Math.max(1e-6, cfg.walkStride);
+  const frame = Math.floor((walkDist / stride) * frames) % frames;
+  const squash = cfg.walkSquash;
+
+  // Вес переносится с ноги на ногу: на опорном кадре он весь на одной
+  // стороне, на проходном — на полпути к другой. Отсюда четыре разные
+  // позы, а не две: без этого проходные кадры совпадают.
+  const shift = WALK_SHIFT[frame] ?? 0;
+  // Вбок — это поперёк хода: сверху «вбок» зависит от того, куда идёшь.
+  const lean = cfg.walkLean * shift;
+  pose.dx = (-vy / speed) * lean;
+  pose.dy = (vx / speed) * lean;
+
+  if (frame % 2 === 0) {
+    // Опорный кадр: вес на ноге, тело ниже и шире.
+    pose.hx = half * (1 + squash);
+    pose.hy = half * (1 - squash);
+    pose.dy += half * squash;
+    return pose;
+  }
+
+  // Проходной кадр: тело вытянуто и оторвано от пола.
+  pose.hx = half * (1 - squash / 2);
+  pose.hy = half * (1 + squash / 2);
+  pose.dy += -cfg.walkBob - (half * squash) / 2;
+  pose.shadow = half <= 0 ? 1 : half / (half + cfg.walkBob);
+  return pose;
+}
+
+/** Перенос веса по кадрам цикла: опора, полпути, другая опора, полпути. */
+const WALK_SHIFT = [-1, -0.5, 1, 0.5];
+
+/**
  * Субъект. Единственное красное на экране и потому верхний слой:
  * что бы ни творилось на участке, себя видно всегда.
  */
@@ -299,20 +402,29 @@ function drawPlayer(g: Graphics, w: World, alpha: number): void {
   const x = lerp(t.px, t.x, alpha);
   const y = lerp(t.py, t.y, alpha);
   const half = draw.size * TUNING.render.playerSizeFactor;
+  const pose = playerPose(w, x, y);
+  const cx = x + pose.dx;
+  const cy = y + pose.dy;
 
   if (player.phase === 'dash') {
     const speed = TUNING.player.dashDistance / TUNING.player.dashDuration;
     for (let i = 1; i <= TUNING.render.dashTrail; i++) {
       const back = speed * TUNING.render.dashTrailStep * i;
-      g.rect(x - player.dashX * back - half, y - player.dashY * back - half, half * 2, half * 2).fill({
+      g.rect(
+        cx - player.dashX * back - pose.hx,
+        cy - player.dashY * back - pose.hy,
+        pose.hx * 2,
+        pose.hy * 2,
+      ).fill({
         color: PALETTE.red,
         alpha: (1 - i / (TUNING.render.dashTrail + 1)) * TUNING.render.dashGhostAlpha,
       });
     }
   }
 
-  // Контактная тень сжимается на рывке, иначе полёт читается как скольжение.
-  contactShadow(g, x, y, half, player.phase === 'dash' ? TUNING.render.contactDashScale : 1);
+  // Контактная тень остаётся на полу и сжимается, когда тело оторвано:
+  // иначе подъём читается как скольжение.
+  contactShadow(g, x, y, half, pose.shadow);
 
   const blink =
     health !== undefined &&
@@ -321,11 +433,11 @@ function drawPlayer(g: Graphics, w: World, alpha: number): void {
     Math.floor(w.tick * STEP * TUNING.feel.blinkRate) % 2 === 0;
   if (!blink) {
     const color = health !== undefined && health.flash > 0 ? PALETTE.concrete100 : PALETTE.red;
-    block(g, x - half, y - half, half * 2, half * 2, color);
+    block(g, cx - pose.hx, cy - pose.hy, pose.hx * 2, pose.hy * 2, color);
     // Кант: красный тёмный, и без канта субъект на полу пропадает,
     // стоит убрать цвет. Контур — единственный в кадре, силуэт читается
     // формой, а не оттенком.
-    g.rect(x - half, y - half, half * 2, half * 2).stroke({
+    g.rect(cx - pose.hx, cy - pose.hy, pose.hx * 2, pose.hy * 2).stroke({
       width: TUNING.render.playerRim,
       color: PALETTE.concrete100,
       alignment: 1,
@@ -334,8 +446,8 @@ function drawPlayer(g: Graphics, w: World, alpha: number): void {
 
   const ax = player.aimX;
   const ay = player.aimY;
-  g.moveTo(x + ax * half, y + ay * half)
-    .lineTo(x + ax * TUNING.render.aimLength, y + ay * TUNING.render.aimLength)
+  g.moveTo(cx + ax * half, cy + ay * half)
+    .lineTo(cx + ax * TUNING.render.aimLength, cy + ay * TUNING.render.aimLength)
     .stroke({ width: TUNING.render.aimWidth, color: PALETTE.red });
 }
 
