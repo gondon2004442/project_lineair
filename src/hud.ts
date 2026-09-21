@@ -36,6 +36,10 @@ export function createHud(
 ): Hud {
   let cooldown = 0;
   let dossierOpen = false;
+  // Кадр и хитбоксы приходят в update, а нужны в профайлере: он рисуется
+  // отдельным вызовом и своих аргументов не получает.
+  let lastFps = 0;
+  let lastHitboxes = false;
 
   const renderLobby = (w: World, fps: number, hitboxes: boolean): void => {
     left.innerHTML = [
@@ -75,56 +79,35 @@ export function createHud(
     if (dossierOpen) dossier.innerHTML = dossierBody(w);
   };
 
-  const render = (w: World, fps: number, hitboxes: boolean): void => {
+  /**
+   * Игровой оверлей: четыре строки из HANDOFF — форма, обойма, энергия,
+   * вакансии. К ним здоровье и расходники: их больше нигде не прочитать,
+   * на самом субъекте цифр нет. Всё остальное ушло под F3.
+   */
+  const render = (w: World): void => {
     const health = w.health.get(w.player);
-    const player = w.playerC.get(w.player);
     const hp = health === undefined ? 0 : Math.max(0, health.hp);
     const maxHp = health === undefined ? 0 : health.max;
-    const dashReady = player === undefined || player.dashCooldown <= 0;
-    const room = currentRoom(w);
 
     left.innerHTML = [
       row('СУБЪЕКТ', bar(hp, maxHp)),
-      row('РЫВОК', dashReady ? '<span class="ok">ГОТОВ</span>' : '<span class="warn">ПЕРЕЗАРЯД</span>'),
-      row('ШТАТ НА УЧАСТКЕ', String(w.staffC.size)),
-      rankRow(w),
-      courierRow(w),
-      row('ВАКАНСИЙ', vacancyLine(w)),
-      auditRow(w),
-      row('ДВЕРИ', w.map.doorsLocked ? '<span class="warn">ЗАПЕРТЫ</span>' : '<span class="ok">ОТКРЫТЫ</span>'),
-      row('БЛАНКИ (Q)', blankLine(w)),
-      row('ДОПУСК', passLine(w)),
-      stashRow(w),
-    w.note.length > 0 ? row('АРХИВ', '<span class="ok">ДЕЛО ПРОЧТЕНО · [I]</span>') : '',
       weaponRows(w),
       energyRow(w),
+      row('ВАКАНСИЙ', vacancyLine(w)),
+      row('Q БЛАНК · ДОПУСК', suppliesLine(w)),
+      promptRow(w),
     ].join('');
 
-    right.innerHTML = [
-      row('SEED', formatSeed(w.seed)),
-      row('FPS', String(Math.round(fps))),
-      row('СУЩНОСТЕЙ', String(entityCount(w))),
-      row('ШАГ', String(w.tick)),
-      row('F1 ХИТБОКСЫ', hitboxes ? '<span class="ok">ВКЛ</span>' : 'ВЫКЛ'),
-      row('F2', 'ПОВТОР'),
-      row('I ЛИЧНОЕ ДЕЛО', dossierLine(w)),
-      w.commendations > 0
-        ? row('БЛАГОДАРНОСТЕЙ', `<span class="ok">${w.commendations}</span>`)
-        : '',
-    ].join('');
+    // Seed обязан быть на экране всегда: по нему воспроизводят забег.
+    right.innerHTML = [row('SEED', formatSeed(w.seed)), row('F3', 'ПРИБОРЫ')].join('');
 
     dossier.hidden = !dossierOpen;
     if (dossierOpen) dossier.innerHTML = dossierBody(w);
 
-    const template = room === undefined ? undefined : TEMPLATES_BY_ID.get(room.template);
-    const staffing = room === undefined ? undefined : STAFFING_BY_ID.get(room.staffing);
+    // Под схемой остаётся только номер участка: планировку и расписание
+    // видно в самой комнате, а не в списке.
     map.innerHTML =
-      [
-        row('УЧАСТОК', `${w.room + 1} / ${w.floor.rooms.length}`),
-        row('ЗАЧИЩЕНО', `${clearedCount(w)} / ${w.floor.rooms.length}`),
-        row('ПЛАНИРОВКА', template === undefined ? '—' : template.label),
-        row('РАСПИСАНИЕ', staffing === undefined ? '—' : staffing.label),
-      ].join('') + schematic(w);
+      row('УЧАСТОК', `${w.room + 1} / ${w.floor.rooms.length}`) + schematic(w);
 
     if (w.status === 'dead') {
       banner.hidden = false;
@@ -139,16 +122,18 @@ export function createHud(
 
   return {
     update(w, fps, hitboxes, dt) {
+      lastFps = fps;
+      lastHitboxes = hitboxes;
       cooldown -= dt;
       if (cooldown > 0) return;
       cooldown = TUNING.debug.overlayInterval;
       if (w.scene === 'lobby') renderLobby(w, fps, hitboxes);
-      else render(w, fps, hitboxes);
+      else render(w);
     },
     profile(p, w) {
       profileBlock.hidden = !p.enabled;
       if (!p.enabled) return;
-      profileBlock.innerHTML = profileBody(p) + dashBody(w);
+      profileBlock.innerHTML = profileBody(p) + roomBody(w, lastFps, lastHitboxes) + dashBody(w);
     },
     toggleDossier() {
       dossierOpen = !dossierOpen;
@@ -159,7 +144,11 @@ export function createHud(
   };
 }
 
-/** Текущая форма, её боезапас и заряд. */
+/**
+ * Форма и обойма — две строки из четырёх. Запас патронов и заряд пики
+ * стоят внутри них, а не отдельными строками: сами по себе обе цифры
+ * ничего не решают, а место держали всю игру.
+ */
 function weaponRows(w: World): string {
   const player = w.playerC.get(w.player);
   if (player === undefined) return '';
@@ -169,30 +158,98 @@ function weaponRows(w: World): string {
   const have = Math.floor(player.ammo[index] ?? 0);
   const cost = Math.max(0, formStat(w, form.id, 'cost'));
   const ready = have >= cost;
+  const reserve = reserveOf(w, index);
 
-  const rows = [row('ФОРМА (КОЛЕСО)', `<span class="ok">${form.code} · ${form.title}</span>`)];
-
-  if (player.reloading) {
-    const full = formStat(w, form.id, 'reloadTime');
-    const done = full <= 0 ? 1 : Math.max(0, Math.min(1, 1 - player.reloadTimer / full));
-    rows.push(
-      row('ПЕРЕЗАРЯДКА', `<span class="warn">${gauge(Math.round(done * 10), 10)}</span>`),
-    );
-  } else {
-    rows.push(
-      row('ОБОЙМА (R)', `<span class="${ready ? 'ok' : 'warn'}">${gauge(have, max)} ${have}/${max}</span>`),
-    );
-  }
-  // Запас конечный, поэтому он в основном блоке, а не под F3: без него
-  // перезаряжаться нечем и форму придётся менять.
-  const left = reserveOf(w, index);
-  rows.push(row('ЗАПАС', `<span class="${left > 0 ? 'ok' : 'warn'}">${left}</span>`));
+  let head = `${form.code} · ${form.title}`;
   if (form.id === 'lance' && !player.reloading) {
     const full = formStat(w, 'lance', 'chargeTime');
     const ratio = full <= 0 ? 1 : Math.min(1, player.charge / full);
-    rows.push(row('ЗАРЯД', `<span class="ok">${gauge(Math.round(ratio * 10), 10)}</span>`));
+    head += ` · ЗАРЯД ${gauge(Math.round(ratio * 10), 10)}`;
   }
-  return rows.join('');
+
+  let ammo: string;
+  if (player.reloading) {
+    const full = formStat(w, form.id, 'reloadTime');
+    const done = full <= 0 ? 1 : Math.max(0, Math.min(1, 1 - player.reloadTimer / full));
+    ammo = `<span class="warn">${gauge(Math.round(done * 10), 10)} ПЕРЕЗАРЯДКА</span>`;
+  } else {
+    ammo = `<span class="${ready ? 'ok' : 'warn'}">${gauge(have, max)} ${have}/${max}</span>` +
+      ` · <span class="${reserve > 0 ? 'ok' : 'warn'}">ЗАПАС ${reserve}</span>`;
+  }
+
+  return row('ФОРМА (КОЛЕСО)', `<span class="ok">${head}</span>`) + row('ОБОЙМА (R)', ammo);
+}
+
+/**
+ * Бланки и допуски одной строкой: обе цифры — расходники, и решение по
+ * ним игрок принимает вместе, «чем платить за этот шкаф».
+ */
+function suppliesLine(w: World): string {
+  const blanks = Math.max(0, w.blanks);
+  const passes = Math.max(0, w.passes);
+  const bMax = Math.max(1, TUNING.blank.refillTo);
+  const pMax = Math.max(1, TUNING.stash.passesMax);
+  return (
+    `<span class="${blanks > 0 ? 'ok' : 'warn'}">${gauge(blanks, bMax)} ${blanks}</span> · ` +
+    `<span class="${passes > 0 ? 'ok' : 'warn'}">${gauge(passes, pMax)} ${passes}</span>`
+  );
+}
+
+/**
+ * Одна контекстная строка вместо шести постоянных. Порядок — по тому,
+ * требует ли это нажатия прямо сейчас: приглашение у шкафа исчезнет,
+ * стоит отойти на шаг, а курьер бежит секунды и виден в кадре сам.
+ */
+function promptRow(w: World): string {
+  const stash = stashRow(w);
+  if (stash !== '') return stash;
+  const player = w.playerC.get(w.player);
+  const held = player === undefined ? undefined : w.propC.get(player.held);
+  if (held !== undefined) {
+    return row('В ЗАХВАТЕ', `<span class="ok">${held.title} · КОРОТКО — НАБОК</span>`);
+  }
+  const courier = courierRow(w);
+  if (courier !== '') return courier;
+  if (w.note.length > 0) return row('АРХИВ', '<span class="ok">ДЕЛО ПРОЧТЕНО · [I]</span>');
+  return '';
+}
+
+/**
+ * Участок под F3: всё, что раньше стояло в игровом оверлее постоянно.
+ * Здесь оно не мешает смотреть в кадр, но остаётся под рукой.
+ */
+function roomBody(w: World, fps: number, hitboxes: boolean): string {
+  const room = currentRoom(w);
+  const template = room === undefined ? undefined : TEMPLATES_BY_ID.get(room.template);
+  const staffing = room === undefined ? undefined : STAFFING_BY_ID.get(room.staffing);
+  const player = w.playerC.get(w.player);
+  const dashReady = player === undefined || player.dashCooldown <= 0;
+  return [
+    '<div class="profile-split"></div>',
+    '<div class="subtitle">УЧАСТОК</div>',
+    row('НОМЕР', `${w.room + 1} / ${w.floor.rooms.length}`),
+    row('ЗАЧИЩЕНО', `${clearedCount(w)} / ${w.floor.rooms.length}`),
+    row('ПЛАНИРОВКА', template === undefined ? '—' : template.label),
+    row('РАСПИСАНИЕ', staffing === undefined ? '—' : staffing.label),
+    row('ШТАТ НА УЧАСТКЕ', String(w.staffC.size)),
+    rankRow(w),
+    courierRow(w),
+    auditRow(w),
+    row('ВАКАНСИЙ', vacancyLine(w)),
+    row('ДВЕРИ', w.map.doorsLocked ? '<span class="warn">ЗАПЕРТЫ</span>' : '<span class="ok">ОТКРЫТЫ</span>'),
+    row('РЫВОК', dashReady ? '<span class="ok">ГОТОВ</span>' : '<span class="warn">ПЕРЕЗАРЯД</span>'),
+    row('I ЛИЧНОЕ ДЕЛО', dossierLine(w)),
+    w.commendations > 0 ? row('БЛАГОДАРНОСТЕЙ', `<span class="ok">${w.commendations}</span>`) : '',
+    '<div class="profile-split"></div>',
+    '<div class="subtitle">СЛУЖЕБНОЕ</div>',
+    row('SEED', formatSeed(w.seed)),
+    row('FPS', String(Math.round(fps))),
+    row('СУЩНОСТЕЙ', String(entityCount(w))),
+    row('ШАГ', String(w.tick)),
+    row('F1 ХИТБОКСЫ', hitboxes ? '<span class="ok">ВКЛ</span>' : 'ВЫКЛ'),
+    row('F2', 'ПОВТОР'),
+    row('` ', 'КРУТИЛКИ'),
+  ].join('');
 }
 
 /**
@@ -204,7 +261,9 @@ function profileBody(p: Profiler): string {
   const head = [
     '<div class="subtitle">ПРОФАЙЛЕР · F3</div>',
     row('КАДР', ms(s.frameMs)),
-    row('СЕРЕДИНА · ХВОСТ', `${ms(s.frameP50)} · ${ms(s.frameP95)}`),
+    // В колонке панели две полных подписи «МС» не помещаются и строка
+    // переносится: единица одна на обе цифры.
+    row('СЕРЕДИНА · ХВОСТ', `${s.frameP50.toFixed(3)} · ${ms(s.frameP95)}`),
     row('САМЫЙ ДОЛГИЙ', ms(s.frameMax)),
     row(
       'РЫВКОВ В ОКНЕ',
@@ -348,20 +407,6 @@ function auditRow(w: World): string {
   return row('ОПИСЬ', `<span class="warn">ОСТАЛОСЬ ${left} · НЕУЯЗВИМ</span>`);
 }
 
-/** Бланки: сколько осталось. Пустая строка — значит подавать нечего. */
-function blankLine(w: World): string {
-  const left = Math.max(0, w.blanks);
-  const max = Math.max(1, TUNING.blank.refillTo);
-  return `<span class="${left > 0 ? 'ok' : 'warn'}">${gauge(left, max)} ${left}</span>`;
-}
-
-/** Допуски: ими вскрывают шкафы и получают со стола выдачи. */
-function passLine(w: World): string {
-  const left = Math.max(0, w.passes);
-  const max = Math.max(1, TUNING.stash.passesMax);
-  return `<span class="${left > 0 ? 'ok' : 'warn'}">${gauge(left, max)} ${left}</span>`;
-}
-
 /**
  * Приглашение к оформлению. Строка появляется только у шкафа или ячейки
  * и сразу говорит, чем платить: иначе игрок жмёт F наугад.
@@ -377,19 +422,16 @@ function stashRow(w: World): string {
   return row('НЕЧЕМ ОФОРМИТЬ', `<span class="warn">${stash.title}</span>`);
 }
 
-/** Телекинез: запас энергии и что сейчас в руках. */
+/** Телекинез: запас энергии. Что в руках — в контекстной строке. */
 function energyRow(w: World): string {
   const player = w.playerC.get(w.player);
   if (player === undefined) return '';
   const max = Math.max(1, TUNING.telekinesis.energyMax);
   const ratio = Math.max(0, Math.min(1, player.energy / max));
   const enough = player.energy >= TUNING.telekinesis.grabCost;
-  const held = w.propC.get(player.held);
-  return (
-    row('ЭНЕРГИЯ (ПКМ)', `<span class="${enough ? 'ok' : 'warn'}">${gauge(Math.round(ratio * 10), 10)}</span>`) +
-    (held === undefined
-      ? ''
-      : row('В ЗАХВАТЕ', `<span class="ok">${held.title} · КОРОТКО — НАБОК</span>`))
+  return row(
+    'ЭНЕРГИЯ (ПКМ)',
+    `<span class="${enough ? 'ok' : 'warn'}">${gauge(Math.round(ratio * 10), 10)}</span>`,
   );
 }
 

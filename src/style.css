@@ -382,13 +382,27 @@ body.panel-open #hud-right {
 
 /* --- Профайлер ---------------------------------------------------------- */
 
+/* Панель приборов держит всё, что убрали из игрового оверлея, поэтому
+   растёт выше экрана. Раскладываем её в две колонки по высоте экрана:
+   прокрутка в панели, которую открывают на секунду, — это потерянные
+   строки, их никто не листает. */
 #hud-profile {
-  top: auto;
+  /* Начинается под правым блоком: seed остаётся виден и при открытой
+     панели, а не прячется под ней. */
+  top: 58px;
   right: 10px;
   bottom: 10px;
-  min-width: 300px;
-  max-height: 70vh;
-  overflow-y: auto;
+  width: 620px;
+  min-width: 0;
+  overflow: hidden;
+  columns: 2;
+  column-gap: 14px;
+  column-fill: auto;
+}
+
+#hud-profile .row,
+#hud-profile .subtitle {
+  break-inside: avoid;
 }
 
 body.panel-open #hud-profile {
