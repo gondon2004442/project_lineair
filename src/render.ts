@@ -426,10 +426,14 @@ function drawPlayer(g: Graphics, w: World, alpha: number): void {
   // иначе подъём читается как скольжение.
   contactShadow(g, x, y, half, pose.shadow);
 
+  // Мигание объясняет неуязвимость после урона. На рывке она и так есть
+  // и видна по растяжению со смазом, а мигание съедало субъекта целиком:
+  // всю фазу рывка его в кадре не было. Поэтому мигает только остаток
+  // окна сверх рывкового — то есть именно полученный урон.
   const blink =
     health !== undefined &&
     health.flash <= 0 &&
-    health.iframes > 0 &&
+    health.iframes > TUNING.player.dashIFrames &&
     Math.floor(w.tick * STEP * TUNING.feel.blinkRate) % 2 === 0;
   if (!blink) {
     const color = health !== undefined && health.flash > 0 ? PALETTE.concrete100 : PALETTE.red;
