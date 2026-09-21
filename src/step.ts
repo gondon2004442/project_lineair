@@ -2,6 +2,7 @@
 import { flushDoomed, type World } from './ecs';
 import { blankSystem } from './systems/blank';
 import { issueSystem } from './systems/issue';
+import { counterSystem } from './systems/counter';
 import { bulletSystem } from './systems/combat';
 import { internSystem } from './systems/postIntern';
 import { inspectorSystem } from './systems/postInspector';
@@ -40,6 +41,9 @@ export function step(w: World): void {
   // Бланк идёт до управления: он отменяет то, что уже летит, а не то,
   // что только появится на этом шаге.
   blankSystem(w);
+  // Стойка идёт до оформления и забирает нажатие, только если она рядом:
+  // иначе она съедала бы F у шкафов.
+  counterSystem(w);
   issueSystem(w);
   if (w.status !== 'dead') playerControlSystem(w, STEP);
   profiler.end('СИМ: СУБЪЕКТ');

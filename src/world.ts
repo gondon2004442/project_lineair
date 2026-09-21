@@ -20,7 +20,8 @@ import { PROPS } from './data/props';
 import { TEMPLATES_BY_ID, type CoverSlot } from './data/roomTemplates';
 import { WEAPON_FORMS } from './data/weaponForms';
 import { ammoMax, reserveMax } from './weapon';
-import { postNumbers, propNumbers, spawnPlayer, spawnProp, spawnStaff, spawnStash } from './spawn';
+import { COUNTERS, type CounterSpec } from './data/counters';
+import { postNumbers, propNumbers, spawnCounter, spawnPlayer, spawnProp, spawnStaff, spawnStash } from './spawn';
 import { TUNING } from './tuning';
 
 export function createWorld(seed: number, input: InputSnapshot): World {
@@ -81,6 +82,7 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     propC: new Map(),
     stashC: new Map(),
     ticketC: new Map(),
+    counterC: new Map(),
     bulletC: new Map(),
     drawC: new Map(),
   };
@@ -216,6 +218,7 @@ export function enterRoom(w: World, index: number, fromDir: Dir | null): void {
   buildRoster(w, room);
   scatterProps(w, room, spot.x, spot.y);
   placeStash(w, room, spot.x, spot.y);
+  placeCounter(w, room, spot.x, spot.y);
   if (!room.cleared) staffRoom(w, room, spot.x, spot.y);
   if (w.staffC.size === 0 && !room.cleared) {
     room.cleared = true;
@@ -294,6 +297,53 @@ function placeStash(w: World, room: RoomNode, entryX: number, entryY: number): v
     const x = centre.x + (i - (cells - 1) / 2) * cfg.deskGap;
     spawnStash(w, 'cell', pick.id, `${pick.code} · ${pick.title}`, x, centre.y);
   }
+}
+
+/**
+ * Какие участки этажа получают стойки и какие именно. Считается от seed
+ * и раскладки этажа, а не хранится: расстановка не должна зависеть от
+ * того, в каком порядке игрок обходит этаж.
+ *
+ * Коридоры, вестибюльный участок и приёмная не в счёт: в первом негде
+ * стоять, в последней не до окошек.
+ */
+function counterPlan(w: World): Map<number, CounterSpec> {
+  const cfg = TUNING.counter;
+  const rng = makeRng((w.seed ^ cfg.seedStride) >>> 0);
+  const pool = w.floor.rooms
+    .filter((r) => !r.corridor && r.kind !== 'start' && r.index !== w.floor.end)
+    .map((r) => r.index);
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = rng.int(i + 1);
+    const swap = pool[i];
+    pool[i] = pool[j];
+    pool[j] = swap;
+  }
+  // Виды тоже тасуются: иначе на этаже всегда была бы одна и та же пара.
+  const kinds = COUNTERS.slice();
+  for (let i = kinds.length - 1; i > 0; i--) {
+    const j = rng.int(i + 1);
+    const swap = kinds[i];
+    kinds[i] = kinds[j];
+    kinds[j] = swap;
+  }
+  const plan = new Map<number, CounterSpec>();
+  const take = Math.min(pool.length, Math.max(0, Math.round(cfg.perFloor)));
+  for (let i = 0; i < take; i++) {
+    const spec = kinds[i % kinds.length];
+    if (spec === undefined) break;
+    plan.set(pool[i] ?? -1, spec);
+  }
+  return plan;
+}
+
+function placeCounter(w: World, room: RoomNode, entryX: number, entryY: number): void {
+  const spec = counterPlan(w).get(room.index);
+  if (spec === undefined) return;
+  const cfg = TUNING.counter;
+  const rng = makeRng((w.seed + room.index * cfg.seedStride) >>> 0);
+  const spot = findSpawnSpot(w.map, rng, entryX, entryY, cfg.clearance, cfg.radius);
+  spawnCounter(w, spec, spot.x, spot.y);
 }
 
 /** Ячейка стола: то же взвешивание, но без повторов в одном столе. */
@@ -480,6 +530,7 @@ function clearExceptPlayer(w: World): void {
     w.propC.delete(e);
     w.stashC.delete(e);
     w.ticketC.delete(e);
+    w.counterC.delete(e);
     w.bulletC.delete(e);
     w.drawC.delete(e);
   }

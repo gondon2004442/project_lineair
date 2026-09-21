@@ -14,6 +14,7 @@ import { hasChief } from './systems/postChief';
 import { courierTarget } from './systems/postCourier';
 import { synergyFactor } from './paperwork';
 import { issueCost, stashInReach } from './systems/issue';
+import { counterInReach, counterOffer } from './systems/counter';
 import { hasRegistrar, vacancyCount } from './systems/staff';
 import type { Profiler } from './profiler';
 import { ammoMax, currentForm, formStat, reserveOf } from './weapon';
@@ -202,6 +203,8 @@ function suppliesLine(w: World): string {
  * стоит отойти на шаг, а курьер бежит секунды и виден в кадре сам.
  */
 function promptRow(w: World): string {
+  const counter = counterRow(w);
+  if (counter !== '') return counter;
   const stash = stashRow(w);
   if (stash !== '') return stash;
   const player = w.playerC.get(w.player);
@@ -421,6 +424,21 @@ function stashRow(w: World): string {
   if (cost === 'pass') return row('F · ОФОРМИТЬ', `<span class="ok">${stash.title}</span>`);
   if (cost === 'blank') return row('F · ВСКРЫТЬ БЛАНКОМ', `<span class="ok">${stash.title}</span>`);
   return row('НЕЧЕМ ОФОРМИТЬ', `<span class="warn">${stash.title}</span>`);
+}
+
+/**
+ * Приглашение у стойки. Цена стоит прямо в строке: подавать наугад в
+ * окошко, где с тебя возьмут здоровье, — не то, чего хочется.
+ */
+function counterRow(w: World): string {
+  const target = counterInReach(w);
+  if (target < 0) return '';
+  const counter = w.counterC.get(target);
+  if (counter === undefined) return '';
+  const { offer, price, ok } = counterOffer(w, target);
+  if (counter.used) return row(counter.title, '<span class="warn">ОКОШКО ЗАКРЫТО</span>');
+  if (!ok) return row(offer, `<span class="warn">${price}</span>`);
+  return row(`F · ${offer}`, `<span class="ok">${price}</span>`);
 }
 
 /** Телекинез: запас энергии. Что в руках — в контекстной строке. */

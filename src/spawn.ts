@@ -12,6 +12,7 @@ import { PROPS_BY_ID, PROP_CABINET, PROP_RUBBLE } from './data/props';
 import { WEAPON_FORMS } from './data/weaponForms';
 import { createEntity, type Entity, type Faction, type Shape, type StashKind, type World } from './ecs';
 import { PALETTE } from './palette';
+import type { CounterSpec } from './data/counters';
 import { TUNING } from './tuning';
 
 /** Числа должности. Опознание берётся из данных, поведение — отсюда. */
@@ -303,6 +304,23 @@ export function spawnStash(
   w.transform.set(e, { x, y, px: x, py: y });
   w.body.set(e, { vx: 0, vy: 0, radius });
   w.stashC.set(e, { kind, item, title, opened: false });
+  w.drawC.set(e, {
+    shape: 'square',
+    size: radius,
+    color: PALETTE.furniture,
+    hollow: true,
+    desk: false,
+  });
+  return e;
+}
+
+/** Стойка: тумба с табличкой, к которой подходят и подают. */
+export function spawnCounter(w: World, spec: CounterSpec, x: number, y: number): Entity {
+  const radius = TUNING.counter.radius;
+  const e = createEntity(w);
+  w.transform.set(e, { x, y, px: x, py: y });
+  w.body.set(e, { vx: 0, vy: 0, radius });
+  w.counterC.set(e, { kind: spec.kind, title: spec.title, used: false });
   w.drawC.set(e, {
     shape: 'square',
     size: radius,

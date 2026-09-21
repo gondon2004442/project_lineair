@@ -12,6 +12,8 @@ import { countDrawCalls, profiler } from './profiler';
 import { vacancyCount } from './systems/staff';
 import { pendingItems } from './systems/postAuditor';
 import { stashInReach } from './systems/issue';
+import { counterInReach } from './systems/counter';
+import { COUNTERS_BY_KIND } from './data/counters';
 import { grabCandidate } from './systems/telekinesis';
 import { TILE_DOOR, TILE_GATE, TILE_WALL, TILE_WEAK, type TileMap } from './room';
 import { ROOM_HEIGHT, ROOM_WIDTH, STEP, TUNING } from './tuning';
@@ -694,6 +696,7 @@ function drawEntities(g: Graphics, w: World, alpha: number): void {
   const candidate = grabCandidate(w);
   const heldEntity = w.playerC.get(w.player)?.held ?? -1;
   const reachStash = stashInReach(w);
+  const reachCounter = counterInReach(w);
   for (const mark of [candidate, heldEntity]) {
     if (mark < 0) continue;
     const t = w.transform.get(mark);
@@ -740,6 +743,15 @@ function drawEntities(g: Graphics, w: World, alpha: number): void {
     const stash = w.stashC.get(e);
     if (stash !== undefined) {
       drawStash(g, x, y, draw.size, stash.kind === 'safe', stash.opened, e === reachStash);
+      continue;
+    }
+
+    // Стойка: тумба с табличкой. Рисуется своим — к ней подходят, её
+    // не ломают и не таскают.
+    const counter = w.counterC.get(e);
+    if (counter !== undefined) {
+      const spec = COUNTERS_BY_KIND.get(counter.kind as never);
+      drawCounter(g, x, y, draw.size, spec === undefined ? 1 : spec.marks, counter.used, e === reachCounter);
       continue;
     }
 
@@ -1077,6 +1089,47 @@ function headShadow(g: Graphics, x: number, y: number, half: number): void {
     color: PALETTE.black,
     alpha: TUNING.render.headShadowAlpha,
   });
+}
+
+/**
+ * Стойка. Тумба шире, чем глубже, со светлой столешницей и служебной
+ * табличкой над ней: по числу насечек стойки различаются между собой,
+ * как и должности. Отработанное окошко гаснет и теряет табличку —
+ * чтобы не звало второй раз.
+ */
+function drawCounter(
+  g: Graphics,
+  x: number,
+  y: number,
+  half: number,
+  marks: number,
+  used: boolean,
+  near: boolean,
+): void {
+  const cfg = TUNING.render;
+  const wide = half * cfg.counterWide;
+  contactShadow(g, x, y, half, 1);
+  const body = used ? PALETTE.concrete700 : PALETTE.furniture;
+  block(g, x - wide, y - half, wide * 2, half * 2, body);
+  // Столешница: светлая полоса по верхнему краю. По ней видно, что это
+  // стойка, а не шкаф, даже когда табличка снята.
+  g.rect(x - wide, y - half, wide * 2, cfg.counterTop).fill(
+    used ? PALETTE.concrete500 : PALETTE.concrete300,
+  );
+  g.rect(x - wide, y - half, wide * 2, half * 2).stroke({
+    width: cfg.stashEdge,
+    color: used ? PALETTE.concrete500 : PALETTE.concrete300,
+    alignment: 1,
+  });
+  if (!used) drawPlate(g, x, y - half - cfg.counterPlateLift, wide, marks);
+
+  if (near && !used) {
+    const pad = cfg.stashReachPad;
+    g.rect(x - wide - pad, y - half - pad, (wide + pad) * 2, (half + pad) * 2).stroke({
+      width: cfg.stashEdge,
+      color: PALETTE.concrete100,
+    });
+  }
 }
 
 /**

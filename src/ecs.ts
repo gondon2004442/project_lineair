@@ -232,6 +232,14 @@ export interface BulletC {
  */
 export type Shape = 'square' | 'diamond' | 'dot' | 'bar' | 'card';
 
+/** Стойка: одноразовое окошко, где забег можно поправить. */
+export interface CounterC {
+  kind: string;
+  title: string;
+  /** Одноразовость: подали один раз — окошко закрылось. */
+  used: boolean;
+}
+
 /** Талон на полу: служебная мелочь, оставшаяся от ставки. */
 export interface TicketC {
   /** Сколько талонов засчитает этот листок. */
@@ -370,6 +378,7 @@ export interface World {
   propC: Map<Entity, PropC>;
   stashC: Map<Entity, StashC>;
   ticketC: Map<Entity, TicketC>;
+  counterC: Map<Entity, CounterC>;
   bulletC: Map<Entity, BulletC>;
   drawC: Map<Entity, DrawC>;
 }
@@ -404,6 +413,7 @@ export function flushDoomed(w: World): void {
     w.propC.delete(e);
     w.stashC.delete(e);
     w.ticketC.delete(e);
+    w.counterC.delete(e);
     w.bulletC.delete(e);
     w.drawC.delete(e);
   }

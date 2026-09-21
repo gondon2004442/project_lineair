@@ -18,6 +18,7 @@ import { DIRECTIVES, issuedDirectives } from './data/directives';
 import { ITEMS } from './data/items';
 import { spawnStaff } from './spawn';
 import { statAt } from './weapon';
+import { counterInReach, counterOffer } from './systems/counter';
 import { createWorld, enterLobby, enterRoom } from './world';
 
 /** Приоритеты тикера Pixi: наш проход до отрисовки и замер сразу после неё. */
@@ -109,6 +110,8 @@ async function boot(): Promise<void> {
       step,
       spawnStaff,
       statAt,
+      counterInReach,
+      counterOffer,
       issuedDirectives,
       pickItem,
       synergyFactor,
