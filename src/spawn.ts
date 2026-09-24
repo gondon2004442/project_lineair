@@ -75,6 +75,7 @@ export function spawnPlayer(w: World, x: number, y: number): Entity {
     held: -1,
     dashTime: 0,
     dashCooldown: 0,
+    turnLock: 0,
     dashX: 1,
     dashY: 0,
   });

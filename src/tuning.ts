@@ -52,6 +52,46 @@ export const TUNING = {
     /** Скорость на выходе из рывка — доля от dash-скорости. */
     dashExitFactor: 0.2,
 
+    /**
+     * Схема рывка. 0 — «МИГАНИЕ»: 110 px за 50 мс, то есть телепорт, и
+     * окно неуязвимости в два с половиной раза длиннее самого движения.
+     * Платить за такой рывок нечем, поэтому жать его выгодно всегда.
+     * 1 — «ПЕРЕКАТ»: настоящее движение, окно закрывается на середине,
+     * вторую половину субъект едет уязвимым и ничего не может сделать.
+     * Переключается на ходу — сравнивать надо руками, а не на бумаге.
+     */
+    dashMode: 1,
+    /** Схема 1. Дистанция и длительность задают скорость переката. */
+    rollDistance: 130,
+    rollDuration: 0.22,
+    /** Окно неуязвимости схемы 1: от и до, отсчёт от начала переката. */
+    rollIFramesStart: 0.02,
+    rollIFramesEnd: 0.12,
+    rollCooldown: 0.45,
+    /** Скорость на выходе: импульс переносится, а не гасится. */
+    rollExitFactor: 0.65,
+    /** Больше нуля — направление защёлкивается в момент нажатия. */
+    rollTurnLock: 1,
+    /** С какой доли длительности перекат можно отменить выстрелом. */
+    rollCancelAfter: 0.55,
+
+    /**
+     * Буфер ввода. Нажатие не пропадает, если действие ещё не готово, а
+     * ждёт столько игрового времени. Именно игрового: на замедлении
+     * бланка буфер не должен растягиваться вместе с миром.
+     */
+    inputBufferMs: 120,
+
+    /**
+     * Асимметрия разворота. Резкий разворот на месте стоит мгновения,
+     * движение по дуге — ничего: вес появляется, точность не страдает.
+     * Ниже turnMinSpeed поворачивать не с чего, и штрафа нет.
+     */
+    turnAngleDeg: 120,
+    turnAccelFactor: 0.45,
+    turnLockMs: 90,
+    turnMinSpeed: 70,
+
     /** Неуязвимость после получения урона. */
     hurtIFrames: 0.9,
     /** Отдача, толкающая субъекта назад при выстреле. */
@@ -127,6 +167,8 @@ export const TUNING = {
       reserveMax: 140,
       pickup: 40,
       pickupWeight: 5,
+      /** Множитель отдачи к player.recoil. Точная одиночная — база, по ней и мерена общая отдача. */
+      recoilFactor: 1,
     },
 
     /** Дробовая: сноп на короткую дистанцию. */
@@ -147,6 +189,8 @@ export const TUNING = {
       reserveMax: 56,
       pickup: 16,
       pickupWeight: 3,
+      /** Множитель отдачи к player.recoil. Дробовая толкает заметно: выстрел назад разрывает дистанцию. */
+      recoilFactor: 3.4,
     },
 
     /** Зарядная пробивающая: держишь ЛКМ, отпускаешь — бьёшь насквозь. */
@@ -170,6 +214,8 @@ export const TUNING = {
       reserveMax: 30,
       pickup: 9,
       pickupWeight: 2,
+      /** Множитель отдачи к player.recoil. Зарядная бьёт тяжело и отдаёт соответственно. */
+      recoilFactor: 1.8,
     },
 
     /** Залповая с самонаведением. */
@@ -192,6 +238,8 @@ export const TUNING = {
       reserveMax: 20,
       pickup: 6,
       pickupWeight: 1,
+      /** Множитель отдачи к player.recoil. Залповая почти не толкает: её дело доворот, а не вес. */
+      recoilFactor: 0.6,
     },
   },
 
@@ -598,6 +646,13 @@ export const TUNING = {
   staff: {
     /** Сила расталкивания сотрудников друг от друга. */
     separationForce: 240,
+    /**
+     * Сила, с которой расходятся субъект и сотрудник. До этого штат не
+     * был телом для субъекта вовсе: сквозь сотрудников можно было
+     * ходить пешком, и толпа ничего не стоила. На окне неуязвимости
+     * расталкивания нет — тем перекат и полезен.
+     */
+    playerSeparationForce: 300,
     /** Ближе этого к точке входа штат не появляется. */
     spawnMinDistance: 300,
   },
@@ -1173,11 +1228,41 @@ export const PANEL: TuningGroup[] = [
   {
     title: 'РЫВОК',
     fields: [
+      { path: 'player.dashMode', label: 'СХЕМА: 0 МИГАНИЕ / 1 ПЕРЕКАТ', min: 0, max: 1, step: 1 },
+      { path: 'player.inputBufferMs', label: 'БУФЕР ВВОДА, МС', min: 0, max: 300, step: 10 },
+    ],
+  },
+  {
+    title: 'РЫВОК: СХЕМА 0 МИГАНИЕ',
+    fields: [
       { path: 'player.dashDistance', label: 'ДИСТАНЦИЯ', min: 40, max: 500, step: 5 },
       { path: 'player.dashDuration', label: 'ДЛИТЕЛЬНОСТЬ', min: 0.05, max: 0.6, step: 0.01 },
       { path: 'player.dashCooldown', label: 'ПЕРЕЗАРЯД', min: 0, max: 3, step: 0.05 },
       { path: 'player.dashIFrames', label: 'ОКНО НЕУЯЗВИМОСТИ', min: 0, max: 0.6, step: 0.01 },
       { path: 'player.dashExitFactor', label: 'ВЫНОС НА ВЫХОДЕ', min: 0, max: 1.5, step: 0.05 },
+    ],
+  },
+  {
+    title: 'РЫВОК: СХЕМА 1 ПЕРЕКАТ',
+    fields: [
+      { path: 'player.rollDistance', label: 'ДИСТАНЦИЯ', min: 40, max: 500, step: 5 },
+      { path: 'player.rollDuration', label: 'ДЛИТЕЛЬНОСТЬ', min: 0.06, max: 0.6, step: 0.01 },
+      { path: 'player.rollCooldown', label: 'ПЕРЕЗАРЯД', min: 0, max: 3, step: 0.05 },
+      { path: 'player.rollIFramesStart', label: 'ОКНО: НАЧАЛО', min: 0, max: 0.3, step: 0.01 },
+      { path: 'player.rollIFramesEnd', label: 'ОКНО: КОНЕЦ', min: 0, max: 0.6, step: 0.01 },
+      { path: 'player.rollExitFactor', label: 'ВЫНОС НА ВЫХОДЕ', min: 0, max: 1.5, step: 0.05 },
+      { path: 'player.rollCancelAfter', label: 'ОТМЕНА ВЫСТРЕЛОМ С ДОЛИ', min: 0, max: 1, step: 0.05 },
+      { path: 'player.rollTurnLock', label: 'ЗАЩЁЛКА НАПРАВЛЕНИЯ', min: 0, max: 1, step: 1 },
+    ],
+  },
+  {
+    title: 'РАЗВОРОТ И ТЕЛА',
+    fields: [
+      { path: 'player.turnAngleDeg', label: 'УГОЛ РЕЗКОГО РАЗВОРОТА', min: 60, max: 180, step: 5 },
+      { path: 'player.turnAccelFactor', label: 'РАЗГОН В РАЗВОРОТЕ', min: 0.1, max: 1, step: 0.05 },
+      { path: 'player.turnLockMs', label: 'ДЛИТЕЛЬНОСТЬ ШТРАФА, МС', min: 0, max: 400, step: 10 },
+      { path: 'player.turnMinSpeed', label: 'НИЖЕ ЭТОЙ СКОРОСТИ ШТРАФА НЕТ', min: 0, max: 300, step: 10 },
+      { path: 'staff.playerSeparationForce', label: 'РАСТАЛКИВАНИЕ СУБЪЕКТА', min: 0, max: 900, step: 20 },
     ],
   },
   {

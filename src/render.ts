@@ -13,6 +13,7 @@ import { vacancyCount } from './systems/staff';
 import { pendingItems } from './systems/postAuditor';
 import { stashInReach } from './systems/issue';
 import { counterInReach } from './systems/counter';
+import { dashIFrameWindow, dashSpec } from './systems/playerControl';
 import { COUNTERS_BY_KIND } from './data/counters';
 import { grabCandidate } from './systems/telekinesis';
 import { TILE_DOOR, TILE_GATE, TILE_WALL, TILE_WEAK, type TileMap } from './room';
@@ -428,7 +429,8 @@ function drawPlayer(g: Graphics, w: World, alpha: number): void {
   const cy = y + pose.dy;
 
   if (player.phase === 'dash') {
-    const speed = TUNING.player.dashDistance / TUNING.player.dashDuration;
+    const dash = dashSpec();
+    const speed = dash.duration > 0 ? dash.distance / dash.duration : 0;
     for (let i = 1; i <= TUNING.render.dashTrail; i++) {
       const back = speed * TUNING.render.dashTrailStep * i;
       g.rect(
@@ -454,7 +456,7 @@ function drawPlayer(g: Graphics, w: World, alpha: number): void {
   const blink =
     health !== undefined &&
     health.flash <= 0 &&
-    health.iframes > TUNING.player.dashIFrames &&
+    health.iframes > dashIFrameWindow() &&
     Math.floor(w.tick * STEP * TUNING.feel.blinkRate) % 2 === 0;
   if (!blink) {
     const color = health !== undefined && health.flash > 0 ? PALETTE.concrete100 : PALETTE.red;

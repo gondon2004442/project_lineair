@@ -89,6 +89,55 @@ export function separationSystem(w: World, dt: number): void {
   }
 }
 
+/**
+ * Субъект — тоже тело. До этого штат для него телом не был: сквозь
+ * сотрудников можно было ходить пешком, и толпа ничего не стоила.
+ *
+ * На окне неуязвимости расталкивания нет вовсе — перекат обязан
+ * проходить сквозь наседающих, иначе он наполовину бесполезен. Это же
+ * снимает застревание после полученного урона.
+ */
+export function playerBodySystem(w: World, dt: number): void {
+  // Ноль означает «штат субъекту не тело» — то, как было до этой правки.
+  // Оставлено ручкой в панели: сравнивать надо руками.
+  if (TUNING.staff.playerSeparationForce <= 0) return;
+  const pt = w.transform.get(w.player);
+  const pb = w.body.get(w.player);
+  if (pt === undefined || pb === undefined) return;
+  const ph = w.health.get(w.player);
+  if (ph !== undefined && ph.iframes > 0) return;
+
+  for (const [e] of w.staffC) {
+    const t = w.transform.get(e);
+    const b = w.body.get(e);
+    if (t === undefined || b === undefined) continue;
+    const dx = t.x - pt.x;
+    const dy = t.y - pt.y;
+    const dist = Math.hypot(dx, dy);
+    const minDist = pb.radius + b.radius;
+    if (dist >= minDist || dist === 0) continue;
+
+    const nx = dx / dist;
+    const ny = dy / dist;
+
+    // Субъекта выставляем из тела целиком, а не толкаем силой. Мягкий
+    // толчок здесь не работает: при 300 он двигает на 2.5 px за шаг, а
+    // субъект на полном ходу проходит 4.8 px — и продавливает штат
+    // насквозь, то есть тела как не было, так и нет.
+    const overlap = minDist - dist;
+    pt.x -= nx * overlap;
+    pt.y -= ny * overlap;
+
+    // Сотрудника при этом ещё и отжимает — но силой, а не жёстко:
+    // толпу можно растолкать, идя в неё, и это стоит времени.
+    // Регистратор стоит на месте по своей должности: его не двигаем.
+    if (w.registrarC.has(e)) continue;
+    const push = (1 - dist / minDist) * TUNING.staff.playerSeparationForce * dt;
+    t.x += nx * push;
+    t.y += ny * push;
+  }
+}
+
 /** Плавный подгон скорости к желаемой. Общий для всех должностей. */
 export function approach(current: number, target: number, maxDelta: number): number {
   const diff = target - current;

@@ -10,7 +10,7 @@ import { auditorSystem } from './systems/postAuditor';
 import { chiefSystem } from './systems/postChief';
 import { courierSystem } from './systems/postCourier';
 import { registrarSystem } from './systems/postRegistrar';
-import { metronomeSystem, rosterSystem, separationSystem } from './systems/staff';
+import { metronomeSystem, playerBodySystem, rosterSystem, separationSystem } from './systems/staff';
 import { feedbackSystem, lifecycleSystem, statusSystem } from './systems/lifecycle';
 import { physicsSystem } from './systems/physics';
 import { propPushSystem, propSystem } from './systems/props';
@@ -61,6 +61,7 @@ export function step(w: World): void {
   chiefSystem(w, STEP);
   courierSystem(w, STEP);
   separationSystem(w, STEP);
+  playerBodySystem(w, STEP);
   profiler.end('СИМ: ШТАТ');
 
   profiler.begin('СИМ: ТЕЛЕКИНЕЗ');

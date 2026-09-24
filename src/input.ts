@@ -16,6 +16,19 @@ export interface InputSnapshot {
   grabHeld: boolean;
   /** Рывок запрошен и ещё не израсходован. */
   dashQueued: boolean;
+  /**
+   * Возраст непринятых нажатий в игровом времени. Пока он меньше
+   * player.inputBufferMs, нажатие ждёт своей очереди; дальше сгорает.
+   * Считает симуляция, слушатели только обнуляют при нажатии.
+   */
+  dashAge: number;
+  reloadAge: number;
+  /**
+   * Одиночное нажатие огня. fireHeld отвечает за удержание, а нажатие
+   * короче паузы между выстрелами иначе пропадало бы целиком.
+   */
+  firePressed: boolean;
+  fireAge: number;
   /** На сколько форм провернули колесо и ещё не отработали. */
   formStep: number;
   /** Перезарядка запрошена и ещё не отработана. */
@@ -54,6 +67,10 @@ export function createInput(target: HTMLElement): InputDevice {
     fireHeld: false,
     grabHeld: false,
     dashQueued: false,
+    dashAge: 0,
+    reloadAge: 0,
+    firePressed: false,
+    fireAge: 0,
     formStep: 0,
     reloadQueued: false,
     blankQueued: false,
@@ -101,6 +118,7 @@ export function createInput(target: HTMLElement): InputDevice {
     }
     if (ev.code === 'KeyR') {
       snapshot.reloadQueued = true;
+      snapshot.reloadAge = 0;
       return;
     }
     if (ev.code === 'KeyQ') {
@@ -121,6 +139,7 @@ export function createInput(target: HTMLElement): InputDevice {
     }
     if (ev.code === 'ShiftLeft' || ev.code === 'ShiftRight') {
       snapshot.dashQueued = true;
+      snapshot.dashAge = 0;
       return;
     }
     if (MOVE_KEYS[ev.code] !== undefined) {
@@ -138,8 +157,10 @@ export function createInput(target: HTMLElement): InputDevice {
     held.clear();
     recomputeMove();
     snapshot.fireHeld = false;
+    snapshot.firePressed = false;
     snapshot.grabHeld = false;
     snapshot.formStep = 0;
+    snapshot.dashQueued = false;
     snapshot.reloadQueued = false;
     snapshot.blankQueued = false;
     snapshot.useQueued = false;
@@ -152,7 +173,11 @@ export function createInput(target: HTMLElement): InputDevice {
   });
 
   target.addEventListener('pointerdown', (ev) => {
-    if (ev.button === 0) snapshot.fireHeld = true;
+    if (ev.button === 0) {
+      snapshot.fireHeld = true;
+      snapshot.firePressed = true;
+      snapshot.fireAge = 0;
+    }
     if (ev.button === 2) snapshot.grabHeld = true;
     const p = project(ev.clientX, ev.clientY);
     snapshot.aimX = p.x;

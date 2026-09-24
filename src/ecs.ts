@@ -67,6 +67,8 @@ export interface PlayerC {
   held: Entity;
   dashTime: number;
   dashCooldown: number;
+  /** Пока > 0 — разгон срезан: субъект разворачивается на месте. */
+  turnLock: number;
   dashX: number;
   dashY: number;
 }

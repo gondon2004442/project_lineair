@@ -4,11 +4,76 @@
  * Перезарядка по R или сама, когда патронов на выстрел не хватило.
  */
 import { WEAPON_FORMS } from '../data/weaponForms';
-import type { PlayerC, World } from '../ecs';
+import type { Health, PlayerC, World } from '../ecs';
 import { spawnBullet, type BulletSpec } from '../spawn';
 import { DEG, TUNING } from '../tuning';
 import { ammoMax, formStat } from '../weapon';
 import { addShake } from './damage';
+
+/**
+ * Числа рывка в текущей схеме.
+ *
+ * Схема 0 «МИГАНИЕ» — то, что было: 110 px за 50 мс и окно неуязвимости
+ * в два с половиной раза длиннее самого движения. Платить за такой
+ * рывок нечем, поэтому жать его выгодно всегда.
+ *
+ * Схема 1 «ПЕРЕКАТ» — движение, а не телепорт: окно закрывается на
+ * середине, вторую половину субъект едет уязвимым и ничего не может
+ * сделать, кроме как отменить хвост выстрелом.
+ *
+ * Обе живут одновременно и переключаются на ходу: сравнивать ощущение
+ * надо руками, а не по числам на бумаге.
+ */
+export interface DashSpec {
+  mode: number;
+  distance: number;
+  duration: number;
+  cooldown: number;
+  iframesStart: number;
+  iframesEnd: number;
+  exitFactor: number;
+  turnLock: boolean;
+  cancelAfter: number;
+}
+
+export function dashSpec(): DashSpec {
+  const cfg = TUNING.player;
+  if (Math.round(cfg.dashMode) === 0) {
+    return {
+      mode: 0,
+      distance: cfg.dashDistance,
+      duration: cfg.dashDuration,
+      cooldown: cfg.dashCooldown,
+      iframesStart: 0,
+      iframesEnd: cfg.dashIFrames,
+      exitFactor: cfg.dashExitFactor,
+      turnLock: true,
+      cancelAfter: 0,
+    };
+  }
+  return {
+    mode: 1,
+    distance: cfg.rollDistance,
+    duration: cfg.rollDuration,
+    cooldown: cfg.rollCooldown,
+    iframesStart: cfg.rollIFramesStart,
+    iframesEnd: cfg.rollIFramesEnd,
+    exitFactor: cfg.rollExitFactor,
+    turnLock: cfg.rollTurnLock > 0,
+    cancelAfter: cfg.rollCancelAfter,
+  };
+}
+
+/** Длина окна неуязвимости рывка в текущей схеме. */
+export function dashIFrameWindow(): number {
+  const spec = dashSpec();
+  return Math.max(0, spec.iframesEnd - spec.iframesStart);
+}
+
+/** Сколько игрового времени живёт непринятое нажатие. */
+function bufferTime(): number {
+  return Math.max(0, TUNING.player.inputBufferMs) / 1000;
+}
 
 function approach(current: number, target: number, maxDelta: number): number {
   const diff = target - current;
@@ -53,49 +118,119 @@ export function playerControlSystem(w: World, dt: number): void {
   }
   w.input.formStep = 0;
 
+  const spec = dashSpec();
+  const buffer = bufferTime();
+
+  // Перезарядка из буфера: нажатие не пропадает, если оно пришло на
+  // полной обойме или во время другой перезарядки.
   if (w.input.reloadQueued) {
-    w.input.reloadQueued = false;
-    startReload(w, p);
+    if (startReload(w, p)) {
+      w.input.reloadQueued = false;
+      w.input.reloadAge = 0;
+    } else {
+      w.input.reloadAge += dt;
+      if (w.input.reloadAge > buffer) {
+        w.input.reloadQueued = false;
+        w.input.reloadAge = 0;
+      }
+    }
   }
 
+  // Рывок из буфера: нажатие за десяток миллисекунд до готовности
+  // раньше просто пропадало, и это читалось как «игра не слушается».
   if (w.input.dashQueued) {
-    w.input.dashQueued = false;
     if (p.phase === 'normal' && p.dashCooldown <= 0) {
-      const hasMove = w.input.moveX !== 0 || w.input.moveY !== 0;
-      p.dashX = hasMove ? w.input.moveX : p.aimX;
-      p.dashY = hasMove ? w.input.moveY : p.aimY;
-      p.phase = 'dash';
-      w.sounds.push('dash');
-      p.dashTime = TUNING.player.dashDuration;
-      // Выслуга укорачивает кулдаун рывка: контора доверяет проверенным.
-      const rec = TUNING.record;
-      const cut = Math.min(rec.serviceCooldownCap, w.record.service * rec.serviceCooldownStep);
-      p.dashCooldown = TUNING.player.dashCooldown * (1 - cut);
-      h.iframes = Math.max(h.iframes, TUNING.player.dashIFrames);
+      w.input.dashQueued = false;
+      w.input.dashAge = 0;
+      startDash(w, p, h, spec);
+    } else {
+      w.input.dashAge += dt;
+      if (w.input.dashAge > buffer) {
+        w.input.dashQueued = false;
+        w.input.dashAge = 0;
+      }
     }
   }
 
   if (p.phase === 'dash') {
-    const dashSpeed = TUNING.player.dashDistance / TUNING.player.dashDuration;
+    const elapsed = Math.max(0, spec.duration - p.dashTime);
+
+    // Окно неуязвимости держится ровно между началом и концом. В схеме 0
+    // конец дальше длительности, поэтому ведёт она себя как раньше.
+    if (elapsed >= spec.iframesStart && elapsed < spec.iframesEnd) {
+      h.iframes = Math.max(h.iframes, spec.iframesEnd - elapsed);
+    }
+
+    // Без защёлки перекат слушается ввода и правит направление на ходу.
+    if (!spec.turnLock && (w.input.moveX !== 0 || w.input.moveY !== 0)) {
+      const len = Math.hypot(w.input.moveX, w.input.moveY) || 1;
+      p.dashX = w.input.moveX / len;
+      p.dashY = w.input.moveY / len;
+    }
+
+    const dashSpeed = spec.duration > 0 ? spec.distance / spec.duration : 0;
     b.vx = p.dashX * dashSpeed;
     b.vy = p.dashY * dashSpeed;
     p.dashTime -= dt;
-    if (p.dashTime <= 0) {
-      p.phase = 'normal';
-      b.vx *= TUNING.player.dashExitFactor;
-      b.vy *= TUNING.player.dashExitFactor;
-    }
-    // Во время рывка субъект не стреляет: рывок — это трата хода.
-    return;
+
+    // Отмена хвоста: во второй, уязвимой половине выстрел прерывает
+    // перекат. Это и есть мастерство — выйти раньше, чем кончится
+    // анимация, заплатив за это тем, что вышел на открытом месте.
+    const cancelAt = spec.cancelAfter > 0 ? spec.duration * spec.cancelAfter : Infinity;
+    const wantsFire = w.input.fireHeld || w.input.firePressed;
+    const cancelled = wantsFire && elapsed >= cancelAt;
+
+    if (p.dashTime > 0 && !cancelled) return;
+
+    p.phase = 'normal';
+    p.dashTime = 0;
+    b.vx = p.dashX * dashSpeed * spec.exitFactor;
+    b.vy = p.dashY * dashSpeed * spec.exitFactor;
+    // Обычный выход тратит шаг целиком, отменённый — продолжает его:
+    // ради этого отмену и делали.
+    if (!cancelled) return;
+  }
+
+  // Асимметрия разворота: резкий разворот на месте стоит мгновения,
+  // движение по дуге — ничего. Вес появляется, точность не страдает.
+  p.turnLock = Math.max(0, p.turnLock - dt);
+  const moveLen = Math.hypot(w.input.moveX, w.input.moveY);
+  const speedNow = Math.hypot(b.vx, b.vy);
+  if (moveLen > 0 && speedNow >= TUNING.player.turnMinSpeed) {
+    const cos = (w.input.moveX * b.vx + w.input.moveY * b.vy) / (moveLen * speedNow);
+    const turn = Math.acos(Math.max(-1, Math.min(1, cos))) / DEG;
+    if (turn >= TUNING.player.turnAngleDeg) p.turnLock = TUNING.player.turnLockMs / 1000;
   }
 
   const targetVx = w.input.moveX * TUNING.player.speed;
   const targetVy = w.input.moveY * TUNING.player.speed;
-  const rate = (w.input.moveX === 0 && w.input.moveY === 0 ? TUNING.player.friction : TUNING.player.accel) * dt;
+  const idle = w.input.moveX === 0 && w.input.moveY === 0;
+  const accel = TUNING.player.accel * (p.turnLock > 0 ? TUNING.player.turnAccelFactor : 1);
+  const rate = (idle ? TUNING.player.friction : accel) * dt;
   b.vx = approach(b.vx, targetVx, rate);
   b.vy = approach(b.vy, targetVy, rate);
 
   fireSystem(w, p, t.x, t.y, dt);
+}
+
+/** Начать рывок по числам текущей схемы. */
+function startDash(w: World, p: PlayerC, h: Health, spec: DashSpec): void {
+  const hasMove = w.input.moveX !== 0 || w.input.moveY !== 0;
+  const dx = hasMove ? w.input.moveX : p.aimX;
+  const dy = hasMove ? w.input.moveY : p.aimY;
+  const len = Math.hypot(dx, dy) || 1;
+  p.dashX = dx / len;
+  p.dashY = dy / len;
+  p.phase = 'dash';
+  w.sounds.push('dash');
+  p.dashTime = spec.duration;
+  // Выслуга укорачивает кулдаун рывка: контора доверяет проверенным.
+  const rec = TUNING.record;
+  const cut = Math.min(rec.serviceCooldownCap, w.record.service * rec.serviceCooldownStep);
+  p.dashCooldown = spec.cooldown * (1 - cut);
+  // Окно, открытое с первого кадра, выставляется разом: так вела себя
+  // схема 0, и её поведение трогать нельзя — она эталон для сравнения.
+  if (spec.iframesStart <= 0) h.iframes = Math.max(h.iframes, spec.iframesEnd);
 }
 
 function reloadTick(w: World, p: PlayerC, dt: number): void {
@@ -167,7 +302,21 @@ function fireSystem(w: World, p: PlayerC, x: number, y: number, dt: number): voi
     return;
   }
 
-  if (!w.input.fireHeld || p.fireCooldown > 0) return;
+  // Одиночное нажатие тоже ждёт своей очереди: тап короче паузы между
+  // выстрелами раньше пропадал целиком.
+  const wantsFire = w.input.fireHeld || w.input.firePressed;
+  if (!wantsFire || p.fireCooldown > 0) {
+    if (w.input.firePressed) {
+      w.input.fireAge += dt;
+      if (w.input.fireAge > bufferTime()) {
+        w.input.firePressed = false;
+        w.input.fireAge = 0;
+      }
+    }
+    return;
+  }
+  w.input.firePressed = false;
+  w.input.fireAge = 0;
 
   switch (form.id) {
     case 'precise':
@@ -213,8 +362,12 @@ function muzzleAt(x: number, y: number, dirX: number, dirY: number): [number, nu
 function recoil(w: World, dirX: number, dirY: number, shake: number): void {
   const b = w.body.get(w.player);
   if (b !== undefined) {
-    b.vx -= dirX * TUNING.player.recoil;
-    b.vy -= dirY * TUNING.player.recoil;
+    // Отдача на форму: дробовая толкает втрое, и выстрел назад становится
+    // способом разорвать дистанцию, а не только уроном.
+    const form = WEAPON_FORMS[w.playerC.get(w.player)?.form ?? 0];
+    const kick = TUNING.player.recoil * formStat(w, form?.id ?? 'precise', 'recoilFactor');
+    b.vx -= dirX * kick;
+    b.vy -= dirY * kick;
   }
   addShake(w, shake);
 }
@@ -289,5 +442,7 @@ function launchVolleyShot(w: World, p: PlayerC, x: number, y: number): void {
   };
   const [mx, my] = muzzleAt(x, y, dirX, dirY);
   spawnBullet(w, 'player', spec, mx, my, dirX, dirY);
-  addShake(w, TUNING.feel.shakeShoot);
+  // Залповая тоже отдаёт, хоть и слабее всех: раз отдача стала
+  // позиционным инструментом, форма без неё выпадала бы из правила.
+  recoil(w, dirX, dirY, TUNING.feel.shakeShoot);
 }

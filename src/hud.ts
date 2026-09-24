@@ -15,6 +15,7 @@ import { courierTarget } from './systems/postCourier';
 import { synergyFactor } from './paperwork';
 import { issueOffer, stashInReach } from './systems/issue';
 import { counterInReach, counterOffer } from './systems/counter';
+import { dashIFrameWindow, dashSpec } from './systems/playerControl';
 import { hasRegistrar, vacancyCount } from './systems/staff';
 import type { Profiler } from './profiler';
 import { ammoMax, currentForm, formStat, reserveOf } from './weapon';
@@ -304,18 +305,21 @@ function dashBody(w: World): string {
   const p = w.playerC.get(w.player);
   const h = w.health.get(w.player);
   if (p === undefined || h === undefined) return '';
-  const dur = TUNING.player.dashDuration;
-  const iframes = TUNING.player.dashIFrames;
-  const share = dur <= 0 ? 0 : (iframes / dur) * 100;
+  const spec = dashSpec();
+  const dur = spec.duration;
+  const window = dashIFrameWindow();
+  const share = dur <= 0 ? 0 : (window / dur) * 100;
   const left = Math.max(0, h.iframes);
-  const filled = iframes <= 0 ? 0 : Math.round((left / iframes) * 10);
+  const filled = window <= 0 ? 0 : Math.round((left / window) * 10);
   return [
     '<div class="profile-split"></div>',
     '<div class="subtitle">РЫВОК</div>',
+    row('СХЕМА', spec.mode === 0 ? 'МИГАНИЕ' : 'ПЕРЕКАТ'),
     row('ДЛИТЕЛЬНОСТЬ', `${dur.toFixed(3)} С · ${Math.round(dur / STEP)} ТИКА`),
-    row('НЕУЯЗВИМОСТЬ', `${iframes.toFixed(3)} С · ${Math.round(iframes / STEP)} ТИКОВ`),
+    row('ОКНО', `${spec.iframesStart.toFixed(2)} — ${spec.iframesEnd.toFixed(2)} С`),
+    row('НЕУЯЗВИМОСТЬ', `${window.toFixed(3)} С · ${Math.round(window / STEP)} ТИКОВ`),
     row('ПОКРЫТИЕ РЫВКА', `${Math.round(share)}%`),
-    row('КУЛДАУН', `${TUNING.player.dashCooldown.toFixed(2)} С`),
+    row('КУЛДАУН', `${spec.cooldown.toFixed(2)} С`),
     row('ФАЗА', p.phase === 'dash' ? '<span class="warn">РЫВОК</span>' : 'ОБЫЧНАЯ'),
     row('ОКНО СЕЙЧАС', `${gauge(filled, 10)} ${left.toFixed(3)} С`),
     row('ДО СЛЕДУЮЩЕГО', `${p.dashCooldown.toFixed(2)} С`),
