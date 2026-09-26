@@ -16,7 +16,9 @@ import { counterInReach } from './systems/counter';
 import { dashIFrameWindow, dashSpec } from './systems/playerControl';
 import { COUNTERS_BY_KIND } from './data/counters';
 import { grabCandidate } from './systems/telekinesis';
-import { TILE_DOOR, TILE_GATE, TILE_WALL, TILE_WEAK, type TileMap } from './room';
+import { DIRS, TILE_DOOR, TILE_GATE, TILE_WALL, TILE_WEAK, type TileMap } from './room';
+import { roomNumber } from './floor';
+import { currentRoom } from './world';
 import { ROOM_HEIGHT, ROOM_WIDTH, STEP, TUNING } from './tuning';
 
 export interface Renderer {
@@ -117,6 +119,7 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
       if (w.mapToken !== drawnToken) {
         drawnToken = w.mapToken;
         drawRoom(roomLayer, w.map);
+        drawDoorSigns(roomLayer, w);
       }
       profiler.end('КАДР: ТАЙЛМАП');
 
@@ -409,6 +412,123 @@ function mix(from: number, to: number, t: number): number {
 const WALK_SHIFT = [-1, -0.5, 1, 0.5];
 const WALK_SQUASH = [1, -0.5, 1, -0.5];
 const WALK_LIFT = [0, 1, 0, 1];
+
+/**
+ * Цифры таблички. Шрифта в игре нет и быть не должно: всё рисуется
+ * примитивами, поэтому знак — это сетка 3x5 из залитых квадратов.
+ * Больше знаков, чем нужно номеру помещения, здесь не требуется.
+ */
+const GLYPHS: Record<string, string[]> = {
+  '0': ['111', '101', '101', '101', '111'],
+  '1': ['010', '110', '010', '010', '111'],
+  '2': ['111', '001', '111', '100', '111'],
+  '3': ['111', '001', '111', '001', '111'],
+  '4': ['101', '101', '111', '001', '001'],
+  '5': ['111', '100', '111', '001', '111'],
+  '6': ['111', '100', '111', '101', '111'],
+  '7': ['111', '001', '001', '001', '001'],
+  '8': ['111', '101', '111', '101', '111'],
+  '9': ['111', '101', '111', '001', '111'],
+  '-': ['000', '000', '111', '000', '000'],
+  'Б': ['111', '100', '110', '101', '110'],
+};
+
+/** Ширина набора в пикселях при заданном размере пикселя знака. */
+function signWidth(text: string, digit: number, gap: number): number {
+  if (text.length === 0) return 0;
+  return text.length * 3 * digit + (text.length - 1) * gap;
+}
+
+/** Набрать текст квадратами. Левый верхний угол — в (x, y). */
+function drawGlyphs(g: Graphics, text: string, x: number, y: number, digit: number, gap: number, color: number): void {
+  let cursor = x;
+  for (const ch of text) {
+    const glyph = GLYPHS[ch];
+    if (glyph !== undefined) {
+      for (let row = 0; row < glyph.length; row++) {
+        const line = glyph[row] ?? '';
+        for (let col = 0; col < line.length; col++) {
+          if (line[col] !== '1') continue;
+          g.rect(cursor + col * digit, y + row * digit, digit, digit).fill(color);
+        }
+      }
+    }
+    cursor += 3 * digit + gap;
+  }
+}
+
+/**
+ * Таблички помещений у проёмов. На табличке стоит номер того помещения,
+ * КУДА ведёт проём: изнутри видно вывеску соседнего участка, как в
+ * настоящем коридоре, и этаж перестаёт быть набором одинаковых арен.
+ *
+ * Табличка садится на стену рядом с зевом, а не поперёк него: проём
+ * должен оставаться проёмом.
+ */
+function drawDoorSigns(g: Graphics, w: World): void {
+  const cfg = TUNING.render;
+  const digit = Math.max(0, Math.round(cfg.signDigit));
+  if (digit <= 0) return;
+  const room = currentRoom(w);
+  if (room === undefined) return;
+  const map = w.map;
+  const size = map.size;
+  const gap = Math.max(0, Math.round(cfg.signGap));
+  const pad = Math.max(0, Math.round(cfg.signPad));
+  const inset = Math.max(0, Math.round(cfg.signInset));
+
+  for (const dir of DIRS) {
+    const next = w.floor.rooms[room.neighbors[dir]];
+    if (next === undefined) continue;
+    const text = roomNumber(next);
+
+    // Собираем зев: клетки двери идут подряд вдоль своей стороны.
+    const horizontal = dir === 0 || dir === 2;
+    const line = dir === 0 ? 0 : dir === 2 ? map.rows - 1 : dir === 3 ? 0 : map.cols - 1;
+    let lo = Infinity;
+    let hi = -Infinity;
+    const span = horizontal ? map.cols : map.rows;
+    for (let i = 0; i < span; i++) {
+      const cx = horizontal ? i : line;
+      const cy = horizontal ? line : i;
+      if (map.tiles[cy * map.cols + cx] !== TILE_DOOR) continue;
+      lo = Math.min(lo, i);
+      hi = Math.max(hi, i);
+    }
+    if (hi < 0) continue;
+
+    // Стенная клетка сразу за зевом: сюда и вешаем.
+    const at = hi + 1 < span ? hi + 1 : lo - 1;
+    if (at < 0 || at >= span) continue;
+    const cellX = horizontal ? at : line;
+    const cellY = horizontal ? line : at;
+
+    const textW = signWidth(text, digit, gap);
+    const plateW = textW + pad * 2;
+    const plateH = 5 * digit + pad * 2;
+    // Табличка прижата к той грани стены, что смотрит в помещение.
+    const px = horizontal
+      ? cellX * size + (size - plateW) / 2
+      : dir === 3
+        ? cellX * size + size - plateW - inset
+        : cellX * size + inset;
+    const py = horizontal
+      ? dir === 0
+        ? cellY * size + size - plateH - inset
+        : cellY * size + inset
+      : cellY * size + (size - plateH) / 2;
+
+    // Бумага — единственное светлое в декоре: мелкая, плоская, за
+    // укрытие её никто не примет, зато прочесть можно.
+    g.rect(px, py, plateW, plateH).fill(PALETTE.paper);
+    g.rect(px, py, plateW, plateH).stroke({
+      width: 1,
+      color: PALETTE.concrete900,
+      alignment: 1,
+    });
+    drawGlyphs(g, text, px + pad, py + pad, digit, gap, PALETTE.concrete900);
+  }
+}
 
 /**
  * Субъект. Единственное красное на экране и потому верхний слой:

@@ -76,6 +76,20 @@ export type FloorScheme = 'line' | 'ring' | 'fork';
 
 const SCHEMES: FloorScheme[] = ['line', 'ring', 'fork'];
 
+/**
+ * Номер помещения. Считается от места на сетке этажа, а не от порядка
+ * обхода: соседние по плану помещения получают соседние номера, как в
+ * настоящем здании. Переходы отмечены буквой — это служебные помещения,
+ * и по номеру это видно.
+ *
+ * Контора тридцать лет нумеровала помещения; нумерация — это и есть
+ * первое, чем набор комнат отличается от набора арен.
+ */
+export function roomNumber(room: RoomNode): string {
+  const base = 100 + room.gy * 10 + room.gx + 1;
+  return room.corridor ? `${base}-Б` : String(base);
+}
+
 export function generateFloor(rng: Rng): Floor {
   const scheme = SCHEMES[rng.int(SCHEMES.length)] ?? 'line';
   if (scheme === 'ring') return buildRing(rng);

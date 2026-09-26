@@ -1010,6 +1010,16 @@ export const TUNING = {
     counterWide: 1.5,
     counterTop: 5,
     counterPlateLift: 7,
+    /**
+     * Табличка помещения у проёма. Размер плашки считается от текста, а
+     * не задан: цифра рисуется сеткой 3x5, signDigit — сторона её
+     * пикселя, signGap — просвет между знаками, signPad — поля плашки.
+     * signInset — насколько табличка утоплена в стену от края проёма.
+     */
+    signDigit: 2,
+    signGap: 2,
+    signPad: 3,
+    signInset: 3,
     /** Талон: во сколько раз полоска шире своей высоты, кромка и просечка. */
     ticketWide: 1.7,
     ticketEdge: 1,
@@ -1474,6 +1484,8 @@ export const PANEL: TuningGroup[] = [
   {
     title: 'ВИЗУАЛ',
     fields: [
+      { path: 'render.signDigit', label: 'ТАБЛИЧКА: ПИКСЕЛЬ ЦИФРЫ', min: 0, max: 5, step: 1 },
+      { path: 'render.signInset', label: 'ТАБЛИЧКА: УТОПЛЕНА В СТЕНУ', min: 0, max: 12, step: 1 },
       { path: 'fx.bloomAlpha', label: 'СВЕЧЕНИЕ КРАСНОГО', min: 0, max: 2, step: 0.05 },
       { path: 'fx.bloomBlur', label: 'РАЗМЫТИЕ СВЕЧЕНИЯ', min: 0, max: 40, step: 1 },
       { path: 'fx.aberration', label: 'АБЕРРАЦИЯ ПО КРАЯМ', min: 0, max: 3, step: 0.05 },
