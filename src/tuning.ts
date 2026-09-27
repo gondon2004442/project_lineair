@@ -273,6 +273,8 @@ export const TUNING = {
     miniBossSeedStride: 0x27d4eb2f,
     /** Смещение seed для расстановки мебели участка. */
     propSeedStride: 0xc2b2ae35,
+    /** Свой поток случайности у антуража: он не должен двигать мебель. */
+    decorSeedStride: 0x1b873593,
     /** Смещение seed для выдачи предмета за участок. */
     itemSeedStride: 0x85ebca6b,
     /** Сколько раз пытаться подобрать точку появления, прежде чем взять любую. */
@@ -1011,6 +1013,15 @@ export const TUNING = {
     counterTop: 5,
     counterPlateLift: 7,
     /**
+     * Слой антуража целиком. Ноль гасит его одной крутилкой — чтобы
+     * можно было увидеть, сколько он стоит, и сравнить кадр без него.
+     */
+    decorOn: 1,
+    /** Световое пятно от потолочной панели: плотность заливки. */
+    decorCeilingAlpha: 0.12,
+    /** Какую долю габарита занимает светлая деталь, если она есть. */
+    decorDetailShare: 0.25,
+    /**
      * Табличка помещения у проёма. Размер плашки считается от текста, а
      * не задан: цифра рисуется сеткой 3x5, signDigit — сторона её
      * пикселя, signGap — просвет между знаками, signPad — поля плашки.
@@ -1484,6 +1495,7 @@ export const PANEL: TuningGroup[] = [
   {
     title: 'ВИЗУАЛ',
     fields: [
+      { path: 'render.decorOn', label: 'АНТУРАЖ', min: 0, max: 1, step: 1 },
       { path: 'render.signDigit', label: 'ТАБЛИЧКА: ПИКСЕЛЬ ЦИФРЫ', min: 0, max: 5, step: 1 },
       { path: 'render.signInset', label: 'ТАБЛИЧКА: УТОПЛЕНА В СТЕНУ', min: 0, max: 12, step: 1 },
       { path: 'fx.bloomAlpha', label: 'СВЕЧЕНИЕ КРАСНОГО', min: 0, max: 2, step: 0.05 },

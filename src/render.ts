@@ -19,6 +19,8 @@ import { grabCandidate } from './systems/telekinesis';
 import { DIRS, TILE_DOOR, TILE_GATE, TILE_WALL, TILE_WEAK, type TileMap } from './room';
 import { roomNumber } from './floor';
 import { currentRoom } from './world';
+import { DECOR_BY_ID } from './data/decor';
+import { TEMPLATES_BY_ID } from './data/roomTemplates';
 import { ROOM_HEIGHT, ROOM_WIDTH, STEP, TUNING } from './tuning';
 
 export interface Renderer {
@@ -48,6 +50,7 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
   const root = new Container();
   const shakeLayer = new Container();
   const roomLayer = new Graphics();
+  const decorLayer = new Graphics();
   const dustLayer = new Graphics();
   const smokeLayer = new Graphics();
   const entityLayer = new Graphics();
@@ -65,7 +68,9 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
   // Свечение идёт ПОД сущностями. Сверху оно складывалось с телами и
   // красило их в бордовый: сотрудник переставал быть бетонным, а красный
   // переставал принадлежать субъекту. Снизу ореол остаётся ореолом.
-  shakeLayer.addChild(roomLayer, dustLayer, smokeLayer, glowLayer, entityLayer, debugLayer);
+  // Антураж идёт сразу за помещением и до всего живого: он часть места,
+  // а не участник сцены. Отдельным слоем — чтобы гаситься одной ручкой.
+  shakeLayer.addChild(roomLayer, decorLayer, dustLayer, smokeLayer, glowLayer, entityLayer, debugLayer);
   root.addChild(shakeLayer);
   app.stage.addChild(root);
 
@@ -120,7 +125,10 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
         drawnToken = w.mapToken;
         drawRoom(roomLayer, w.map);
         drawDoorSigns(roomLayer, w);
+        drawDecor(decorLayer, w);
       }
+      // Ручка гасит слой целиком и не требует перерисовки: он запечён.
+      decorLayer.visible = TUNING.render.decorOn > 0;
       profiler.end('КАДР: ТАЙЛМАП');
 
       const frame = app.ticker.deltaMS / 1000;
@@ -412,6 +420,71 @@ function mix(from: number, to: number, t: number): number {
 const WALK_SHIFT = [-1, -0.5, 1, 0.5];
 const WALK_SQUASH = [1, -0.5, 1, -0.5];
 const WALK_LIFT = [0, 1, 0, 1];
+
+/**
+ * АНТУРАЖ. Один проход по слотам шаблона, ничего в мире не создаётся.
+ *
+ * Слой запекается один раз на вход в помещение, вместе с тайлмапом:
+ * антураж не двигается, и пересчитывать его каждый кадр незачем.
+ * Случайность своя, отдельным потоком от мебели, — иначе добавление
+ * декора сдвинуло бы расстановку укрытий на том же seed.
+ */
+function drawDecor(g: Graphics, w: World): void {
+  g.clear();
+  const room = currentRoom(w);
+  if (room === undefined) return;
+  const template = TEMPLATES_BY_ID.get(room.template);
+  if (template === undefined) return;
+  const slots = template.decor;
+  if (slots === undefined || slots.length === 0) return;
+
+  const map = w.map;
+  const size = map.size;
+  const wall = TUNING.room.wall;
+  const rng = makeRng((w.seed + room.index * TUNING.floor.decorSeedStride) >>> 0);
+
+  for (const slot of slots) {
+    const spec = DECOR_BY_ID.get(slot.kind);
+    if (spec === undefined) continue;
+    const count = Math.max(1, Math.round(slot.repeat?.count ?? 1));
+    const stepCol = slot.repeat?.stepCol ?? 0;
+    const stepRow = slot.repeat?.stepRow ?? 0;
+
+    for (let i = 0; i < count; i++) {
+      // Бросок делается всегда, даже когда слот пропускается: иначе
+      // поток случайности зависел бы от содержимого каталога.
+      const roll = rng.float();
+      const jx = slot.jitter > 0 ? rng.range(-slot.jitter, slot.jitter) : 0;
+      const jy = slot.jitter > 0 ? rng.range(-slot.jitter, slot.jitter) : 0;
+      if (slot.chance !== undefined && roll >= slot.chance) continue;
+
+      const col = slot.col + stepCol * i + jx;
+      const row = slot.row + stepRow * i + jy;
+      const [cw, ch] = spec.size;
+      let x = (wall + col) * size;
+      let y = (wall + row) * size;
+      let width = cw * size;
+      let height = ch * size;
+
+      // Настенное прижимается к своей стене, а не висит в воздухе.
+      if (spec.mount === 'wall' && slot.facing !== undefined) {
+        if (slot.facing === 'n') y = wall * size;
+        if (slot.facing === 's') y = (wall + TUNING.room.rows) * size - height;
+        if (slot.facing === 'w') x = wall * size;
+        if (slot.facing === 'e') x = (wall + TUNING.room.cols) * size - width;
+      }
+
+      // Потолочное — это световое пятно на полу, а не предмет.
+      const alpha = spec.mount === 'ceiling' ? TUNING.render.decorCeilingAlpha : 1;
+      g.rect(x, y, width, height).fill({ color: PALETTE[spec.color], alpha });
+
+      if (spec.detail === undefined) continue;
+      const share = Math.max(0, Math.min(1, spec.detailShare ?? TUNING.render.decorDetailShare));
+      const dh = Math.max(1, height * share);
+      g.rect(x, y, width, dh).fill(PALETTE[spec.detail]);
+    }
+  }
+}
 
 /**
  * Цифры таблички. Шрифта в игре нет и быть не должно: всё рисуется

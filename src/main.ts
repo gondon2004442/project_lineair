@@ -20,6 +20,8 @@ import { spawnStaff } from './spawn';
 import { statAt } from './weapon';
 import { counterInReach, counterOffer } from './systems/counter';
 import { issueOffer } from './systems/issue';
+import { DECOR, DECOR_BY_ID, DECOR_TOO_LIGHT } from './data/decor';
+import { TEMPLATES_BY_ID } from './data/roomTemplates';
 import { createWorld, enterLobby, enterRoom } from './world';
 
 /** Приоритеты тикера Pixi: наш проход до отрисовки и замер сразу после неё. */
@@ -120,6 +122,12 @@ async function boot(): Promise<void> {
       makeRng,
       items: ITEMS,
       directives: DIRECTIVES,
+      // Антураж и шаблоны нужны стенду: иначе слой декора нечем
+      // нагрузить и правило светлоты нечем проверить.
+      decor: DECOR,
+      decorById: DECOR_BY_ID,
+      decorTooLight: DECOR_TOO_LIGHT,
+      templates: TEMPLATES_BY_ID,
       tuning: TUNING,
     },
   });
