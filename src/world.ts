@@ -512,11 +512,20 @@ function scatterProps(w: World, room: RoomNode, entryX: number, entryY: number):
   const template = TEMPLATES_BY_ID.get(room.template);
   if (template !== undefined && template.cover.length > 0) {
     for (const slot of template.cover) {
-      if (slot.chance !== undefined && rng.float() >= slot.chance) continue;
-      const radius = propNumbers(slot.kind).radius;
-      const spot = coverSpot(w.map, rng, slot, radius, entryX, entryY);
-      if (spot === null) continue;
-      spawnProp(w, slot.kind, spot.x, spot.y);
+      const count = Math.max(1, Math.round(slot.repeat?.count ?? 1));
+      const stepCol = slot.repeat?.stepCol ?? 0;
+      const stepRow = slot.repeat?.stepRow ?? 0;
+      for (let i = 0; i < count; i++) {
+        // Бросок делается всегда, даже когда слот пропускается: поток
+        // случайности не должен зависеть от того, занят слот или нет.
+        const roll = rng.float();
+        if (slot.chance !== undefined && roll >= slot.chance) continue;
+        const radius = propNumbers(slot.kind).radius;
+        const at = { ...slot, col: slot.col + stepCol * i, row: slot.row + stepRow * i };
+        const spot = coverSpot(w.map, rng, at, radius, entryX, entryY);
+        if (spot === null) continue;
+        spawnProp(w, slot.kind, spot.x, spot.y);
+      }
     }
     return;
   }

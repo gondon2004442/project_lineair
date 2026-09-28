@@ -92,6 +92,16 @@ export const DECOR: DecorSpec[] = [
     detailShare: 0.7,
   },
   {
+    /** Портрет во всю стену: он один такой и висит только в приёмной. */
+    id: 'portrait-big',
+    title: 'ПОРТРЕТ ВО ВСЮ СТЕНУ',
+    mount: 'wall',
+    size: [6, 0.95],
+    color: 'woodDark',
+    detail: 'concrete900',
+    detailShare: 0.8,
+  },
+  {
     id: 'evac',
     title: 'СХЕМА ЭВАКУАЦИИ',
     mount: 'wall',
