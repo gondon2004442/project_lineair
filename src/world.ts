@@ -21,11 +21,13 @@ import { TEMPLATES_BY_ID, type CoverSlot } from './data/roomTemplates';
 import { WEAPON_FORMS } from './data/weaponForms';
 import { ammoMax, reserveMax } from './weapon';
 import { COUNTERS, type CounterSpec } from './data/counters';
+import { FIXTURES_BY_ID } from './data/fixtures';
 import {
   postNumbers,
   propNumbers,
   spawnClerk,
   spawnCounter,
+  spawnFixture,
   spawnPlayer,
   spawnProp,
   spawnStaff,
@@ -93,6 +95,7 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     ticketC: new Map(),
     counterC: new Map(),
     clerkC: new Map(),
+    fixtureC: new Map(),
     bulletC: new Map(),
     drawC: new Map(),
   };
@@ -229,6 +232,7 @@ export function enterRoom(w: World, index: number, fromDir: Dir | null): void {
   scatterProps(w, room, spot.x, spot.y);
   placeStash(w, room, spot.x, spot.y);
   placeCounter(w, room, spot.x, spot.y);
+  placeFixtures(w, room, spot.x, spot.y);
   if (!room.cleared) staffRoom(w, room, spot.x, spot.y);
   if (w.staffC.size === 0 && !room.cleared) {
     room.cleared = true;
@@ -314,6 +318,42 @@ function placeStash(w: World, room: RoomNode, entryX: number, entryY: number): v
 
   // Кладовщик стоит позади ряда: к столу подходят, а не натыкаются.
   spawnClerk(w, centre.x, centre.y - TUNING.clerk.standBack);
+}
+
+/**
+ * Оборудование участка. Слоты берутся из шаблона, разброс — свой поток
+ * случайности: добавление кулера не должно сдвигать мебель на том же
+ * seed. Клетка под стеной пропускается: оборудование стоит в помещении.
+ */
+function placeFixtures(w: World, room: RoomNode, entryX: number, entryY: number): void {
+  const template = TEMPLATES_BY_ID.get(room.template);
+  const slots = template?.fixtures;
+  if (slots === undefined || slots.length === 0) return;
+  const cfg = TUNING.fixture;
+  const rng = makeRng((w.seed + room.index * cfg.seedStride) >>> 0);
+
+  for (const slot of slots) {
+    const count = Math.max(1, Math.round(slot.repeat?.count ?? 1));
+    for (let i = 0; i < count; i++) {
+      // Бросок делается всегда: поток не должен зависеть от того,
+      // занят слот или пропущен.
+      const roll = rng.float();
+      const jx = slot.jitter > 0 ? rng.range(-slot.jitter, slot.jitter) : 0;
+      const jy = slot.jitter > 0 ? rng.range(-slot.jitter, slot.jitter) : 0;
+      if (slot.chance !== undefined && roll >= slot.chance) continue;
+      const spec = FIXTURES_BY_ID.get(slot.kind);
+      if (spec === undefined) continue;
+
+      const col = slot.col + (slot.repeat?.stepCol ?? 0) * i + jx;
+      const row = slot.row + (slot.repeat?.stepRow ?? 0) * i + jy;
+      const x = (TUNING.room.wall + col + 0.5) * TUNING.room.tile;
+      const y = (TUNING.room.wall + row + 0.5) * TUNING.room.tile;
+      if (!bodyFits(w.map, x, y, spec.radius)) continue;
+      // Вплотную к входу не ставим: шагнул в участок и сразу уронил.
+      if (Math.hypot(x - entryX, y - entryY) < cfg.clearance) continue;
+      spawnFixture(w, spec, x, y);
+    }
+  }
 }
 
 /**
@@ -570,6 +610,7 @@ function clearExceptPlayer(w: World): void {
     w.ticketC.delete(e);
     w.counterC.delete(e);
     w.clerkC.delete(e);
+    w.fixtureC.delete(e);
     w.bulletC.delete(e);
     w.drawC.delete(e);
   }

@@ -20,6 +20,7 @@ import { DIRS, TILE_DOOR, TILE_GATE, TILE_WALL, TILE_WEAK, type TileMap } from '
 import { roomNumber } from './floor';
 import { currentRoom } from './world';
 import { DECOR_BY_ID } from './data/decor';
+import { FIXTURES_BY_ID } from './data/fixtures';
 import { TEMPLATES_BY_ID } from './data/roomTemplates';
 import { ROOM_HEIGHT, ROOM_WIDTH, STEP, TUNING } from './tuning';
 
@@ -519,6 +520,73 @@ function drawDecor(g: Graphics, w: World): void {
       g.rect(x + width * inset, y + height * inset, dw, dh).fill(PALETTE[spec.detail]);
     }
   }
+}
+
+/**
+ * Оборудование. Стоящее рисуется как мебель — иначе непонятно, почему
+ * оно не пускает. Опрокинутое ложится ниже и шире, а под ним остаётся
+ * пятно: лужа от кулера, земля из кадки, плащ с вешалки.
+ *
+ * Пятно ложится по правилу декора — темнее мебели, — поэтому лежащее
+ * уже не читается как укрытие, и это правда: через него ходят.
+ */
+function drawFixture(
+  g: Graphics,
+  e: number,
+  fixture: { kind: string; toppled: boolean; spillX: number; spillY: number },
+  draw: { size: number; color: number },
+  x: number,
+  y: number,
+): void {
+  const spec = FIXTURES_BY_ID.get(fixture.kind);
+  const cfg = TUNING.fixture;
+  const half = draw.size;
+
+  if (!fixture.toppled) {
+    contactShadow(g, x, y, half, 1);
+    block(g, x - half, y - half, half * 2, half * 2, draw.color);
+    if (spec?.detail !== undefined) {
+      const mark = half * TUNING.render.decorDetailShare * 2;
+      g.rect(x - half + mark / 2, y - half + mark / 2, half * 2 - mark, mark).fill(
+        PALETTE[spec.detail as keyof typeof PALETTE],
+      );
+    }
+    return;
+  }
+
+  // Пятно: вытянуто по ходу удара, поэтому видно, откуда прилетело.
+  if (spec !== undefined) {
+    const spread = half * spec.spillSpread;
+    const along = spread * cfg.spillStretch;
+    const cx = x + fixture.spillX * spread * 0.4;
+    const cy = y + fixture.spillY * spread * 0.4;
+    const wide = Math.abs(fixture.spillX) >= Math.abs(fixture.spillY);
+    g.ellipse(cx, cy, wide ? along : spread, wide ? spread : along).fill({
+      color: PALETTE[spec.spill as keyof typeof PALETTE],
+      alpha: cfg.spillAlpha,
+    });
+
+    if (spec.spillDetail !== undefined) {
+      // Отметины считаются от номера сущности: они не должны дрожать
+      // от кадра к кадру и не должны трогать поток симуляции.
+      const marks = Math.max(0, Math.round(cfg.spillMarks));
+      const size = cfg.spillMarkSize;
+      for (let i = 0; i < marks; i++) {
+        const seed = Math.sin((e * 7 + i * 31) * 12.9898) * 43758.5453;
+        const a = (seed - Math.floor(seed)) * Math.PI * 2;
+        const r = ((Math.sin((e * 13 + i * 17) * 78.233) + 1) / 2) * spread;
+        g.rect(cx + Math.cos(a) * r - size / 2, cy + Math.sin(a) * r - size / 2, size, size).fill({
+          color: PALETTE[spec.spillDetail as keyof typeof PALETTE],
+          alpha: cfg.spillMarkAlpha,
+        });
+      }
+    }
+  }
+
+  // Само лежащее: ниже и шире, чем было.
+  const lw = half * cfg.lyingWide;
+  const lh = half * cfg.lyingFlat;
+  block(g, x - lw, y - lh, lw * 2, lh * 2, draw.color);
 }
 
 /**
@@ -1024,6 +1092,13 @@ function drawEntities(g: Graphics, w: World, alpha: number): void {
     const stash = w.stashC.get(e);
     if (stash !== undefined) {
       drawStash(g, x, y, draw.size, stash.kind, stash.opened, e === reachStash);
+      continue;
+    }
+
+    // Оборудование: стоящее видно как мебель, лежащее — как след.
+    const fixture = w.fixtureC.get(e);
+    if (fixture !== undefined) {
+      drawFixture(g, e, fixture, draw, x, y);
       continue;
     }
 

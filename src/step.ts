@@ -16,6 +16,7 @@ import { physicsSystem } from './systems/physics';
 import { propPushSystem, propSystem } from './systems/props';
 import { telekinesisSystem } from './systems/telekinesis';
 import { ticketSystem } from './systems/tickets';
+import { fixtureSystem } from './systems/fixtures';
 import { lobbySystem } from './systems/lobby';
 import { roomSystem } from './systems/rooms';
 import { playerControlSystem } from './systems/playerControl';
@@ -74,6 +75,9 @@ export function step(w: World): void {
   // Талоны считаются до физики: она же и развозит их по полу.
   ticketSystem(w, STEP);
   physicsSystem(w, STEP);
+  // Оборудование разбирается ПОСЛЕ физики: она уже поставила субъекта
+  // туда, куда он дошёл, и только теперь видно, во что он влетел.
+  fixtureSystem(w);
   profiler.end('СИМ: ФИЗИКА');
 
   profiler.begin('СИМ: ПУЛИ');

@@ -255,6 +255,20 @@ export interface CounterC {
   used: boolean;
 }
 
+/**
+ * Оборудование: кулер, фикус, вешалка. Стоит и не пускает, пока в него
+ * не влетели; после этого лежит и оставляет за собой след.
+ */
+export interface FixtureC {
+  kind: string;
+  title: string;
+  /** Опрокинуто. Обратно не встаёт: убирать некому. */
+  toppled: boolean;
+  /** Куда разлилось: единичный вектор от точки удара. */
+  spillX: number;
+  spillY: number;
+}
+
 /** Талон на полу: служебная мелочь, оставшаяся от ставки. */
 export interface TicketC {
   /** Сколько талонов засчитает этот листок. */
@@ -395,6 +409,7 @@ export interface World {
   ticketC: Map<Entity, TicketC>;
   counterC: Map<Entity, CounterC>;
   clerkC: Map<Entity, ClerkC>;
+  fixtureC: Map<Entity, FixtureC>;
   bulletC: Map<Entity, BulletC>;
   drawC: Map<Entity, DrawC>;
 }
@@ -431,6 +446,7 @@ export function flushDoomed(w: World): void {
     w.ticketC.delete(e);
     w.counterC.delete(e);
     w.clerkC.delete(e);
+    w.fixtureC.delete(e);
     w.bulletC.delete(e);
     w.drawC.delete(e);
   }

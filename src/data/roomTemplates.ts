@@ -72,6 +72,11 @@ export interface RoomTemplate {
    * Необязательное поле: шаблон без антуража остаётся валидным.
    */
   decor?: DecorSlot[];
+  /**
+   * Оборудование: кулер, фикус, вешалка. Стоит, не пускает и роняется.
+   * Слоты те же, что у антуража, но это уже сущности.
+   */
+  fixtures?: DecorSlot[];
   /** Сцена: три-четыре предмета в осмысленном расположении. */
   scene?: string;
   rows: string[];
@@ -90,6 +95,11 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
     cover: [{ kind: 'chair', col: 8, row: 5, jitter: 2 }, { kind: 'chair', col: 23, row: 12, jitter: 2 },
       { kind: 'cabinet', col: 6, row: 9, jitter: 1 }, { kind: 'cabinet', col: 25, row: 8, jitter: 1 },
       { kind: 'chair', col: 16, row: 3, jitter: 3, chance: 0.6 }],
+    fixtures: [
+      { kind: 'cooler', col: 3, row: 6, jitter: 1 },
+      { kind: 'bin', col: 28, row: 10, jitter: 1 },
+      { kind: 'ficus', col: 15, row: 16, jitter: 1, chance: 0.7 },
+    ],
     decor: [
       { kind: 'path', col: 2, row: 8, jitter: 0, repeat: { count: 7, stepCol: 4, stepRow: 0 } },
       { kind: 'lamp', col: 5, row: 3, jitter: 0, repeat: { count: 4, stepCol: 7, stepRow: 0 } },
@@ -134,6 +144,11 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
     cover: [{ kind: 'cabinet', col: 9, row: 9, jitter: 1 }, { kind: 'cabinet', col: 22, row: 9, jitter: 1 },
       { kind: 'chair', col: 16, row: 4, jitter: 2 }, { kind: 'chair', col: 16, row: 13, jitter: 2 },
       { kind: 'chair', col: 4, row: 9, jitter: 1, chance: 0.5 }],
+    fixtures: [
+      { kind: 'trolley', col: 8, row: 8, jitter: 2 },
+      { kind: 'bin', col: 24, row: 4, jitter: 1 },
+      { kind: 'cooler', col: 3, row: 13, jitter: 1, chance: 0.6 },
+    ],
     decor: [
       { kind: 'path', col: 2, row: 8, jitter: 0, repeat: { count: 7, stepCol: 4, stepRow: 0 } },
       { kind: 'lamp', col: 4, row: 2, jitter: 0, repeat: { count: 4, stepCol: 7, stepRow: 0 } },
@@ -175,6 +190,11 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
     staffing: ['patrol'],
     cover: [{ kind: 'cabinet', col: 16, row: 8, jitter: 1 }, { kind: 'chair', col: 8, row: 17, jitter: 2 },
       { kind: 'chair', col: 24, row: 17, jitter: 2, chance: 0.7 }],
+    fixtures: [
+      { kind: 'ashtray', col: 9, row: 7, jitter: 1 },
+      { kind: 'bin', col: 22, row: 9, jitter: 1 },
+      { kind: 'rack', col: 15, row: 8, jitter: 1, chance: 0.5 },
+    ],
     decor: [
       { kind: 'path', col: 1, row: 8, jitter: 0, repeat: { count: 8, stepCol: 4, stepRow: 0 } },
       { kind: 'lamp', col: 3, row: 7, jitter: 0, repeat: { count: 5, stepCol: 6, stepRow: 0 } },
@@ -218,6 +238,11 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
     cover: [{ kind: 'chair', col: 16, row: 8, jitter: 3 }, { kind: 'cabinet', col: 8, row: 8, jitter: 2 },
       { kind: 'cabinet', col: 23, row: 8, jitter: 2 }, { kind: 'chair', col: 16, row: 16, jitter: 2 },
       { kind: 'chair', col: 16, row: 0, jitter: 2, chance: 0.6 }],
+    fixtures: [
+      { kind: 'ficus', col: 6, row: 5, jitter: 1 },
+      { kind: 'ficus', col: 25, row: 12, jitter: 1 },
+      { kind: 'cooler', col: 16, row: 3, jitter: 1, chance: 0.7 },
+    ],
     decor: [
       { kind: 'path', col: 2, row: 8, jitter: 0, repeat: { count: 7, stepCol: 4, stepRow: 0 } },
       { kind: 'path', col: 14, row: 2, jitter: 0, repeat: { count: 5, stepCol: 0, stepRow: 3 } },
@@ -260,6 +285,10 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
     staffing: ['head_office'],
     cover: [{ kind: 'cabinet', col: 3, row: 9, jitter: 1 }, { kind: 'cabinet', col: 28, row: 9, jitter: 1 },
       { kind: 'chair', col: 16, row: 5, jitter: 2 }, { kind: 'chair', col: 16, row: 12, jitter: 2 }],
+    fixtures: [
+      { kind: 'rack', col: 3, row: 3, jitter: 0 },
+      { kind: 'ficus', col: 28, row: 14, jitter: 0 },
+    ],
     decor: [
       { kind: 'path', col: 2, row: 8, jitter: 0, repeat: { count: 7, stepCol: 4, stepRow: 0 } },
       { kind: 'lamp', col: 4, row: 7, jitter: 0, repeat: { count: 4, stepCol: 7, stepRow: 0 } },
@@ -309,6 +338,12 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
     ],
     // Перегородки ломают линию взгляда, но не останавливают пули:
     // Инспектор здесь почти беспомощен, Регистратор накрывает поверх.
+    fixtures: [
+      { kind: 'cooler', col: 16, row: 8, jitter: 1 },
+      { kind: 'bin', col: 6, row: 10, jitter: 2 },
+      { kind: 'trolley', col: 22, row: 8, jitter: 1 },
+      { kind: 'ashtray', col: 29, row: 15, jitter: 1, chance: 0.6 },
+    ],
     decor: [
       { kind: 'path', col: 2, row: 8, jitter: 0, repeat: { count: 7, stepCol: 4, stepRow: 0 } },
       { kind: 'lamp', col: 4, row: 3, jitter: 0, repeat: { count: 4, stepCol: 7, stepRow: 0 } },
@@ -361,6 +396,11 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
     ],
     // Кабинет из стекла: видно всё, и тебя тоже. Стены простреливаются
     // и бьются, поэтому укрытие здесь расходуется прямо по ходу боя.
+    fixtures: [
+      { kind: 'rack', col: 4, row: 4, jitter: 1 },
+      { kind: 'cooler', col: 27, row: 11, jitter: 1 },
+      { kind: 'ficus', col: 16, row: 14, jitter: 1, chance: 0.7 },
+    ],
     decor: [
       { kind: 'path', col: 2, row: 8, jitter: 0, repeat: { count: 7, stepCol: 4, stepRow: 0 } },
       { kind: 'lamp', col: 5, row: 4, jitter: 0, repeat: { count: 3, stepCol: 9, stepRow: 0 } },

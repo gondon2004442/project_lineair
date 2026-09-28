@@ -8,6 +8,7 @@ import { cellCenter, damageWall, tileAtPoint, TILE_WEAK } from '../room';
 import { spawnProp } from '../spawn';
 import { TUNING } from '../tuning';
 import { applyDamage } from './damage';
+import { toppleAt } from './fixtures';
 
 export function propSystem(w: World, dt: number): void {
   const cfg = TUNING.prop;
@@ -59,6 +60,10 @@ function strike(
   const health = w.health.get(e);
   if (prop === undefined || health === undefined) return;
   const damage = (TUNING.prop.impulseDamage * mass * speed) / 1000;
+
+  // Оборудование сносит всё летящее, не разбираясь: кулер не держит
+  // удар шкафа. Урона от этого нет — только беспорядок.
+  toppleAt(w, x, y, radius);
 
   for (const [target] of w.staffC) {
     if (target === prop.lastHit) continue;
