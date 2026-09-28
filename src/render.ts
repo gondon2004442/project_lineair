@@ -819,7 +819,7 @@ function drawPlayer(g: Graphics, w: World, alpha: number): void {
   const cy = y + pose.dy;
 
   if (player.phase === 'dash') {
-    const dash = dashSpec();
+    const dash = dashSpec(w);
     const speed = dash.duration > 0 ? dash.distance / dash.duration : 0;
     for (let i = 1; i <= TUNING.render.dashTrail; i++) {
       const back = speed * TUNING.render.dashTrailStep * i;
@@ -846,7 +846,7 @@ function drawPlayer(g: Graphics, w: World, alpha: number): void {
   const blink =
     health !== undefined &&
     health.flash <= 0 &&
-    health.iframes > dashIFrameWindow() &&
+    health.iframes > dashIFrameWindow(w) &&
     Math.floor(w.tick * STEP * TUNING.feel.blinkRate) % 2 === 0;
   if (!blink) {
     const color = health !== undefined && health.flash > 0 ? PALETTE.concrete100 : PALETTE.red;

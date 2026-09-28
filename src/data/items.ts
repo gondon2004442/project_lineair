@@ -15,8 +15,23 @@ export interface ItemMod {
   mul?: number;
 }
 
+/**
+ * Вид предмета. Различие не косметическое: приложение правит орудие,
+ * инструкция правит самого субъекта и порядки конторы.
+ *
+ *   'attachment'  — ПРИЛОЖЕНИЕ: пассивная правка орудия, пути weapon.*
+ *   'instruction' — ИНСТРУКЦИЯ: пассивная правка субъекта, пути
+ *                   player.*, record.*, ticket.*, telekinesis.*, clerk.*
+ *
+ * Механики у них общие: и то и другое — набор правок к tuning-путям.
+ * Разными их делает то, куда эти правки попадают, и то, как предмет
+ * читается: приложение выдают к орудию, инструкцию — субъекту.
+ */
+export type ItemKind = 'attachment' | 'instruction';
+
 export interface Item {
   id: string;
+  kind: ItemKind;
   /** Инвентарный номер. По нему предмет опознают в оверлее. */
   code: string;
   title: string;
@@ -28,6 +43,7 @@ export interface Item {
 export const ITEMS: Item[] = [
   {
     id: 'clip',
+    kind: 'attachment',
     code: 'ОБ-114',
     title: 'СКОБА КАНЦЕЛЯРСКАЯ',
     report: [
@@ -44,6 +60,7 @@ export const ITEMS: Item[] = [
   },
   {
     id: 'tape',
+    kind: 'attachment',
     code: 'ОБ-207',
     title: 'ЛЕНТА МЕРНАЯ',
     report: [
@@ -60,6 +77,7 @@ export const ITEMS: Item[] = [
   },
   {
     id: 'press',
+    kind: 'attachment',
     code: 'ОБ-301',
     title: 'ПРЕСС ДЛЯ ПОДШИВКИ',
     report: [
@@ -76,6 +94,7 @@ export const ITEMS: Item[] = [
   },
   {
     id: 'stamp',
+    kind: 'attachment',
     code: 'ОБ-355',
     title: 'ШТЕМПЕЛЬ СКВОЗНОЙ',
     report: [
@@ -93,6 +112,7 @@ export const ITEMS: Item[] = [
   },
   {
     id: 'index',
+    kind: 'attachment',
     code: 'ОБ-402',
     title: 'КАРТОТЕЧНЫЙ ИНДЕКС',
     report: [
@@ -110,6 +130,7 @@ export const ITEMS: Item[] = [
   },
   {
     id: 'regulation',
+    kind: 'attachment',
     code: 'ОБ-448',
     title: 'РЕГЛАМЕНТ СОКРАЩЁННЫЙ',
     report: [
@@ -133,6 +154,7 @@ export const ITEMS: Item[] = [
   },
   {
     id: 'facsimile',
+    kind: 'attachment',
     code: 'ОБ-519',
     title: 'ПОДПИСЬ ФАКСИМИЛЬНАЯ',
     report: [
@@ -156,6 +178,7 @@ export const ITEMS: Item[] = [
   },
   {
     id: 'writeoff',
+    kind: 'attachment',
     code: 'ОБ-673',
     title: 'АКТ О СПИСАНИИ',
     report: [
@@ -180,6 +203,7 @@ export const ITEMS: Item[] = [
   },
   {
     id: 'carbon',
+    kind: 'attachment',
     code: 'ОБ-720',
     title: 'КОПИРКА ОБОРОТНАЯ',
     report: [
@@ -196,6 +220,7 @@ export const ITEMS: Item[] = [
   },
   {
     id: 'seal',
+    kind: 'attachment',
     code: 'ОБ-808',
     title: 'ПЕЧАТЬ ГЕРБОВАЯ',
     report: [
@@ -208,6 +233,142 @@ export const ITEMS: Item[] = [
     mods: [
       { path: 'weapon.scatter.spreadDeg', mul: 0.6 },
       { path: 'weapon.scatter.speed', mul: 1.2 },
+    ],
+  },
+  // --- ИНСТРУКЦИИ. Правят не орудие, а субъекта и порядки конторы.
+  {
+    id: 'movement',
+    kind: 'instruction',
+    code: 'ИН-402',
+    title: 'ИНСТРУКЦИЯ О ПЕРЕДВИЖЕНИИ ПО СЛУЖЕБНЫМ ПОМЕЩЕНИЯМ',
+    report: [
+      'ОСНОВАНИЕ: стенд у лестницы, лист под стеклом, стекло треснуто.',
+      'ОПИСАНИЕ: предписан шаг твёрдый и ровный, повороты — по разметке,',
+      'на поворотах не ускоряться.',
+      'ЗАКЛЮЧЕНИЕ: субъект идёт быстрее, разворот даётся тяжелее.',
+      'Ознакомлен под роспись.',
+    ],
+    mods: [
+      { path: 'player.speed', mul: 1.12 },
+      { path: 'player.turnLockMs', mul: 1.6 },
+    ],
+  },
+  {
+    id: 'evacuation',
+    kind: 'instruction',
+    code: 'ИН-118',
+    title: 'РЕГЛАМЕНТ ЭВАКУАЦИИ',
+    report: [
+      'ОСНОВАНИЕ: схема эвакуации, оборот листа, текст мелкий.',
+      'ОПИСАНИЕ: покидать помещение одним движением, не оглядываясь,',
+      'пункт о времени пребывания в проёме вымаран.',
+      'ЗАКЛЮЧЕНИЕ: перекат длиннее и откатывается быстрее,',
+      'но неуязвимость в нём короче. Это обмен, а не улучшение.',
+    ],
+    mods: [
+      { path: 'player.rollDistance', mul: 1.25 },
+      { path: 'player.rollCooldown', mul: 0.8 },
+      { path: 'player.rollIFramesEnd', mul: 0.6 },
+    ],
+  },
+  {
+    id: 'discipline',
+    kind: 'instruction',
+    code: 'ИН-055',
+    title: 'ПРАВИЛА ВНУТРЕННЕГО РАСПОРЯДКА',
+    report: [
+      'ОСНОВАНИЕ: доска объявлений, пункт седьмой подчёркнут дважды.',
+      'ОПИСАНИЕ: с рабочего места вставать резко, возвращаться не спеша.',
+      'ЗАКЛЮЧЕНИЕ: субъект разгоняется охотнее, тормозит хуже.',
+      'Разъяснений не требует.',
+    ],
+    mods: [
+      { path: 'player.accel', mul: 1.35 },
+      { path: 'player.friction', mul: 0.7 },
+    ],
+  },
+  {
+    id: 'property',
+    kind: 'instruction',
+    code: 'ИН-230',
+    title: 'ПАМЯТКА О БЕРЕЖНОМ ОБРАЩЕНИИ С ИМУЩЕСТВОМ',
+    report: [
+      'ОСНОВАНИЕ: изъята со стола заведующего хозяйственной частью.',
+      'ОПИСАНИЕ: норма списания пересмотрена в сторону увеличения',
+      'третий раз за квартал, подпись неразборчива.',
+      'ЗАКЛЮЧЕНИЕ: контора прощает субъекту больше порчи имущества.',
+      'Хранить на видном месте.',
+    ],
+    mods: [{ path: 'record.breakAllowance', add: 3 }],
+  },
+  {
+    id: 'service',
+    kind: 'instruction',
+    code: 'ИН-901',
+    title: 'ПОЛОЖЕНИЕ О ВЫСЛУГЕ',
+    report: [
+      'ОСНОВАНИЕ: кадровый отдел, папка без завязок.',
+      'ОПИСАНИЕ: выслуга начисляется за каждое сданное помещение,',
+      'взыскание — за каждую единицу имущества, в двойном размере.',
+      'ЗАКЛЮЧЕНИЕ: и то и другое идёт вдвое быстрее.',
+      'Кому выгодно — решает субъект.',
+    ],
+    mods: [
+      { path: 'record.servicePerCleanRoom', add: 1 },
+      { path: 'record.penaltyPerBreak', add: 1 },
+    ],
+  },
+  {
+    id: 'storeman',
+    kind: 'instruction',
+    code: 'ИН-514',
+    title: 'ДОЛЖНОСТНАЯ ИНСТРУКЦИЯ КЛАДОВЩИКА',
+    report: [
+      'ОСНОВАНИЕ: кладовая, гвоздь у двери, лист наколот на гвоздь.',
+      'ОПИСАНИЕ: талоны надлежит собирать не глядя, выдачу вести',
+      'по ведомости прошлого года.',
+      'ЗАКЛЮЧЕНИЕ: талоны тянутся с большего расстояния,',
+      'ячейка стола выдачи обходится дешевле.',
+    ],
+    mods: [
+      { path: 'ticket.magnetRadius', mul: 1.6 },
+      { path: 'clerk.cellPrice', mul: 0.75 },
+    ],
+  },
+  {
+    id: 'lifting',
+    kind: 'instruction',
+    code: 'ИН-307',
+    title: 'РЕГЛАМЕНТ РАБОТЫ С ТЯЖЁЛЫМИ ПРЕДМЕТАМИ',
+    report: [
+      'ОСНОВАНИЕ: складское помещение, приколот к стеллажу.',
+      'ОПИСАНИЕ: поднимать с расстояния, нести на весу, не бросать.',
+      'Последний пункт зачёркнут и переписан от руки.',
+      'ЗАКЛЮЧЕНИЕ: захват достаёт дальше и стоит меньше,',
+      'но брошенное летит медленнее.',
+    ],
+    mods: [
+      { path: 'telekinesis.grabRange', mul: 1.4 },
+      { path: 'telekinesis.grabCost', mul: 0.7 },
+      { path: 'telekinesis.throwSpeed', mul: 0.85 },
+    ],
+  },
+  {
+    id: 'breaks',
+    kind: 'instruction',
+    code: 'ИН-640',
+    title: 'ГРАФИК ПЕРЕРЫВОВ',
+    report: [
+      'ОСНОВАНИЕ: буфет, приклеен к кассовому аппарату.',
+      'ОПИСАНИЕ: перерыв полагается сразу после работы, а не в конце дня.',
+      'ЗАКЛЮЧЕНИЕ: энергия восстанавливается раньше и быстрее,',
+      'но удержание предмета выматывает сильнее.',
+      'Отдыхать по графику.',
+    ],
+    mods: [
+      { path: 'telekinesis.energyRegen', mul: 1.3 },
+      { path: 'telekinesis.energyRegenDelay', mul: 0.5 },
+      { path: 'telekinesis.holdDrain', mul: 1.4 },
     ],
   },
 ];

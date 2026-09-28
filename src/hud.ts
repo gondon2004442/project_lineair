@@ -18,7 +18,7 @@ import { counterInReach, counterOffer } from './systems/counter';
 import { dashIFrameWindow, dashSpec } from './systems/playerControl';
 import { hasRegistrar, vacancyCount } from './systems/staff';
 import type { Profiler } from './profiler';
-import { ammoMax, currentForm, formStat, reserveOf } from './weapon';
+import { ammoMax, currentForm, formStat, reserveOf, statAt } from './weapon';
 import { clearedCount, currentRoom } from './world';
 
 export interface Hud {
@@ -305,9 +305,9 @@ function dashBody(w: World): string {
   const p = w.playerC.get(w.player);
   const h = w.health.get(w.player);
   if (p === undefined || h === undefined) return '';
-  const spec = dashSpec();
+  const spec = dashSpec(w);
   const dur = spec.duration;
-  const window = dashIFrameWindow();
+  const window = dashIFrameWindow(w);
   const share = dur <= 0 ? 0 : (window / dur) * 100;
   const left = Math.max(0, h.iframes);
   const filled = window <= 0 ? 0 : Math.round((left / window) * 10);
@@ -338,7 +338,7 @@ function dashBody(w: World): string {
     '<div class="subtitle">ЛИЧНОЕ ДЕЛО</div>',
     row('ВЗЫСКАНИЕ', String(w.record.penalty)),
     row('ВЫСЛУГА', String(w.record.service)),
-    row('ИСПОРЧЕНО ИМУЩЕСТВА', `${w.record.broken} · НОРМА ${TUNING.record.breakAllowance}`),
+    row('ИСПОРЧЕНО ИМУЩЕСТВА', `${w.record.broken} · НОРМА ${statAt(w, 'record.breakAllowance')}`),
     row('ШАНС ПРОВЕРКИ', `${Math.round(controlChance(w) * 100)}%`),
     row('НА КОНТРОЛЕ ЗДЕСЬ', String(w.record.controlHere)),
     row('УЧАСТОК ЧИСТЫЙ', w.record.roomClean ? '<span class="ok">ДА</span>' : 'НЕТ'),

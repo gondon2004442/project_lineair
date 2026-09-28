@@ -7,6 +7,7 @@ import { destroyEntity, type World } from '../ecs';
 import { cellCenter, damageWall, tileAtPoint, TILE_WEAK } from '../room';
 import { spawnProp } from '../spawn';
 import { TUNING } from '../tuning';
+import { statAt } from '../weapon';
 import { applyDamage } from './damage';
 import { spillAt, toppleAt } from './fixtures';
 import { PROPS_BY_ID } from '../data/props';
@@ -116,8 +117,11 @@ function breakProp(w: World, e: number, kind: string, x: number, y: number): voi
   if (kind !== PROP_RUBBLE) {
     const cfg = TUNING.record;
     w.record.broken += 1;
-    if (w.record.broken > cfg.breakAllowance) {
-      w.record.penalty = Math.min(cfg.penaltyMax, w.record.penalty + cfg.penaltyPerBreak);
+    if (w.record.broken > statAt(w, 'record.breakAllowance')) {
+      w.record.penalty = Math.min(
+        cfg.penaltyMax,
+        w.record.penalty + statAt(w, 'record.penaltyPerBreak'),
+      );
     }
   }
   destroyEntity(w, e);

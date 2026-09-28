@@ -12,6 +12,7 @@ import { createEntity, destroyEntity, type Entity, type World } from '../ecs';
 import { PALETTE } from '../palette';
 import { makeRng } from '../rng';
 import { TUNING } from '../tuning';
+import { statAt } from '../weapon';
 
 /**
  * Сколько талонов стоит эта ставка. Старшая платит больше, «на контроле»
@@ -69,6 +70,9 @@ export function ticketSystem(w: World, dt: number): void {
   if (w.ticketC.size === 0) return;
   const cfg = TUNING.ticket;
   const pt = w.transform.get(w.player);
+  // Радиус притяжения правит инструкция кладовщика, поэтому читается
+  // через statAt, а не прямо из тюнинга.
+  const magnet = statAt(w, 'ticket.magnetRadius');
 
   for (const [e, ticket] of w.ticketC) {
     const t = w.transform.get(e);
@@ -95,9 +99,9 @@ export function ticketSystem(w: World, dt: number): void {
       destroyEntity(w, e);
       continue;
     }
-    if (ticket.delay > 0 || dist > cfg.magnetRadius || dist <= 0) continue;
+    if (ticket.delay > 0 || dist > magnet || dist <= 0) continue;
     // Тянет тем сильнее, чем ближе: издалека это намёк, вблизи — захват.
-    const pull = cfg.magnetPull * (1 - dist / cfg.magnetRadius) * dt;
+    const pull = cfg.magnetPull * (1 - dist / magnet) * dt;
     b.vx += (dx / dist) * pull;
     b.vy += (dy / dist) * pull;
   }

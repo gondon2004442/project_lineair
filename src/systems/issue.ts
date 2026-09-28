@@ -12,7 +12,7 @@ import type { Entity, World } from '../ecs';
 import { pickItem } from '../paperwork';
 import { makeRng } from '../rng';
 import { TUNING } from '../tuning';
-import { formStat, reserveMax } from '../weapon';
+import { formStat, reserveMax, statAt } from '../weapon';
 
 /** Ближайшая добыча в пределах вытянутой руки. */
 export function stashInReach(w: World): Entity {
@@ -60,7 +60,7 @@ export function issueCost(
       const need = Math.max(1, Math.round(TUNING.clerk.specialCommendations));
       return w.commendations >= need ? 'commendation' : '';
     }
-    return w.tickets >= Math.max(0, Math.round(TUNING.clerk.cellPrice)) ? 'ticket' : '';
+    return w.tickets >= cellPrice(w) ? 'ticket' : '';
   }
 
   if (w.passes > 0) return 'pass';
@@ -69,13 +69,22 @@ export function issueCost(
   return '';
 }
 
+/**
+ * Цена ячейки стола выдачи. Читается через statAt: её правит
+ * должностная инструкция кладовщика, и цена на табличке обязана
+ * совпадать с той, что спишут.
+ */
+export function cellPrice(w: World): number {
+  return Math.max(0, Math.round(statAt(w, 'clerk.cellPrice')));
+}
+
 /** Что написать у добычи: чем платят и хватает ли. */
 export function issueOffer(w: World, target: Entity): { text: string; ok: boolean } {
   const stash = w.stashC.get(target);
   if (stash === undefined || stash.opened) return { text: '', ok: false };
   const cost = issueCost(w, target);
   if (cost !== '') {
-    if (cost === 'ticket') return { text: `${Math.round(TUNING.clerk.cellPrice)} ТАЛОНОВ`, ok: true };
+    if (cost === 'ticket') return { text: `${cellPrice(w)} ТАЛОНОВ`, ok: true };
     if (cost === 'commendation') return { text: 'БЛАГОДАРНОСТЬ', ok: true };
     if (cost === 'blank') return { text: 'БЛАНК', ok: true };
     if (cost === 'pass') return { text: 'ДОПУСК', ok: true };
@@ -85,7 +94,7 @@ export function issueOffer(w: World, target: Entity): { text: string; ok: boolea
     return { text: 'СТОЛ ЗАКРЫТ', ok: false };
   }
   if (stash.kind === 'special') return { text: 'НУЖНА БЛАГОДАРНОСТЬ', ok: false };
-  if (stash.kind === 'cell') return { text: `НУЖНО ${Math.round(TUNING.clerk.cellPrice)} ТАЛОНОВ`, ok: false };
+  if (stash.kind === 'cell') return { text: `НУЖНО ${cellPrice(w)} ТАЛОНОВ`, ok: false };
   return { text: 'НЕЧЕМ ОФОРМИТЬ', ok: false };
 }
 
@@ -117,7 +126,7 @@ export function issueSystem(w: World): void {
   if (cost === '') return;
   if (cost === 'pass') w.passes -= 1;
   else if (cost === 'blank') w.blanks -= 1;
-  else if (cost === 'ticket') w.tickets -= Math.max(0, Math.round(TUNING.clerk.cellPrice));
+  else if (cost === 'ticket') w.tickets -= cellPrice(w);
   else if (cost === 'commendation') spendCommendation(w);
 
   stash.opened = true;

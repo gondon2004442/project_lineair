@@ -9,7 +9,7 @@ import { makeRng, type Rng } from '../rng';
 import { DIRS, opposite, standingInDoor } from '../room';
 import { TUNING } from '../tuning';
 import { enterRoom } from '../world';
-import { formStat, reserveMax } from '../weapon';
+import { formStat, reserveMax, statAt } from '../weapon';
 
 export function roomSystem(w: World): void {
   const room = w.floor.rooms[w.room];
@@ -20,7 +20,10 @@ export function roomSystem(w: World): void {
     // Участок, пройденный без единого попадания, идёт в выслугу.
     if (w.record.roomClean) {
       const cfg = TUNING.record;
-      w.record.service = Math.min(cfg.serviceMax, w.record.service + cfg.servicePerCleanRoom);
+      w.record.service = Math.min(
+        cfg.serviceMax,
+        w.record.service + statAt(w, 'record.servicePerCleanRoom'),
+      );
     }
     w.map.doorsLocked = false;
     w.mapToken += 1;

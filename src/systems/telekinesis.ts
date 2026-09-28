@@ -5,6 +5,7 @@
 import type { Entity, PlayerC, PropC, World } from '../ecs';
 import { propNumbers } from '../spawn';
 import { TUNING } from '../tuning';
+import { statAt } from '../weapon';
 
 export function telekinesisSystem(w: World, dt: number): void {
   const p = w.playerC.get(w.player);
@@ -27,7 +28,7 @@ export function telekinesisSystem(w: World, dt: number): void {
     if (prop === undefined || t === undefined || b === undefined) {
       p.held = -1;
     } else {
-      spend(p, cfg.holdDrain * dt);
+      spend(w, p, statAt(w, 'telekinesis.holdDrain') * dt);
       if (p.energy <= 0 || !w.input.grabHeld) {
         release(w, p, w.input.grabHeld ? false : true);
       } else {
@@ -43,8 +44,8 @@ export function telekinesisSystem(w: World, dt: number): void {
         prop.lastHit = -1;
       }
     }
-  } else if (w.input.grabHeld && p.energy >= cfg.grabCost) {
-    const target = nearestProp(w, pt.x, pt.y, cfg.grabRange);
+  } else if (w.input.grabHeld && p.energy >= statAt(w, 'telekinesis.grabCost')) {
+    const target = nearestProp(w, pt.x, pt.y, statAt(w, 'telekinesis.grabRange'));
     if (target >= 0) {
       const prop = w.propC.get(target);
       if (prop !== undefined) {
@@ -55,7 +56,7 @@ export function telekinesisSystem(w: World, dt: number): void {
         p.held = target;
         p.grabTime = 0;
         w.sounds.push('grab');
-        spend(p, cfg.grabCost);
+        spend(w, p, statAt(w, 'telekinesis.grabCost'));
         const gt = w.transform.get(target);
         if (gt !== undefined) warp(w, gt.x, gt.y, cfg.grabWarp);
       }
@@ -66,14 +67,14 @@ export function telekinesisSystem(w: World, dt: number): void {
   if (p.energyDelay > 0) {
     p.energyDelay = Math.max(0, p.energyDelay - dt);
   } else if (p.held < 0) {
-    p.energy = Math.min(max, p.energy + cfg.energyRegen * dt);
+    p.energy = Math.min(max, p.energy + statAt(w, 'telekinesis.energyRegen') * dt);
   }
   p.energy = Math.max(0, Math.min(max, p.energy));
 }
 
-function spend(p: PlayerC, amount: number): void {
+function spend(w: World, p: PlayerC, amount: number): void {
   p.energy -= amount;
-  p.energyDelay = TUNING.telekinesis.energyRegenDelay;
+  p.energyDelay = statAt(w, 'telekinesis.energyRegenDelay');
 }
 
 /** Отпустить удерживаемое: броском или просто уронив. */
@@ -99,7 +100,7 @@ function release(w: World, p: PlayerC, thrown: boolean): void {
     b.vy = 0;
     return;
   }
-  const speed = TUNING.telekinesis.throwSpeed * propNumbers(prop.kind).speedFactor;
+  const speed = statAt(w, 'telekinesis.throwSpeed') * propNumbers(prop.kind).speedFactor;
   w.sounds.push('throw');
   const tt = w.transform.get(thrownEntity);
   if (tt !== undefined) warp(w, tt.x, tt.y, TUNING.telekinesis.throwWarp);
@@ -174,6 +175,6 @@ export function grabCandidate(w: World): Entity {
   const p = w.playerC.get(w.player);
   const pt = w.transform.get(w.player);
   if (p === undefined || pt === undefined || p.held >= 0) return -1;
-  if (p.energy < TUNING.telekinesis.grabCost) return -1;
-  return nearestProp(w, pt.x, pt.y, TUNING.telekinesis.grabRange);
+  if (p.energy < statAt(w, 'telekinesis.grabCost')) return -1;
+  return nearestProp(w, pt.x, pt.y, statAt(w, 'telekinesis.grabRange'));
 }

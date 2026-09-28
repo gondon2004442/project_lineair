@@ -7,7 +7,7 @@ import { WEAPON_FORMS } from '../data/weaponForms';
 import type { Health, PlayerC, World } from '../ecs';
 import { spawnBullet, type BulletSpec } from '../spawn';
 import { DEG, TUNING } from '../tuning';
-import { ammoMax, formStat } from '../weapon';
+import { ammoMax, formStat, statAt } from '../weapon';
 import { addShake } from './damage';
 
 /**
@@ -36,8 +36,10 @@ export interface DashSpec {
   cancelAfter: number;
 }
 
-export function dashSpec(): DashSpec {
+export function dashSpec(w: World): DashSpec {
   const cfg = TUNING.player;
+  // Числа рывка читаются через statAt: инструкция «регламент эвакуации»
+  // правит именно их, и мимо неё они бы не прошли.
   if (Math.round(cfg.dashMode) === 0) {
     return {
       mode: 0,
@@ -53,11 +55,11 @@ export function dashSpec(): DashSpec {
   }
   return {
     mode: 1,
-    distance: cfg.rollDistance,
+    distance: statAt(w, 'player.rollDistance'),
     duration: cfg.rollDuration,
-    cooldown: cfg.rollCooldown,
+    cooldown: statAt(w, 'player.rollCooldown'),
     iframesStart: cfg.rollIFramesStart,
-    iframesEnd: cfg.rollIFramesEnd,
+    iframesEnd: statAt(w, 'player.rollIFramesEnd'),
     exitFactor: cfg.rollExitFactor,
     turnLock: cfg.rollTurnLock > 0,
     cancelAfter: cfg.rollCancelAfter,
@@ -65,8 +67,8 @@ export function dashSpec(): DashSpec {
 }
 
 /** Длина окна неуязвимости рывка в текущей схеме. */
-export function dashIFrameWindow(): number {
-  const spec = dashSpec();
+export function dashIFrameWindow(w: World): number {
+  const spec = dashSpec(w);
   return Math.max(0, spec.iframesEnd - spec.iframesStart);
 }
 
@@ -118,7 +120,7 @@ export function playerControlSystem(w: World, dt: number): void {
   }
   w.input.formStep = 0;
 
-  const spec = dashSpec();
+  const spec = dashSpec(w);
   const buffer = bufferTime();
 
   // Перезарядка из буфера: нажатие не пропадает, если оно пришло на
@@ -199,14 +201,15 @@ export function playerControlSystem(w: World, dt: number): void {
   if (moveLen > 0 && speedNow >= TUNING.player.turnMinSpeed) {
     const cos = (w.input.moveX * b.vx + w.input.moveY * b.vy) / (moveLen * speedNow);
     const turn = Math.acos(Math.max(-1, Math.min(1, cos))) / DEG;
-    if (turn >= TUNING.player.turnAngleDeg) p.turnLock = TUNING.player.turnLockMs / 1000;
+    if (turn >= TUNING.player.turnAngleDeg) p.turnLock = statAt(w, 'player.turnLockMs') / 1000;
   }
 
-  const targetVx = w.input.moveX * TUNING.player.speed;
-  const targetVy = w.input.moveY * TUNING.player.speed;
+  const speed = statAt(w, 'player.speed');
+  const targetVx = w.input.moveX * speed;
+  const targetVy = w.input.moveY * speed;
   const idle = w.input.moveX === 0 && w.input.moveY === 0;
-  const accel = TUNING.player.accel * (p.turnLock > 0 ? TUNING.player.turnAccelFactor : 1);
-  const rate = (idle ? TUNING.player.friction : accel) * dt;
+  const accel = statAt(w, 'player.accel') * (p.turnLock > 0 ? TUNING.player.turnAccelFactor : 1);
+  const rate = (idle ? statAt(w, 'player.friction') : accel) * dt;
   b.vx = approach(b.vx, targetVx, rate);
   b.vy = approach(b.vy, targetVy, rate);
 
