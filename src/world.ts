@@ -69,6 +69,7 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     player: -1,
     roster: [],
     build: [],
+    tool: { id: '', cooldown: 0, charges: -1 },
     blanks: TUNING.blank.refillTo,
     passes: TUNING.stash.passesStart,
     reward: { chance: TUNING.reward.base, dry: 0, lastItem: '', lastOrder: '', lastWeight: 1 },

@@ -35,6 +35,8 @@ export interface InputSnapshot {
   reloadQueued: boolean;
   /** Бланк подан и ещё не отработан. */
   blankQueued: boolean;
+  /** Нажали E: применить то, что в слоте инвентаря. */
+  toolQueued: boolean;
   /** Оформление добычи запрошено и ещё не отработано. */
   useQueued: boolean;
 }
@@ -74,6 +76,7 @@ export function createInput(target: HTMLElement): InputDevice {
     formStep: 0,
     reloadQueued: false,
     blankQueued: false,
+    toolQueued: false,
     useQueued: false,
   };
   const held = new Set<string>();
@@ -134,6 +137,10 @@ export function createInput(target: HTMLElement): InputDevice {
       return;
     }
     if (ev.code === 'KeyE') {
+      // Одна кнопка на две сцены: в вестибюле это перевыдача seed, в
+      // забеге — инвентарь. Перевыдача сама проверяет, что мы в
+      // вестибюле, поэтому спорить им не о чем.
+      snapshot.toolQueued = true;
       reroll();
       return;
     }
@@ -163,6 +170,7 @@ export function createInput(target: HTMLElement): InputDevice {
     snapshot.dashQueued = false;
     snapshot.reloadQueued = false;
     snapshot.blankQueued = false;
+    snapshot.toolQueued = false;
     snapshot.useQueued = false;
   });
 

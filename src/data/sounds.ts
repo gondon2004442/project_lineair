@@ -56,6 +56,9 @@ export const SOUNDS: Record<string, SoundRecipe> = {
   /** Талон подобран: сухой бумажный щелчок, почти на пределе слышимости. */
   ticket: { source: 'noise', freq: 0, duration: 0.05, gain: 0.16, cutoff: 5200 },
 
+  /** Инвентарь применён: удар печати по бумаге. */
+  stamp: { source: 'noise', freq: 0, duration: 0.09, gain: 0.42, cutoff: 900 },
+
   /** Шаг в проём: забег начался. */
   gate: { source: 'tone', freq: 70, freqEnd: 40, duration: 0.7, gain: 0.55, wave: 'sine', attack: 0.3 },
 };

@@ -12,6 +12,7 @@
  */
 import { DIRECTIVES, directiveIssued, issuedDirectives } from './data/directives';
 import { ITEMS, type Item } from './data/items';
+import { equipTool } from './systems/tool';
 import type { World } from './ecs';
 import type { Rng } from './rng';
 import { TUNING } from './tuning';
@@ -35,6 +36,20 @@ export function completes(w: World, itemId: string): string {
     if (directiveIssued(directive, after)) return directive.number;
   }
   return '';
+}
+
+/**
+ * Выдать найденное. Приложение и инструкция ложатся в дело, инвентарь —
+ * в слот: это разные полки, и складывать их в одну нельзя. Слот один,
+ * поэтому новый инвентарь заменяет прежний.
+ */
+export function grantItem(w: World, item: Item): void {
+  // В дело попадает всё найденное — это опись забега, а не только
+  // правки. Инвентарь правок не несёт, его mods пусты, поэтому на числа
+  // запись не влияет; зато выдача помнит, что он уже был, и не выдаёт
+  // его по кругу.
+  if (!w.build.includes(item.id)) w.build.push(item.id);
+  if (item.kind === 'implement') equipTool(w, item);
 }
 
 /**

@@ -20,6 +20,7 @@ import { fixtureSystem } from './systems/fixtures';
 import { lobbySystem } from './systems/lobby';
 import { roomSystem } from './systems/rooms';
 import { playerControlSystem } from './systems/playerControl';
+import { toolSystem } from './systems/tool';
 import { profiler } from './profiler';
 import { STEP } from './tuning';
 
@@ -46,6 +47,9 @@ export function step(w: World): void {
   // иначе она съедала бы F у шкафов.
   counterSystem(w);
   issueSystem(w);
+  // Инвентарь до управления: почта пополняет обойму раньше, чем на этом
+  // же шаге по ней выстрелят, а перенос случается до разбора движения.
+  toolSystem(w, STEP);
   if (w.status !== 'dead') playerControlSystem(w, STEP);
   profiler.end('СИМ: СУБЪЕКТ');
 

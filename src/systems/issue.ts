@@ -9,7 +9,8 @@
  */
 import { WEAPON_FORMS } from '../data/weaponForms';
 import type { Entity, World } from '../ecs';
-import { pickItem } from '../paperwork';
+import { ITEMS_BY_ID } from '../data/items';
+import { grantItem, pickItem } from '../paperwork';
 import { makeRng } from '../rng';
 import { TUNING } from '../tuning';
 import { formStat, infiniteReserve, reserveMax, statAt } from '../weapon';
@@ -141,7 +142,8 @@ export function issueSystem(w: World): void {
   }
 
   if (stash.kind === 'cell') {
-    if (stash.item !== '' && !w.build.includes(stash.item)) w.build.push(stash.item);
+    const found = ITEMS_BY_ID.get(stash.item);
+    if (found !== undefined) grantItem(w, found);
     return;
   }
 
@@ -153,7 +155,7 @@ export function issueSystem(w: World): void {
     for (let i = 0; i < count; i++) {
       const item = pickItem(w, rng);
       if (item === undefined) break;
-      if (!w.build.includes(item.id)) w.build.push(item.id);
+      grantItem(w, item);
     }
     return;
   }
@@ -181,5 +183,5 @@ export function issueSystem(w: World): void {
     return;
   }
   const item = pickItem(w, rng);
-  if (item !== undefined) w.build.push(item.id);
+  if (item !== undefined) grantItem(w, item);
 }

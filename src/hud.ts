@@ -2,6 +2,7 @@
 import { TEMPLATES_BY_ID } from './data/roomTemplates';
 import { issuedDirectives } from './data/directives';
 import { ITEMS_BY_ID } from './data/items';
+import { toolCooldown } from './systems/tool';
 import { WEAPON_FORMS } from './data/weaponForms';
 import { STAFFING_BY_ID } from './data/staffing';
 import { entityCount, type World } from './ecs';
@@ -97,6 +98,7 @@ export function createHud(
       energyRow(w),
       row('ВАКАНСИЙ', vacancyLine(w)),
       row('Q БЛАНК · ДОПУСК · ТАЛОН', suppliesLine(w)),
+      toolRow(w),
       promptRow(w),
     ].join('');
 
@@ -184,6 +186,25 @@ function weaponRows(w: World): string {
   }
 
   return row('ФОРМА (КОЛЕСО)', `<span class="ok">${head}</span>`) + row('ОБОЙМА (R)', ammo);
+}
+
+/**
+ * Инвентарь: что в слоте и можно ли этим сейчас воспользоваться. Пустой
+ * слот строки не занимает — сводка и так на шесть строк.
+ */
+function toolRow(w: World): string {
+  const slot = w.tool;
+  if (slot.id === '') return '';
+  const item = ITEMS_BY_ID.get(slot.id);
+  if (item === undefined) return '';
+  const effect = item.active?.effect ?? '';
+  const full = toolCooldown(w, effect);
+  const ready = slot.cooldown <= 0 && slot.charges !== 0;
+  // Шкала стоит всегда, даже полная: если её показывать только на
+  // откате, сводка прыгает по ширине при каждом применении.
+  const done = ready ? 10 : Math.round((1 - slot.cooldown / Math.max(0.001, full)) * 10);
+  const left = `<span class="${ready ? 'ok' : 'warn'}">${gauge(done, 10)}</span>`;
+  return row('E ИНВЕНТАРЬ', `<span class="${ready ? 'ok' : 'warn'}">${item.title}</span> · ${left}`);
 }
 
 /**

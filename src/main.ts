@@ -10,7 +10,7 @@ import { createInput } from './input';
 import { createPanel } from './panel';
 import { profiler } from './profiler';
 import { createRenderer } from './render';
-import { pickItem, synergyFactor } from './paperwork';
+import { grantItem, pickItem, synergyFactor } from './paperwork';
 import { makeRng, resolveSeed, seedPinned } from './rng';
 import { step } from './step';
 import { STEP, TUNING } from './tuning';
@@ -118,6 +118,9 @@ async function boot(): Promise<void> {
       issueOffer,
       issuedDirectives,
       pickItem,
+      // Выдача нужна стенду: иначе не проверить, что инвентарь ложится
+      // в слот, а не в дело.
+      grantItem,
       synergyFactor,
       makeRng,
       items: ITEMS,
