@@ -92,7 +92,10 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
     difficulty: 1,
     weight: 4,
     staffing: ['patrol'],
-    cover: [{ kind: 'chair', col: 8, row: 5, jitter: 2 }, { kind: 'chair', col: 23, row: 12, jitter: 2 },
+    cover: [
+      { kind: 'desk', col: 16, row: 9, jitter: 1 },
+      { kind: 'tank', col: 2, row: 16, jitter: 1, chance: 0.7 },
+      { kind: 'faxstand', col: 20, row: 6, jitter: 2, chance: 0.8 },{ kind: 'chair', col: 8, row: 5, jitter: 2 }, { kind: 'chair', col: 23, row: 12, jitter: 2 },
       { kind: 'cabinet', col: 6, row: 9, jitter: 1 }, { kind: 'cabinet', col: 25, row: 8, jitter: 1 },
       { kind: 'chair', col: 16, row: 3, jitter: 3, chance: 0.6 }],
     fixtures: [
@@ -141,7 +144,10 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
     difficulty: 2,
     weight: 3,
     staffing: ['registry'],
-    cover: [{ kind: 'cabinet', col: 9, row: 9, jitter: 1 }, { kind: 'cabinet', col: 22, row: 9, jitter: 1 },
+    cover: [
+      { kind: 'cardbox', col: 10, row: 4, jitter: 2 },
+      { kind: 'cardbox', col: 21, row: 13, jitter: 2 },
+      { kind: 'typewriter', col: 16, row: 9, jitter: 2, chance: 0.8 },{ kind: 'cabinet', col: 9, row: 9, jitter: 1 }, { kind: 'cabinet', col: 22, row: 9, jitter: 1 },
       { kind: 'chair', col: 16, row: 4, jitter: 2 }, { kind: 'chair', col: 16, row: 13, jitter: 2 },
       { kind: 'chair', col: 4, row: 9, jitter: 1, chance: 0.5 }],
     fixtures: [
@@ -188,7 +194,10 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
     difficulty: 1,
     weight: 2,
     staffing: ['patrol'],
-    cover: [{ kind: 'cabinet', col: 16, row: 8, jitter: 1 }, { kind: 'chair', col: 8, row: 17, jitter: 2 },
+    cover: [
+      { kind: 'faxstand', col: 11, row: 9, jitter: 1 },
+      { kind: 'faxstand', col: 20, row: 8, jitter: 1, chance: 0.8 },
+      { kind: 'tank', col: 26, row: 9, jitter: 1, chance: 0.6 },{ kind: 'cabinet', col: 16, row: 8, jitter: 1 }, { kind: 'chair', col: 8, row: 17, jitter: 2 },
       { kind: 'chair', col: 24, row: 17, jitter: 2, chance: 0.7 }],
     fixtures: [
       { kind: 'ashtray', col: 9, row: 7, jitter: 1 },
@@ -235,7 +244,10 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
     difficulty: 3,
     weight: 3,
     staffing: ['patrol', 'registry'],
-    cover: [{ kind: 'chair', col: 16, row: 8, jitter: 3 }, { kind: 'cabinet', col: 8, row: 8, jitter: 2 },
+    cover: [
+      { kind: 'desk', col: 16, row: 9, jitter: 1 },
+      { kind: 'typewriter', col: 9, row: 12, jitter: 2, chance: 0.8 },
+      { kind: 'cardbox', col: 23, row: 5, jitter: 2, chance: 0.8 },{ kind: 'chair', col: 16, row: 8, jitter: 3 }, { kind: 'cabinet', col: 8, row: 8, jitter: 2 },
       { kind: 'cabinet', col: 23, row: 8, jitter: 2 }, { kind: 'chair', col: 16, row: 16, jitter: 2 },
       { kind: 'chair', col: 16, row: 0, jitter: 2, chance: 0.6 }],
     fixtures: [
@@ -283,7 +295,9 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
     difficulty: 3,
     weight: 1,
     staffing: ['head_office'],
-    cover: [{ kind: 'cabinet', col: 3, row: 9, jitter: 1 }, { kind: 'cabinet', col: 28, row: 9, jitter: 1 },
+    cover: [
+      { kind: 'desk', col: 16, row: 9, jitter: 0 },
+      { kind: 'tank', col: 2, row: 16, jitter: 1, chance: 0.6 },{ kind: 'cabinet', col: 3, row: 9, jitter: 1 }, { kind: 'cabinet', col: 28, row: 9, jitter: 1 },
       { kind: 'chair', col: 16, row: 5, jitter: 2 }, { kind: 'chair', col: 16, row: 12, jitter: 2 }],
     fixtures: [
       { kind: 'rack', col: 3, row: 3, jitter: 0 },
@@ -329,6 +343,10 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
     weight: 3,
     staffing: ['registry'],
     cover: [
+      { kind: 'typewriter', col: 8, row: 4, jitter: 1 },
+      { kind: 'typewriter', col: 16, row: 11, jitter: 1 },
+      { kind: 'typewriter', col: 25, row: 4, jitter: 1, chance: 0.8 },
+      { kind: 'faxstand', col: 12, row: 8, jitter: 1, chance: 0.8 },
       { kind: 'chair', col: 4, row: 3, jitter: 1 },
       { kind: 'chair', col: 10, row: 7, jitter: 1 },
       { kind: 'chair', col: 21, row: 13, jitter: 1 },
@@ -387,6 +405,9 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
     weight: 2,
     staffing: ['registry', 'patrol'],
     cover: [
+      { kind: 'desk', col: 16, row: 9, jitter: 1 },
+      { kind: 'faxstand', col: 22, row: 5, jitter: 1, chance: 0.8 },
+      { kind: 'cardbox', col: 7, row: 12, jitter: 2, chance: 0.8 },
       { kind: 'cabinet', col: 16, row: 6, jitter: 1 },
       { kind: 'cabinet', col: 16, row: 11, jitter: 1 },
       { kind: 'chair', col: 12, row: 9, jitter: 1 },

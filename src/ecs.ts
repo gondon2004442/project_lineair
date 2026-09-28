@@ -335,6 +335,10 @@ export interface Feedback {
   warpX: number;
   warpY: number;
   warpPower: number;
+  /** Облако из разбитого огнетушителя: сколько ему осталось и где. */
+  cloudTime: number;
+  cloudX: number;
+  cloudY: number;
 }
 
 export interface World {

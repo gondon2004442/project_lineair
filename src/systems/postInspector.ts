@@ -7,7 +7,35 @@
 import type { World } from '../ecs';
 import { spawnBullet } from '../spawn';
 import { DEG, TUNING } from '../tuning';
+import { PROPS_BY_ID } from '../data/props';
 import { approach } from './staff';
+
+/**
+ * Пересекает ли отрезок от стрелка до цели предмет, который ломает
+ * взгляд. Считается по расстоянию от центра предмета до отрезка —
+ * точности здесь хватает с запасом, а перебор идёт только по мебели.
+ */
+function sightBlocked(w: World, fromX: number, fromY: number, toX: number, toY: number): boolean {
+  const dx = toX - fromX;
+  const dy = toY - fromY;
+  const len = Math.hypot(dx, dy);
+  if (len <= 0) return false;
+
+  for (const [e, prop] of w.propC) {
+    if (PROPS_BY_ID.get(prop.kind)?.blocksSight !== true) continue;
+    if (prop.phase === 'held' || prop.phase === 'thrown') continue;
+    const t = w.transform.get(e);
+    const b = w.body.get(e);
+    if (t === undefined || b === undefined) continue;
+    // Проекция центра на отрезок, зажатая его концами.
+    const along = ((t.x - fromX) * dx + (t.y - fromY) * dy) / (len * len);
+    if (along <= 0 || along >= 1) continue;
+    const px = fromX + dx * along;
+    const py = fromY + dy * along;
+    if (Math.hypot(t.x - px, t.y - py) <= b.radius) return true;
+  }
+  return false;
+}
 
 export function inspectorSystem(w: World, dt: number, beatStruck: boolean): void {
   const pt = w.transform.get(w.player);
@@ -52,7 +80,11 @@ export function inspectorSystem(w: World, dt: number, beatStruck: boolean): void
       // Телеграф: табличка вспыхивает за долю до выстрела.
       if (w.metronome <= cfg.telegraphLead) staff.plateFlash = cfg.telegraphLead;
 
-      if (beatStruck) {
+      // Стойка с факсами ломает взгляд: пока она между инспектором и
+      // субъектом, такт проходит впустую. Пуля сквозь неё летит, а
+      // прицел — нет, и это единственное укрытие, которое работает
+      // против такта, а не против снаряда.
+      if (beatStruck && !sightBlocked(w, t.x, t.y, pt.x, pt.y)) {
         inspector.shotsLeft = Math.max(1, Math.round(cfg.shotsPerBeat));
         inspector.shotTimer = 0;
         // Прицел защёлкивается на доле и дальше не ведётся.

@@ -2,13 +2,14 @@
  * Физические объекты: полёт, удар и разрушение.
  * Урон считается от импульса, поэтому выдохшийся предмет уже не опасен.
  */
-import { PROP_RUBBLE } from '../data/props';
+import { PROP_CARDBOX, PROP_RUBBLE } from '../data/props';
 import { destroyEntity, type World } from '../ecs';
 import { cellCenter, damageWall, tileAtPoint, TILE_WEAK } from '../room';
 import { spawnProp } from '../spawn';
 import { TUNING } from '../tuning';
 import { applyDamage } from './damage';
-import { toppleAt } from './fixtures';
+import { spillAt, toppleAt } from './fixtures';
+import { PROPS_BY_ID } from '../data/props';
 
 export function propSystem(w: World, dt: number): void {
   const cfg = TUNING.prop;
@@ -65,6 +66,14 @@ function strike(
   // удар шкафа. Урона от этого нет — только беспорядок.
   toppleAt(w, x, y, radius);
 
+  // Огнетушитель при ударе даёт облако. Это не урон, а картинка, и
+  // живёт она своим таймером рядом с кольцом бланка.
+  if (PROPS_BY_ID.get(prop.kind)?.cloud === true && speed >= TUNING.prop.minImpactSpeed) {
+    w.fx.cloudTime = TUNING.cloud.time;
+    w.fx.cloudX = x;
+    w.fx.cloudY = y;
+  }
+
   for (const [target] of w.staffC) {
     if (target === prop.lastHit) continue;
     const tt = w.transform.get(target);
@@ -114,6 +123,14 @@ function breakProp(w: World, e: number, kind: string, x: number, y: number): voi
   destroyEntity(w, e);
   const p = w.playerC.get(w.player);
   if (p !== undefined && p.held === e) p.held = -1;
+  // Ящик картотеки не оставляет обломка: он рассыпается карточками, и
+  // они лежат до конца участка, как всякий след.
+  if (kind === PROP_CARDBOX) {
+    const b = w.body.get(e);
+    const len = b === undefined ? 0 : Math.hypot(b.vx, b.vy);
+    spillAt(w, 'cards', x, y, len > 0 ? (b?.vx ?? 0) / len : 1, len > 0 ? (b?.vy ?? 0) / len : 0);
+    return;
+  }
   if (kind !== PROP_RUBBLE) spawnProp(w, PROP_RUBBLE, x, y);
 }
 

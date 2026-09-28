@@ -8,7 +8,7 @@ import {
   POST_INTERN,
   POST_REGISTRAR,
 } from './data/posts';
-import { PROPS_BY_ID, PROP_CABINET, PROP_RUBBLE } from './data/props';
+import { PROPS_BY_ID } from './data/props';
 import { WEAPON_FORMS } from './data/weaponForms';
 import { createEntity, type Entity, type Faction, type Shape, type StashKind, type World } from './ecs';
 import { PALETTE } from './palette';
@@ -236,14 +236,10 @@ export interface PropNumbers {
 }
 
 export function propNumbers(kind: string): PropNumbers {
-  switch (kind) {
-    case PROP_CABINET:
-      return TUNING.prop.cabinet;
-    case PROP_RUBBLE:
-      return TUNING.prop.rubble;
-    default:
-      return TUNING.prop.chair;
-  }
+  // Таблицей, а не перечислением: предметов стало восемь, и switch на
+  // каждый новый — это место, где о новом предмете забывают.
+  const table = TUNING.prop as unknown as Record<string, PropNumbers | undefined>;
+  return table[kind] ?? TUNING.prop.chair;
 }
 
 /**
@@ -251,15 +247,18 @@ export function propNumbers(kind: string): PropNumbers {
  * светлый, кресло тёмное. Три ступени — три разных предмета на глаз,
  * даже если смотреть на кадр без цвета.
  */
+const PROP_SHADE: Record<string, number> = {
+  cabinet: PALETTE.furniture,
+  rubble: PALETTE.concrete500,
+  desk: PALETTE.furniture,
+  typewriter: PALETTE.concrete500,
+  cardbox: PALETTE.concrete700,
+  faxstand: PALETTE.concrete500,
+  tank: PALETTE.furniture,
+};
+
 function propShade(kind: string): number {
-  switch (kind) {
-    case PROP_CABINET:
-      return PALETTE.furniture;
-    case PROP_RUBBLE:
-      return PALETTE.concrete500;
-    default:
-      return PALETTE.concrete700;
-  }
+  return PROP_SHADE[kind] ?? PALETTE.concrete700;
 }
 
 export function spawnProp(w: World, kind: string, x: number, y: number): Entity {

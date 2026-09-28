@@ -169,6 +169,7 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
       smokeLayer.clear();
       drawSmoke(smokeLayer, w, fxTime);
       drawBlankRing(smokeLayer, w, alpha);
+      drawCloud(smokeLayer, w, alpha);
       profiler.end('КАДР: ДЫМ');
 
       entityLayer.clear();
@@ -886,6 +887,29 @@ function drawBlankRing(g: Graphics, w: World, alpha: number): void {
     color: PALETTE.concrete100,
     alpha: TUNING.blank.ringAlpha * fade,
   });
+}
+
+/**
+ * Облако из разбитого огнетушителя. Те же правила, что у кольца бланка:
+ * читается с поправкой на кадр, гаснет в конце, цвета своего не имеет —
+ * бетонная взвесь, а не дым.
+ */
+function drawCloud(g: Graphics, w: World, alpha: number): void {
+  const left = fxLeft(w.fx.cloudTime, alpha);
+  if (left <= 0) return;
+  const cfg = TUNING.cloud;
+  const full = Math.max(1e-6, cfg.time);
+  const grown = 1 - left / full;
+  const fade = 1 - grown * grown;
+  const rings = Math.max(1, Math.round(cfg.rings));
+  for (let i = 0; i < rings; i++) {
+    const spread = grown * (1 - i / (rings + 1));
+    g.circle(w.fx.cloudX, w.fx.cloudY, cfg.radius * spread).stroke({
+      width: cfg.width,
+      color: PALETTE.concrete500,
+      alpha: cfg.alpha * fade * (1 - i / rings),
+    });
+  }
 }
 
 /** Стена: тёмный бетон, к комнате обращена светлая панель с кантом. */

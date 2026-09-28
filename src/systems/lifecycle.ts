@@ -68,4 +68,5 @@ export function feedbackSystem(w: World, dt: number): void {
   w.fx.blankTime = Math.max(0, w.fx.blankTime - dt);
   w.fx.slowMo = Math.max(0, w.fx.slowMo - dt);
   w.fx.warpTime = Math.max(0, w.fx.warpTime - dt);
+  w.fx.cloudTime = Math.max(0, w.fx.cloudTime - dt);
 }

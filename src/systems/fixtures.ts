@@ -13,7 +13,9 @@
  * участка: убирать некому, а уходя с участка не убирают и подавно —
  * clearExceptPlayer уносит всё вместе с самим участком.
  */
-import type { World } from '../ecs';
+import { createEntity, type World } from '../ecs';
+import { FIXTURES_BY_ID } from '../data/fixtures';
+import { PALETTE } from '../palette';
 import { TUNING } from '../tuning';
 
 export function fixtureSystem(w: World): void {
@@ -61,6 +63,24 @@ function topple(w: World, e: number, nx: number, ny: number): void {
   // Лежащее больше не тело: через него ходят, и в этом смысл.
   w.body.delete(e);
   w.sounds.push('impact');
+}
+
+/**
+ * Положить готовый след без предмета: разбитый ящик картотеки не
+ * опрокидывается, он рассыпается. Тела у следа нет с самого начала.
+ */
+export function spillAt(w: World, kind: string, x: number, y: number, dirX: number, dirY: number): void {
+  const e = createEntity(w);
+  w.transform.set(e, { x, y, px: x, py: y });
+  w.fixtureC.set(e, { kind, title: 'РАССЫПАННОЕ', toppled: true, spillX: dirX, spillY: dirY });
+  const spec = FIXTURES_BY_ID.get(kind);
+  w.drawC.set(e, {
+    shape: 'square',
+    size: spec === undefined ? 10 : spec.radius,
+    color: PALETTE.furniture,
+    hollow: false,
+    desk: false,
+  });
 }
 
 /** Опрокинуть всё, чего коснулся брошенный предмет. */

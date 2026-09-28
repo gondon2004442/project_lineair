@@ -5,6 +5,7 @@ import { cellCenter, damageWall, isSolidPoint, tileAtPoint, TILE_WEAK } from '..
 import { spawnProp } from '../spawn';
 import { TUNING } from '../tuning';
 import { applyDamage } from './damage';
+import { PROPS_BY_ID } from '../data/props';
 
 export function bulletSystem(w: World, dt: number): void {
   for (const [e, bullet] of w.bulletC) {
@@ -41,6 +42,9 @@ export function bulletSystem(w: World, dt: number): void {
     let blocked = false;
     for (const [prop, propC] of w.propC) {
       if (propC.phase === 'held' && bullet.faction === 'player' && prop === heldByPlayer) continue;
+      // Стойка с факсами пуль не держит: сквозь неё стреляют, но
+      // из-за неё не видят. В этом вся её ценность.
+      if (PROPS_BY_ID.get(propC.kind)?.stopsBullets === false) continue;
       if (prop === bullet.lastHit || !hit(w, e, b.radius, prop)) continue;
       const health = w.health.get(prop);
       if (health !== undefined) {

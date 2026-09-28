@@ -80,6 +80,19 @@ export const FIXTURES: FixtureSpec[] = [
     spillSpread: 2.8,
   },
   {
+    /**
+     * Не оборудование, а только след: рассыпанные карточки из разбитого
+     * ящика картотеки. Тела у него нет, оно сразу лежит.
+     */
+    id: 'cards',
+    title: 'РАССЫПАННЫЕ КАРТОЧКИ',
+    radius: 12,
+    color: 'furniture',
+    spill: 'worn',
+    spillDetail: 'paper',
+    spillSpread: 2.6,
+  },
+  {
     id: 'ashtray',
     title: 'ПЕПЕЛЬНИЦА НА НОЖКЕ',
     radius: 7,
