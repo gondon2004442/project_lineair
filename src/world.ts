@@ -17,11 +17,12 @@ import {
 } from './room';
 import { ITEMS, type Item } from './data/items';
 import { PROPS } from './data/props';
-import { TEMPLATES_BY_ID, type CoverSlot } from './data/roomTemplates';
+import { TEMPLATES_BY_ID, type CoverSlot, type Scene } from './data/roomTemplates';
 import { WEAPON_FORMS } from './data/weaponForms';
 import { ammoMax, reserveMax } from './weapon';
 import { COUNTERS, type CounterSpec } from './data/counters';
 import { FIXTURES_BY_ID } from './data/fixtures';
+import { spillAt } from './systems/fixtures';
 import {
   postNumbers,
   propNumbers,
@@ -273,6 +274,75 @@ function coverSpot(
 }
 
 /**
+ * Какая сцена досталась участку. Считается от seed и номера участка,
+ * а не хранится: расстановка не должна зависеть от того, в каком
+ * порядке игрок обходит этаж. Свой поток случайности — чтобы добавленная
+ * сцена не сдвинула мебель на той же посевной.
+ */
+function sceneFor(w: World, room: RoomNode): Scene | undefined {
+  const scenes = TEMPLATES_BY_ID.get(room.template)?.scenes;
+  if (scenes === undefined || scenes.length === 0) return undefined;
+  const rng = makeRng((w.seed + room.index * TUNING.floor.sceneSeedStride) >>> 0);
+  return scenes[rng.int(scenes.length)];
+}
+
+/**
+ * Сцена: три-четыре предмета в осмысленном расположении поверх слотов
+ * планировки. Ставится по точным клеткам и без разброса — в этом весь
+ * смысл: стул отодвинут именно от этого стола, а не где-то рядом.
+ *
+ * Не встало — и ладно: сцена необязательна, а ронять из-за неё участок
+ * нельзя. Отступ от входа тот же, что у мебели.
+ */
+function placeScene(w: World, room: RoomNode, entryX: number, entryY: number): void {
+  const scene = sceneFor(w, room);
+  if (scene === undefined) return;
+  const tile = TUNING.room.tile;
+  const wall = TUNING.room.wall;
+  const clear = TUNING.prop.spawnClearance;
+
+  for (const slot of scene.cover ?? []) {
+    const count = Math.max(1, Math.round(slot.repeat?.count ?? 1));
+    for (let i = 0; i < count; i++) {
+      const col = slot.col + (slot.repeat?.stepCol ?? 0) * i;
+      const row = slot.row + (slot.repeat?.stepRow ?? 0) * i;
+      const x = (wall + col + 0.5) * tile;
+      const y = (wall + row + 0.5) * tile;
+      const radius = propNumbers(slot.kind).radius;
+      if (!bodyFits(w.map, x, y, radius)) continue;
+      if (Math.hypot(x - entryX, y - entryY) < clear) continue;
+      spawnProp(w, slot.kind, x, y);
+    }
+  }
+}
+
+/**
+ * Оборудование сцены. Опрокинутое ставится следом, без тела: удара не
+ * было, а беспорядок уже есть.
+ */
+function placeSceneFixtures(w: World, room: RoomNode, entryX: number, entryY: number): void {
+  const scene = sceneFor(w, room);
+  if (scene === undefined) return;
+  const cfg = TUNING.fixture;
+
+  for (const slot of scene.fixtures ?? []) {
+    const spec = FIXTURES_BY_ID.get(slot.kind);
+    if (spec === undefined) continue;
+    const x = (TUNING.room.wall + slot.col + 0.5) * TUNING.room.tile;
+    const y = (TUNING.room.wall + slot.row + 0.5) * TUNING.room.tile;
+    if (!bodyFits(w.map, x, y, spec.radius)) continue;
+    if (!onOpenFloor(w.map, x, y, spec.radius)) continue;
+    if (Math.hypot(x - entryX, y - entryY) < cfg.clearance) continue;
+    if (slot.toppled === undefined) {
+      spawnFixture(w, spec, x, y);
+      continue;
+    }
+    const len = Math.hypot(slot.toppled.x, slot.toppled.y);
+    spillAt(w, spec.id, x, y, len > 0 ? slot.toppled.x / len : 1, len > 0 ? slot.toppled.y / len : 0);
+  }
+}
+
+/**
  * Добыча участка. Шкаф стоит там, где выпал; стол выдачи — три ячейки в
  * ряд, каждая с названным приложением. Что именно лежит, решает тот же
  * seed, поэтому на одном seed добыча всегда одна и та же.
@@ -330,8 +400,7 @@ function placeStash(w: World, room: RoomNode, entryX: number, entryY: number): v
  */
 function placeFixtures(w: World, room: RoomNode, entryX: number, entryY: number): void {
   const template = TEMPLATES_BY_ID.get(room.template);
-  const slots = template?.fixtures;
-  if (slots === undefined || slots.length === 0) return;
+  const slots = template?.fixtures ?? [];
   const cfg = TUNING.fixture;
   const rng = makeRng((w.seed + room.index * cfg.seedStride) >>> 0);
 
@@ -360,6 +429,7 @@ function placeFixtures(w: World, room: RoomNode, entryX: number, entryY: number)
       spawnFixture(w, spec, x, y);
     }
   }
+  placeSceneFixtures(w, room, entryX, entryY);
 }
 
 /**
@@ -527,6 +597,7 @@ function scatterProps(w: World, room: RoomNode, entryX: number, entryY: number):
         spawnProp(w, slot.kind, spot.x, spot.y);
       }
     }
+    placeScene(w, room, entryX, entryY);
     return;
   }
 

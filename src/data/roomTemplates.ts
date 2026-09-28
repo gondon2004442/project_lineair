@@ -55,6 +55,36 @@ export interface DecorSlot {
   repeat?: { count: number; stepCol: number; stepRow: number };
 }
 
+/**
+ * Оборудование сцены. Отличается от обычного слота тем, что может быть
+ * уже опрокинутым: тележка брошена поперёк прохода, и папки лежат
+ * веером — это след, а не предмет, и удара для него не было.
+ */
+export interface SceneFixture {
+  kind: string;
+  col: number;
+  row: number;
+  /** Куда высыпалось. Пусто — оборудование стоит целым. */
+  toppled?: { x: number; y: number };
+}
+
+/**
+ * Сцена: три-четыре предмета в осмысленном взаимном расположении.
+ * Разгадывать её не нужно — она нужна, чтобы участки отличались друг от
+ * друга не только расстановкой укрытий.
+ *
+ * Сцена ставится ПОВЕРХ слотов планировки, своим потоком случайности, и
+ * её предметы не сдвигают обычную мебель.
+ */
+export interface Scene {
+  /** Что здесь произошло. В интерфейс не выводится: это для нас. */
+  title: string;
+  /** Предметы сцены: слоты мебели, обычно без разброса. */
+  cover?: CoverSlot[];
+  /** Оборудование сцены, в том числе уже опрокинутое. */
+  fixtures?: SceneFixture[];
+}
+
 export interface RoomTemplate {
   id: string;
   /** Как помещение называется в служебной сводке. */
@@ -83,8 +113,11 @@ export interface RoomTemplate {
    * Слоты те же, что у антуража, но это уже сущности.
    */
   fixtures?: DecorSlot[];
-  /** Сцена: три-четыре предмета в осмысленном расположении. */
-  scene?: string;
+  /**
+   * Сцены помещения. Одна на участок, выбирается от seed; пусто —
+   * участок без сцены.
+   */
+  scenes?: Scene[];
   rows: string[];
 }
 
@@ -121,6 +154,24 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
       { kind: 'arrow', col: 6, row: 0, jitter: 1, facing: 's', chance: 0.7 },
       { kind: 'portrait', col: 10, row: 0, jitter: 0, facing: 's',
         repeat: { count: 4, stepCol: 2, stepRow: 0 } },
+    ],
+    scenes: [
+      {
+        // Человек резко встал: стул далеко от столика, урна набок.
+        title: 'КТО-ТО РЕЗКО ВСТАЛ',
+        cover: [
+          { kind: 'desk', col: 20, row: 9, jitter: 0 },
+          { kind: 'chair', col: 23, row: 8, jitter: 0 },
+        ],
+        fixtures: [{ kind: 'bin', col: 21, row: 11, toppled: { x: 1, y: 0.4 } }],
+      },
+      {
+        title: 'СТУЛЬЯ СОСТАВИЛИ К СТЕНЕ',
+        cover: [
+          { kind: 'chair', col: 6, row: 17, jitter: 0, repeat: { count: 5, stepCol: 1.6, stepRow: 0 } },
+        ],
+        fixtures: [{ kind: 'ashtray', col: 14, row: 17 }],
+      },
     ],
     rows: [
       OPEN,
@@ -172,6 +223,24 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
       { kind: 'evac', col: 1, row: 0, jitter: 0, facing: 's' },
       { kind: 'panel', col: 24, row: 0, jitter: 1, facing: 's', chance: 0.6 },
     ],
+    scenes: [
+      {
+        title: 'ИСКАЛИ ОДНО ДЕЛО',
+        cover: [
+          { kind: 'cardbox', col: 16, row: 3, jitter: 0, repeat: { count: 3, stepCol: 1.5, stepRow: 0 } },
+        ],
+        fixtures: [{ kind: 'trolley', col: 14, row: 4 }],
+      },
+      {
+        // Тележку бросили поперёк прохода, карточки высыпались к двери.
+        title: 'КТО-ТО БЕЖАЛ',
+        cover: [
+          { kind: 'chair', col: 14, row: 9, jitter: 0 },
+          { kind: 'cardbox', col: 18, row: 9, jitter: 0 },
+        ],
+        fixtures: [{ kind: 'trolley', col: 16, row: 8, toppled: { x: 0, y: 1 } }],
+      },
+    ],
     rows: [
       OPEN,
       '..####..####........####..####..',
@@ -221,6 +290,23 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
       { kind: 'portrait', col: 3, row: 0, jitter: 0, facing: 's',
         repeat: { count: 5, stepCol: 6, stepRow: 0 } },
       { kind: 'arrow', col: 15, row: 0, jitter: 0, facing: 'n' },
+    ],
+    scenes: [
+      {
+        title: 'ОЧЕРЕДЬ НА ПРИЁМ',
+        cover: [
+          { kind: 'chair', col: 1, row: 4, jitter: 0, repeat: { count: 4, stepCol: 0, stepRow: 2 } },
+        ],
+        fixtures: [{ kind: 'rack', col: 1, row: 12 }],
+      },
+      {
+        title: 'ТЕЛЕЖКУ БРОСИЛИ В ПРОХОДЕ',
+        cover: [
+          { kind: 'cardbox', col: 18, row: 8, jitter: 0 },
+          { kind: 'chair', col: 20, row: 8, jitter: 0 },
+        ],
+        fixtures: [{ kind: 'trolley', col: 16, row: 8, toppled: { x: 1, y: 0 } }],
+      },
     ],
     rows: [
       '....##########....##########....',
@@ -274,6 +360,24 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
       { kind: 'extinguisher', col: 31, row: 0, jitter: 0, facing: 'n' },
       { kind: 'clock', col: 16, row: 0, jitter: 0, facing: 's' },
     ],
+    scenes: [
+      {
+        title: 'СМЕНУ СНЯЛИ СРАЗУ',
+        cover: [
+          { kind: 'chair', col: 8, row: 4, jitter: 0 },
+          { kind: 'chair', col: 9, row: 8, jitter: 0 },
+          { kind: 'chair', col: 7, row: 12, jitter: 0 },
+        ],
+        fixtures: [{ kind: 'bin', col: 13, row: 8, toppled: { x: -1, y: 0 } }],
+      },
+      {
+        title: 'КОРОБА ВЫНЕСЛИ В ПРОХОД',
+        cover: [
+          { kind: 'cardbox', col: 16, row: 4, jitter: 0, repeat: { count: 3, stepCol: 0, stepRow: 2 } },
+        ],
+        fixtures: [{ kind: 'trolley', col: 18, row: 8 }],
+      },
+    ],
     rows: [
       OPEN,
       '....##....##..........##....##..',
@@ -322,6 +426,23 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
       { kind: 'clock', col: 16, row: 0, jitter: 0, facing: 's' },
       { kind: 'evac', col: 1, row: 0, jitter: 0, facing: 's' },
       { kind: 'extinguisher', col: 30, row: 0, jitter: 0, facing: 's' },
+    ],
+    scenes: [
+      {
+        title: 'ЖДАЛИ ПРИЁМА',
+        cover: [
+          { kind: 'chair', col: 1, row: 11, jitter: 0, repeat: { count: 5, stepCol: 0, stepRow: 1.4 } },
+        ],
+        fixtures: [{ kind: 'rack', col: 2, row: 2 }],
+      },
+      {
+        title: 'РАЗГОВОР НЕ СОСТОЯЛСЯ',
+        cover: [
+          { kind: 'chair', col: 19, row: 9, jitter: 0 },
+          { kind: 'cardbox', col: 13, row: 8, jitter: 0 },
+        ],
+        fixtures: [{ kind: 'bin', col: 18, row: 11, toppled: { x: 0.6, y: 0.8 } }],
+      },
     ],
     rows: [
       OPEN,
@@ -381,6 +502,24 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
       { kind: 'calendar', col: 9, row: 0, jitter: 1, facing: 's',
         repeat: { count: 3, stepCol: 7, stepRow: 0 } },
     ],
+    scenes: [
+      {
+        // Один стол стоит отдельно от рядов, лицом от всех остальных.
+        title: 'ОДИН ОСТАЛСЯ ПОСЛЕ ВСЕХ',
+        cover: [
+          { kind: 'desk', col: 30, row: 5, jitter: 0 },
+          { kind: 'typewriter', col: 29, row: 4, jitter: 0 },
+          { kind: 'chair', col: 29, row: 6, jitter: 0 },
+        ],
+      },
+      {
+        title: 'ПЕРЕРЫВ',
+        cover: [
+          { kind: 'chair', col: 22, row: 17, jitter: 0, repeat: { count: 4, stepCol: 1.5, stepRow: 0 } },
+        ],
+        fixtures: [{ kind: 'ashtray', col: 29, row: 17 }],
+      },
+    ],
     rows: [
       '................................',
       '..%%%%%.%%%%%.....%%%%%.%%%%%...',
@@ -432,6 +571,24 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
       { kind: 'board', col: 6, row: 0, jitter: 0, facing: 'n' },
       { kind: 'panel', col: 26, row: 0, jitter: 0, facing: 'n', chance: 0.7 },
       { kind: 'evac', col: 2, row: 0, jitter: 0, facing: 's' },
+    ],
+    scenes: [
+      {
+        title: 'БУМАГУ БРОСИЛИ',
+        cover: [
+          { kind: 'cardbox', col: 18, row: 14, jitter: 0 },
+          { kind: 'chair', col: 14, row: 14, jitter: 0 },
+        ],
+        fixtures: [{ kind: 'trolley', col: 16, row: 13, toppled: { x: 0, y: 1 } }],
+      },
+      {
+        title: 'ПЕРЕБИРАЛИ АРХИВ',
+        cover: [
+          { kind: 'cardbox', col: 9, row: 9, jitter: 0, repeat: { count: 3, stepCol: 1.5, stepRow: 0 } },
+          { kind: 'chair', col: 7, row: 9, jitter: 0 },
+        ],
+        fixtures: [{ kind: 'bin', col: 14, row: 9 }],
+      },
     ],
     rows: [
       '................................',
@@ -486,6 +643,23 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
       { kind: 'evac', col: 2, row: 0, jitter: 0, facing: 's' },
       { kind: 'tube', col: 31, row: 3, jitter: 0, facing: 'e',
         repeat: { count: 2, stepCol: 0, stepRow: 6 } },
+    ],
+    scenes: [
+      {
+        title: 'СОВЕЩАНИЕ ПРЕРВАЛИ',
+        cover: [
+          { kind: 'chair', col: 11, row: 4, jitter: 0 },
+          { kind: 'chair', col: 20, row: 13, jitter: 0 },
+          { kind: 'cardbox', col: 16, row: 5, jitter: 0 },
+        ],
+      },
+      {
+        title: 'ГОТОВИЛИ ПОМЕЩЕНИЕ',
+        cover: [
+          { kind: 'chair', col: 2, row: 16, jitter: 0, repeat: { count: 5, stepCol: 1.6, stepRow: 0 } },
+        ],
+        fixtures: [{ kind: 'rack', col: 1, row: 15 }],
+      },
     ],
     rows: [
       '................................',
