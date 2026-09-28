@@ -91,6 +91,11 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
       { kind: 'cabinet', col: 6, row: 9, jitter: 1 }, { kind: 'cabinet', col: 25, row: 8, jitter: 1 },
       { kind: 'chair', col: 16, row: 3, jitter: 3, chance: 0.6 }],
     decor: [
+      { kind: 'path', col: 2, row: 8, jitter: 0, repeat: { count: 7, stepCol: 4, stepRow: 0 } },
+      { kind: 'lamp', col: 5, row: 3, jitter: 0, repeat: { count: 4, stepCol: 7, stepRow: 0 } },
+      { kind: 'lamp-bad', col: 12, row: 12, jitter: 0 },
+      { kind: 'duct', col: 1, row: 0, jitter: 0, repeat: { count: 9, stepCol: 3.4, stepRow: 0 } },
+      { kind: 'paper', col: 4, row: 4, jitter: 3, chance: 0.6, repeat: { count: 10, stepCol: 2.6, stepRow: 1 } },
       { kind: 'evac', col: 2, row: 0, jitter: 0, facing: 'n' },
       { kind: 'extinguisher', col: 29, row: 0, jitter: 0, facing: 'n' },
       { kind: 'clock', col: 16, row: 0, jitter: 0, facing: 'n' },
@@ -130,6 +135,10 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
       { kind: 'chair', col: 16, row: 4, jitter: 2 }, { kind: 'chair', col: 16, row: 13, jitter: 2 },
       { kind: 'chair', col: 4, row: 9, jitter: 1, chance: 0.5 }],
     decor: [
+      { kind: 'path', col: 2, row: 8, jitter: 0, repeat: { count: 7, stepCol: 4, stepRow: 0 } },
+      { kind: 'lamp', col: 4, row: 2, jitter: 0, repeat: { count: 4, stepCol: 7, stepRow: 0 } },
+      { kind: 'lamp-bad', col: 25, row: 13, jitter: 0 },
+      { kind: 'paper', col: 3, row: 3, jitter: 4, chance: 0.75, repeat: { count: 14, stepCol: 2, stepRow: 0.9 } },
       { kind: 'clock', col: 16, row: 0, jitter: 0, facing: 'n' },
       { kind: 'board', col: 3, row: 0, jitter: 0, facing: 'n' },
       { kind: 'calendar', col: 27, row: 0, jitter: 0, facing: 'n', chance: 0.8 },
@@ -167,6 +176,11 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
     cover: [{ kind: 'cabinet', col: 16, row: 8, jitter: 1 }, { kind: 'chair', col: 8, row: 17, jitter: 2 },
       { kind: 'chair', col: 24, row: 17, jitter: 2, chance: 0.7 }],
     decor: [
+      { kind: 'path', col: 1, row: 8, jitter: 0, repeat: { count: 8, stepCol: 4, stepRow: 0 } },
+      { kind: 'lamp', col: 3, row: 7, jitter: 0, repeat: { count: 5, stepCol: 6, stepRow: 0 } },
+      { kind: 'lamp-bad', col: 27, row: 7, jitter: 0 },
+      { kind: 'duct', col: 1, row: 1, jitter: 0, repeat: { count: 10, stepCol: 3.1, stepRow: 0 } },
+      { kind: 'paper', col: 6, row: 9, jitter: 2, chance: 0.5, repeat: { count: 8, stepCol: 3, stepRow: 0 } },
       { kind: 'clock', col: 4, row: 0, jitter: 0, facing: 'n',
         repeat: { count: 6, stepCol: 5, stepRow: 0 } },
       { kind: 'portrait', col: 3, row: 0, jitter: 0, facing: 's',
@@ -205,6 +219,11 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
       { kind: 'cabinet', col: 23, row: 8, jitter: 2 }, { kind: 'chair', col: 16, row: 16, jitter: 2 },
       { kind: 'chair', col: 16, row: 0, jitter: 2, chance: 0.6 }],
     decor: [
+      { kind: 'path', col: 2, row: 8, jitter: 0, repeat: { count: 7, stepCol: 4, stepRow: 0 } },
+      { kind: 'path', col: 14, row: 2, jitter: 0, repeat: { count: 5, stepCol: 0, stepRow: 3 } },
+      { kind: 'lamp', col: 6, row: 4, jitter: 0, repeat: { count: 3, stepCol: 9, stepRow: 0 } },
+      { kind: 'lamp-bad', col: 15, row: 14, jitter: 0 },
+      { kind: 'paper', col: 8, row: 6, jitter: 3, chance: 0.5, repeat: { count: 8, stepCol: 2.4, stepRow: 0.7 } },
       { kind: 'evac', col: 2, row: 0, jitter: 0, facing: 'n' },
       { kind: 'tube', col: 0, row: 4, jitter: 0, facing: 'w',
         repeat: { count: 3, stepCol: 0, stepRow: 4 } },
@@ -242,6 +261,10 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
     cover: [{ kind: 'cabinet', col: 3, row: 9, jitter: 1 }, { kind: 'cabinet', col: 28, row: 9, jitter: 1 },
       { kind: 'chair', col: 16, row: 5, jitter: 2 }, { kind: 'chair', col: 16, row: 12, jitter: 2 }],
     decor: [
+      { kind: 'path', col: 2, row: 8, jitter: 0, repeat: { count: 7, stepCol: 4, stepRow: 0 } },
+      { kind: 'lamp', col: 4, row: 7, jitter: 0, repeat: { count: 4, stepCol: 7, stepRow: 0 } },
+      { kind: 'lamp-bad', col: 16, row: 1, jitter: 0 },
+      { kind: 'paper', col: 10, row: 8, jitter: 3, chance: 0.4, repeat: { count: 8, stepCol: 1.6, stepRow: 0.5 } },
       { kind: 'portrait', col: 12, row: 0, jitter: 0, facing: 'n',
         repeat: { count: 5, stepCol: 2, stepRow: 0 } },
       { kind: 'clock', col: 16, row: 0, jitter: 0, facing: 's' },
@@ -287,6 +310,12 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
     // Перегородки ломают линию взгляда, но не останавливают пули:
     // Инспектор здесь почти беспомощен, Регистратор накрывает поверх.
     decor: [
+      { kind: 'path', col: 2, row: 8, jitter: 0, repeat: { count: 7, stepCol: 4, stepRow: 0 } },
+      { kind: 'lamp', col: 4, row: 3, jitter: 0, repeat: { count: 4, stepCol: 7, stepRow: 0 } },
+      { kind: 'lamp', col: 4, row: 12, jitter: 0, repeat: { count: 4, stepCol: 7, stepRow: 0 } },
+      { kind: 'lamp-bad', col: 20, row: 7, jitter: 0 },
+      { kind: 'duct', col: 1, row: 17, jitter: 0, repeat: { count: 9, stepCol: 3.4, stepRow: 0 } },
+      { kind: 'paper', col: 5, row: 5, jitter: 4, chance: 0.7, repeat: { count: 16, stepCol: 1.7, stepRow: 0.6 } },
       { kind: 'arrow', col: 5, row: 0, jitter: 1, facing: 'n' },
       { kind: 'clock', col: 16, row: 0, jitter: 0, facing: 'n' },
       { kind: 'board', col: 25, row: 0, jitter: 0, facing: 'n' },
@@ -333,6 +362,10 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
     // Кабинет из стекла: видно всё, и тебя тоже. Стены простреливаются
     // и бьются, поэтому укрытие здесь расходуется прямо по ходу боя.
     decor: [
+      { kind: 'path', col: 2, row: 8, jitter: 0, repeat: { count: 7, stepCol: 4, stepRow: 0 } },
+      { kind: 'lamp', col: 5, row: 4, jitter: 0, repeat: { count: 3, stepCol: 9, stepRow: 0 } },
+      { kind: 'lamp-bad', col: 8, row: 13, jitter: 0 },
+      { kind: 'paper', col: 12, row: 7, jitter: 3, chance: 0.45, repeat: { count: 8, stepCol: 2, stepRow: 0.8 } },
       { kind: 'portrait', col: 9, row: 0, jitter: 0, facing: 'n',
         repeat: { count: 3, stepCol: 3, stepRow: 0 } },
       { kind: 'clock', col: 20, row: 0, jitter: 0, facing: 'n' },

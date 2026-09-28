@@ -51,6 +51,7 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
   const shakeLayer = new Container();
   const roomLayer = new Graphics();
   const decorLayer = new Graphics();
+  const flickerLayer = new Graphics();
   const dustLayer = new Graphics();
   const smokeLayer = new Graphics();
   const entityLayer = new Graphics();
@@ -70,7 +71,16 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
   // переставал принадлежать субъекту. Снизу ореол остаётся ореолом.
   // Антураж идёт сразу за помещением и до всего живого: он часть места,
   // а не участник сцены. Отдельным слоем — чтобы гаситься одной ручкой.
-  shakeLayer.addChild(roomLayer, decorLayer, dustLayer, smokeLayer, glowLayer, entityLayer, debugLayer);
+  shakeLayer.addChild(
+    roomLayer,
+    decorLayer,
+    flickerLayer,
+    dustLayer,
+    smokeLayer,
+    glowLayer,
+    entityLayer,
+    debugLayer,
+  );
   root.addChild(shakeLayer);
   app.stage.addChild(root);
 
@@ -129,6 +139,8 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
       }
       // Ручка гасит слой целиком и не требует перерисовки: он запечён.
       decorLayer.visible = TUNING.render.decorOn > 0;
+      flickerLayer.visible = decorLayer.visible;
+      if (flickerLayer.visible) drawFlicker(flickerLayer);
       profiler.end('КАДР: ТАЙЛМАП');
 
       const frame = app.ticker.deltaMS / 1000;
@@ -438,6 +450,7 @@ const WALK_LIFT = [0, 1, 0, 1];
  */
 function drawDecor(g: Graphics, w: World): void {
   g.clear();
+  flickers.length = 0;
   const room = currentRoom(w);
   if (room === undefined) return;
   const template = TEMPLATES_BY_ID.get(room.template);
@@ -483,7 +496,15 @@ function drawDecor(g: Graphics, w: World): void {
       }
 
       // Потолочное — это световое пятно на полу, а не предмет.
-      const alpha = spec.mount === 'ceiling' ? TUNING.render.decorCeilingAlpha : 1;
+      const alpha =
+        spec.alpha ?? (spec.mount === 'ceiling' ? TUNING.render.decorCeilingAlpha : 1);
+
+      // Мигающее не запекается: у него свой генератор и свой проход.
+      if (spec.flicker === true) {
+        flickers.push({ x, y, w: width, h: height, color: PALETTE[spec.color], alpha });
+        continue;
+      }
+
       g.rect(x, y, width, height).fill({ color: PALETTE[spec.color], alpha });
 
       if (spec.detail === undefined) continue;
@@ -498,6 +519,48 @@ function drawDecor(g: Graphics, w: World): void {
       g.rect(x + width * inset, y + height * inset, dw, dh).fill(PALETTE[spec.detail]);
     }
   }
+}
+
+/**
+ * Мигающие пятна света. Собираются при запекании слоя и рисуются каждый
+ * кадр: запечь мигание нельзя по определению.
+ */
+interface Flicker {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  color: number;
+  alpha: number;
+}
+
+const flickers: Flicker[] = [];
+
+/**
+ * Мигание считается по реальному времени кадра, а не по шагу симуляции:
+ * это картинка, и в детерминизм забега ей попадать незачем. Состояния
+ * нет вовсе — решение «гореть или нет» берётся хешем от номера отрезка,
+ * поэтому две панели в одной комнате мигают вразнобой и ничего не помнят.
+ */
+function flickerAlpha(time: number, seed: number): number {
+  const cfg = TUNING.render;
+  const rate = Math.max(0, cfg.lampFlickerRate);
+  if (rate <= 0) return 1;
+  const step = Math.floor(time * rate) + seed * 977;
+  const noise = Math.sin(step * 12.9898) * 43758.5453;
+  const value = noise - Math.floor(noise);
+  return value < cfg.lampFlickerDrop ? cfg.lampFlickerLow : 1;
+}
+
+function drawFlicker(g: Graphics): void {
+  g.clear();
+  if (flickers.length === 0) return;
+  const time = performance.now() / 1000;
+  flickers.forEach((spot, index) => {
+    const alpha = spot.alpha * flickerAlpha(time, index);
+    if (alpha <= 0) return;
+    g.rect(spot.x, spot.y, spot.w, spot.h).fill({ color: spot.color, alpha });
+  });
 }
 
 /**

@@ -1024,6 +1024,16 @@ export const TUNING = {
     /** На сколько деталь утоплена внутрь предмета с каждой стороны. */
     decorDetailInset: 0.18,
     /**
+     * Мигающая панель. Мигание считается по реальному времени кадра, а
+     * не по шагу симуляции: это картинка, и в детерминизм забега ей
+     * попадать незачем. lampFlickerRate — сколько раз в секунду панель
+     * решает, гореть ли ей; lampFlickerDrop — доля решений «погаснуть»;
+     * lampFlickerLow — во сколько раз тускнеет погасшая.
+     */
+    lampFlickerRate: 11,
+    lampFlickerDrop: 0.22,
+    lampFlickerLow: 0.25,
+    /**
      * Табличка помещения у проёма. Размер плашки считается от текста, а
      * не задан: цифра рисуется сеткой 3x5, signDigit — сторона её
      * пикселя, signGap — просвет между знаками, signPad — поля плашки.
@@ -1498,6 +1508,9 @@ export const PANEL: TuningGroup[] = [
     title: 'ВИЗУАЛ',
     fields: [
       { path: 'render.decorOn', label: 'АНТУРАЖ', min: 0, max: 1, step: 1 },
+      { path: 'render.decorCeilingAlpha', label: 'СВЕТ ПАНЕЛЕЙ', min: 0, max: 0.6, step: 0.01 },
+      { path: 'render.lampFlickerRate', label: 'ЧАСТОТА МИГАНИЯ ПАНЕЛИ', min: 0, max: 30, step: 1 },
+      { path: 'render.lampFlickerDrop', label: 'ДОЛЯ ПОГАСАНИЙ', min: 0, max: 1, step: 0.02 },
       { path: 'render.signDigit', label: 'ТАБЛИЧКА: ПИКСЕЛЬ ЦИФРЫ', min: 0, max: 5, step: 1 },
       { path: 'render.signInset', label: 'ТАБЛИЧКА: УТОПЛЕНА В СТЕНУ', min: 0, max: 12, step: 1 },
       { path: 'fx.bloomAlpha', label: 'СВЕЧЕНИЕ КРАСНОГО', min: 0, max: 2, step: 0.05 },
