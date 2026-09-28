@@ -7,7 +7,7 @@ import { WEAPON_FORMS } from '../data/weaponForms';
 import type { Health, PlayerC, World } from '../ecs';
 import { spawnBullet, type BulletSpec } from '../spawn';
 import { DEG, TUNING } from '../tuning';
-import { ammoMax, formStat, statAt } from '../weapon';
+import { ammoMax, formStat, infiniteReserve, statAt } from '../weapon';
 import { addShake } from './damage';
 
 /**
@@ -245,8 +245,13 @@ function reloadTick(w: World, p: PlayerC, dt: number): void {
   p.reloadTimer = 0;
   if (form === undefined) return;
   // Перезарядка не создаёт патроны, а переносит их из запаса. Сколько в
-  // запасе есть — столько и уйдёт в обойму.
-  const need = ammoMax(w, form.id) - Math.max(0, p.ammo[p.form] ?? 0);
+  // запасе есть — столько и уйдёт в обойму. У табельной формы запас
+  // бездонный: обойма набивается целиком и списывать не с чего.
+  const need = Math.max(0, ammoMax(w, form.id) - Math.max(0, p.ammo[p.form] ?? 0));
+  if (infiniteReserve(w, form.id)) {
+    p.ammo[p.form] = Math.max(0, p.ammo[p.form] ?? 0) + need;
+    return;
+  }
   const take = Math.max(0, Math.min(need, Math.floor(p.reserve[p.form] ?? 0)));
   p.ammo[p.form] = Math.max(0, p.ammo[p.form] ?? 0) + take;
   p.reserve[p.form] = Math.max(0, (p.reserve[p.form] ?? 0) - take);
@@ -258,7 +263,8 @@ export function startReload(w: World, p: PlayerC): boolean {
   if (form === undefined || p.reloading) return false;
   if ((p.ammo[p.form] ?? 0) >= ammoMax(w, form.id)) return false;
   // Пустой запас — перезаряжать нечем. Это и заставляет крутить колесо.
-  if ((p.reserve[p.form] ?? 0) <= 0) return false;
+  // Табельную форму это не касается: её запас не кончается.
+  if (!infiniteReserve(w, form.id) && (p.reserve[p.form] ?? 0) <= 0) return false;
   p.reloading = true;
   w.sounds.push('reload');
   p.reloadTimer = formStat(w, form.id, 'reloadTime');

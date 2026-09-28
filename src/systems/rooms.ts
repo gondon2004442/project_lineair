@@ -9,7 +9,7 @@ import { makeRng, type Rng } from '../rng';
 import { DIRS, opposite, standingInDoor } from '../room';
 import { TUNING } from '../tuning';
 import { enterRoom } from '../world';
-import { formStat, reserveMax, statAt } from '../weapon';
+import { formStat, infiniteReserve, reserveMax, statAt } from '../weapon';
 
 export function roomSystem(w: World): void {
   const room = w.floor.rooms[w.room];
@@ -114,6 +114,8 @@ function giveAmmo(w: World, rng: Rng): boolean {
   const need: { index: number; weight: number }[] = [];
   let total = 0;
   WEAPON_FORMS.forEach((form, index) => {
+    // Бездонной форме патроны не нужны: выдача ушла бы в никуда.
+    if (infiniteReserve(w, form.id)) return;
     const max = reserveMax(w, form.id);
     if ((p.reserve[index] ?? 0) >= max) return;
     const weight = Math.max(0, formStat(w, form.id, 'pickupWeight'));

@@ -18,7 +18,7 @@ import { counterInReach, counterOffer } from './systems/counter';
 import { dashIFrameWindow, dashSpec } from './systems/playerControl';
 import { hasRegistrar, vacancyCount } from './systems/staff';
 import type { Profiler } from './profiler';
-import { ammoMax, currentForm, formStat, reserveOf, statAt } from './weapon';
+import { ammoMax, currentForm, formStat, infiniteReserve, reserveOf, statAt } from './weapon';
 import { clearedCount, currentRoom } from './world';
 
 export interface Hud {
@@ -175,8 +175,12 @@ function weaponRows(w: World): string {
     const done = full <= 0 ? 1 : Math.max(0, Math.min(1, 1 - player.reloadTimer / full));
     ammo = `<span class="warn">${gauge(Math.round(done * 10), 10)} ПЕРЕЗАРЯДКА</span>`;
   } else {
+    const endless = infiniteReserve(w, form.id);
+    // Знак, а не слово: «ЗАПАС ТАБЕЛЬНЫЙ» шире самой длинной строки
+    // сводки, и панель прыгала по ширине при каждом повороте колеса.
+    const stock = endless ? 'ЗАПАС ∞' : `ЗАПАС ${reserve}`;
     ammo = `<span class="${ready ? 'ok' : 'warn'}">${gauge(have, max)} ${have}/${max}</span>` +
-      ` · <span class="${reserve > 0 ? 'ok' : 'warn'}">ЗАПАС ${reserve}</span>`;
+      ` · <span class="${endless || reserve > 0 ? 'ok' : 'warn'}">${stock}</span>`;
   }
 
   return row('ФОРМА (КОЛЕСО)', `<span class="ok">${head}</span>`) + row('ОБОЙМА (R)', ammo);

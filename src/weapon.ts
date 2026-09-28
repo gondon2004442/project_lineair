@@ -57,6 +57,16 @@ export function reserveMax(w: World, formId: string): number {
   return Math.max(0, Math.round(formStat(w, formId, 'reserveMax')));
 }
 
+/**
+ * Не кончается ли запас этой формы. Табельная точная одиночная стреляет
+ * бесконечно: обойма и перезарядка у неё остаются, а вот тупика «стрелять
+ * нечем и менять не на что» больше нет. Остальные формы копят запас и
+ * тратят его — этим и решают, когда крутить колесо.
+ */
+export function infiniteReserve(w: World, formId: string): boolean {
+  return formStat(w, formId, 'infiniteReserve') > 0;
+}
+
 /** Сколько патронов в запасе формы сейчас. */
 export function reserveOf(w: World, index: number): number {
   const player = w.playerC.get(w.player);

@@ -12,7 +12,7 @@ import type { Entity, World } from '../ecs';
 import { pickItem } from '../paperwork';
 import { makeRng } from '../rng';
 import { TUNING } from '../tuning';
-import { formStat, reserveMax, statAt } from '../weapon';
+import { formStat, infiniteReserve, reserveMax, statAt } from '../weapon';
 
 /** Ближайшая добыча в пределах вытянутой руки. */
 export function stashInReach(w: World): Entity {
@@ -163,7 +163,11 @@ export function issueSystem(w: World): void {
   const rng = makeRng((w.seed + w.room * TUNING.stash.seedStride + target) >>> 0);
   const roll = rng.float();
   if (roll < TUNING.stash.safeAmmoShare) {
-    const index = rng.int(WEAPON_FORMS.length);
+    // Выбор идёт среди тех форм, которым запас вообще нужен: бросок
+    // тратится тот же самый, поэтому поток случайности не съезжает.
+    const pool = WEAPON_FORMS.filter((f) => !infiniteReserve(w, f.id));
+    const picked = pool[rng.int(Math.max(1, pool.length))];
+    const index = WEAPON_FORMS.findIndex((f) => f.id === picked?.id);
     const form = WEAPON_FORMS[index];
     const p = w.playerC.get(w.player);
     if (form !== undefined && p !== undefined) {
