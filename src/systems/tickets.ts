@@ -5,6 +5,10 @@
  * ближе magnetRadius: собирать их поштучно, бегая по участку в бою, —
  * работа, а не игра. Но и сами не прилетают: подойти всё-таки надо.
  *
+ * Пока штат жив. Как только участок зачищен, радиус перестаёт что-либо
+ * значить и всё, что лежит на полу, идёт к субъекту через весь зал:
+ * обход углов за бумажками — это уже не решение, а повинность.
+ *
  * Уходя с участка, талоны с пола не забирают — clearExceptPlayer уносит
  * их вместе со всем остальным. Это цена спешки, а не потеря.
  */
@@ -73,6 +77,8 @@ export function ticketSystem(w: World, dt: number): void {
   // Радиус притяжения правит инструкция кладовщика, поэтому читается
   // через statAt, а не прямо из тюнинга.
   const magnet = statAt(w, 'ticket.magnetRadius');
+  // Участок зачищен — талоны идут сами, откуда бы ни лежали.
+  const swept = w.staffC.size === 0;
 
   for (const [e, ticket] of w.ticketC) {
     const t = w.transform.get(e);
@@ -99,7 +105,19 @@ export function ticketSystem(w: World, dt: number): void {
       destroyEntity(w, e);
       continue;
     }
-    if (ticket.delay > 0 || dist > magnet || dist <= 0) continue;
+    if (ticket.delay > 0 || dist <= 0) continue;
+    if (swept) {
+      // После зачистки талон ведут напрямую, а не толчком: толчок
+      // оставлял его лежать за первым же бетонным блоком, куда его
+      // прижимала физика. Скорость ровная, путь прямой.
+      const step = Math.min(dist, cfg.sweepSpeed * dt);
+      b.vx = 0;
+      b.vy = 0;
+      t.x += (dx / dist) * step;
+      t.y += (dy / dist) * step;
+      continue;
+    }
+    if (dist > magnet) continue;
     // Тянет тем сильнее, чем ближе: издалека это намёк, вблизи — захват.
     const pull = cfg.magnetPull * (1 - dist / magnet) * dt;
     b.vx += (dx / dist) * pull;

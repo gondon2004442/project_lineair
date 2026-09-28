@@ -23,6 +23,11 @@ export function physicsSystem(w: World, dt: number): void {
     const b = w.body.get(e);
     if (t === undefined || b === undefined) continue;
 
+    // Талоны после зачистки летят над мебелью и бетоном: их ведёт
+    // система талонов, и разбирать им столкновения нечего — иначе
+    // бумажка застревает за блоком в двух шагах от субъекта.
+    if (w.ticketC.has(e) && w.staffC.size === 0) continue;
+
     if (w.bulletC.has(e)) {
       // Пули не отталкиваются от стен, они в них гаснут — этим займётся система боя.
       t.x += b.vx * dt;
