@@ -349,6 +349,9 @@ function placeFixtures(w: World, room: RoomNode, entryX: number, entryY: number)
       const x = (TUNING.room.wall + col + 0.5) * TUNING.room.tile;
       const y = (TUNING.room.wall + row + 0.5) * TUNING.room.tile;
       if (!bodyFits(w.map, x, y, spec.radius)) continue;
+      // В проёме оборудование не ставим: bodyFits считает незапертую
+      // дверь проходимой, и кулер оказывался ровно в дверях.
+      if (!onOpenFloor(w.map, x, y, spec.radius)) continue;
       // Вплотную к входу не ставим: шагнул в участок и сразу уронил.
       if (Math.hypot(x - entryX, y - entryY) < cfg.clearance) continue;
       spawnFixture(w, spec, x, y);
@@ -560,6 +563,24 @@ function findSpawnSpot(
     if (Math.hypot(x - awayX, y - awayY) >= clearance) return { x, y };
   }
   return fallback ?? roomCenter(map);
+}
+
+/**
+ * Стоит ли тело целиком на полу. Отдельно от bodyFits: тот считает
+ * проходимой и незапертую дверь, а оборудованию в дверях не место.
+ */
+function onOpenFloor(map: TileMap, x: number, y: number, radius: number): boolean {
+  const left = Math.floor((x - radius) / map.size);
+  const right = Math.floor((x + radius) / map.size);
+  const top = Math.floor((y - radius) / map.size);
+  const bottom = Math.floor((y + radius) / map.size);
+  for (let cy = top; cy <= bottom; cy++) {
+    for (let cx = left; cx <= right; cx++) {
+      if (cx < 0 || cy < 0 || cx >= map.cols || cy >= map.rows) return false;
+      if (map.tiles[cy * map.cols + cx] !== TILE_FLOOR) return false;
+    }
+  }
+  return true;
 }
 
 /** Влезает ли тело радиуса radius целиком на свободные клетки. */

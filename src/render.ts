@@ -494,6 +494,29 @@ function drawDecor(g: Graphics, w: World): void {
         if (slot.facing === 's') y = (wall + TUNING.room.rows) * size;
         if (slot.facing === 'w') x = wall * size - width;
         if (slot.facing === 'e') x = (wall + TUNING.room.cols) * size;
+        // Проёмы пробивает генератор этажа по соседям, и слот о них не
+        // знает: картина садилась прямо на дверь. Занятую клетку стены
+        // пропускаем — над проёмом ничего не висит.
+        if (wallBusy(map, slot.facing, x, y, width, height)) continue;
+      }
+
+      // Покрытие обрезается по помещению: тропа доходила до боковых
+      // стен, а там проём, и дорожка залезала на дверь. Обрезка, а не
+      // пропуск: тропа должна доходить до порога и там кончаться.
+      if (spec.mount === 'floor' || spec.mount === 'ceiling') {
+        const left = wall * size;
+        const top = wall * size;
+        const right = (wall + TUNING.room.cols) * size;
+        const bottom = (wall + TUNING.room.rows) * size;
+        const x0 = Math.max(x, left);
+        const y0 = Math.max(y, top);
+        const x1 = Math.min(x + width, right);
+        const y1 = Math.min(y + height, bottom);
+        if (x1 <= x0 || y1 <= y0) continue;
+        x = x0;
+        y = y0;
+        width = x1 - x0;
+        height = y1 - y0;
       }
 
       // Потолочное — это световое пятно на полу, а не предмет.
@@ -587,6 +610,34 @@ function drawFixture(
   const lw = half * cfg.lyingWide;
   const lh = half * cfg.lyingFlat;
   block(g, x - lw, y - lh, lw * 2, lh * 2, draw.color);
+}
+
+/**
+ * Занята ли клетка стены под настенным предметом. Занятой считается
+ * всякая клетка, которая не глухая стена: проём, ворота, стеклянная
+ * перегородка. Вешать на них нечего.
+ */
+function wallBusy(
+  map: TileMap,
+  facing: 'n' | 's' | 'e' | 'w',
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): boolean {
+  const size = map.size;
+  const horizontal = facing === 'n' || facing === 's';
+  const line = facing === 'n' ? 0 : facing === 's' ? map.rows - 1 : facing === 'w' ? 0 : map.cols - 1;
+  const from = Math.floor((horizontal ? x : y) / size);
+  const to = Math.floor(((horizontal ? x + width : y + height) - 1) / size);
+
+  for (let i = from; i <= to; i++) {
+    const cx = horizontal ? i : line;
+    const cy = horizontal ? line : i;
+    if (cx < 0 || cy < 0 || cx >= map.cols || cy >= map.rows) return true;
+    if (map.tiles[cy * map.cols + cx] !== TILE_WALL) return true;
+  }
+  return false;
 }
 
 /**
