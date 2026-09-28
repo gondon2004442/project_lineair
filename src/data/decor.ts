@@ -37,10 +37,93 @@ export interface DecorSpec {
 }
 
 /**
- * Каталог. Пока пуст: сначала проверяется, что слой ничего не стоит,
- * и только потом он наполняется.
+ * Каталог облицовки. Всё, что висит на стенах и не делает ничего.
+ *
+ * Красного здесь нет и быть не может — даже у огнетушителя, который в
+ * жизни красный: красный принадлежит субъекту, и правило старше
+ * правдоподобия.
  */
-export const DECOR: DecorSpec[] = [];
+export const DECOR: DecorSpec[] = [
+  {
+    id: 'arrow',
+    title: 'УКАЗАТЕЛЬ СО СТРЕЛКОЙ',
+    mount: 'wall',
+    size: [1, 0.4],
+    color: 'plaster',
+    detail: 'paper',
+    detailShare: 0.55,
+  },
+  {
+    id: 'clock',
+    title: 'ЧАСЫ СЛУЖЕБНЫЕ',
+    mount: 'wall',
+    size: [0.5, 0.5],
+    color: 'enamel',
+    detail: 'paper',
+    detailShare: 0.45,
+  },
+  {
+    id: 'calendar',
+    title: 'КАЛЕНДАРЬ ПЕРЕКИДНОЙ',
+    mount: 'wall',
+    size: [0.55, 0.7],
+    color: 'concrete700',
+    detail: 'paper',
+    detailShare: 0.6,
+  },
+  {
+    id: 'portrait',
+    title: 'ПОРТРЕТ В РАМКЕ',
+    mount: 'wall',
+    size: [0.7, 0.9],
+    color: 'woodDark',
+    detail: 'concrete700',
+    detailShare: 0.7,
+  },
+  {
+    id: 'evac',
+    title: 'СХЕМА ЭВАКУАЦИИ',
+    mount: 'wall',
+    size: [1, 0.75],
+    color: 'concrete900',
+    detail: 'paper',
+    detailShare: 0.7,
+  },
+  {
+    id: 'extinguisher',
+    title: 'ОГНЕТУШИТЕЛЬ В НИШЕ',
+    mount: 'wall',
+    size: [0.35, 0.85],
+    color: 'enamel',
+    detail: 'concrete900',
+    detailShare: 0.25,
+  },
+  {
+    id: 'panel',
+    title: 'ЩИТОК С ТУМБЛЕРАМИ',
+    mount: 'wall',
+    size: [0.7, 0.55],
+    color: 'enamel',
+    detail: 'concrete900',
+    detailShare: 0.3,
+  },
+  {
+    id: 'board',
+    title: 'ДОСКА ОБЪЯВЛЕНИЙ',
+    mount: 'wall',
+    size: [1.4, 0.9],
+    color: 'woodDark',
+    detail: 'paper',
+    detailShare: 0.35,
+  },
+  {
+    id: 'tube',
+    title: 'ТРУБА ПНЕВМОПОЧТЫ',
+    mount: 'wall',
+    size: [0.3, 1],
+    color: 'enamel',
+  },
+];
 
 export const DECOR_BY_ID = new Map(DECOR.map((d) => [d.id, d]));
 

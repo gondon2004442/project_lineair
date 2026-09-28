@@ -123,7 +123,7 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
       profiler.begin('КАДР: ТАЙЛМАП');
       if (w.mapToken !== drawnToken) {
         drawnToken = w.mapToken;
-        drawRoom(roomLayer, w.map);
+        drawRoom(roomLayer, w.map, warmSector(w));
         drawDoorSigns(roomLayer, w);
         drawDecor(decorLayer, w);
       }
@@ -258,7 +258,14 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
  * обращённой в комнату, и латунным профилем над ней, стеклянные
  * перегородки вместо разрушаемого бетона, жёлтая разметка у проёмов.
  */
-function drawRoom(g: Graphics, map: TileMap): void {
+/** Офисный сектор одевается в дерево, бетонный остаётся бетонным. */
+function warmSector(w: World): boolean {
+  const room = currentRoom(w);
+  if (room === undefined) return false;
+  return TEMPLATES_BY_ID.get(room.template)?.sector === 'office';
+}
+
+function drawRoom(g: Graphics, map: TileMap, warm: boolean): void {
   g.clear();
   const size = map.size;
   for (let cy = 0; cy < map.rows; cy++) {
@@ -268,7 +275,7 @@ function drawRoom(g: Graphics, map: TileMap): void {
       const tile = map.tiles[cy * map.cols + cx];
 
       if (tile === TILE_WALL) {
-        drawPanelledWall(g, map, cx, cy, x, y, size);
+        drawPanelledWall(g, map, cx, cy, x, y, size, warm);
         continue;
       }
       if (tile === TILE_WEAK) {
@@ -466,12 +473,13 @@ function drawDecor(g: Graphics, w: World): void {
       let width = cw * size;
       let height = ch * size;
 
-      // Настенное прижимается к своей стене, а не висит в воздухе.
+      // Настенное садится НА стену, а не внутрь помещения: сверху
+      // висящее на стене видно как полосу на самой стене.
       if (spec.mount === 'wall' && slot.facing !== undefined) {
-        if (slot.facing === 'n') y = wall * size;
-        if (slot.facing === 's') y = (wall + TUNING.room.rows) * size - height;
-        if (slot.facing === 'w') x = wall * size;
-        if (slot.facing === 'e') x = (wall + TUNING.room.cols) * size - width;
+        if (slot.facing === 'n') y = wall * size - height;
+        if (slot.facing === 's') y = (wall + TUNING.room.rows) * size;
+        if (slot.facing === 'w') x = wall * size - width;
+        if (slot.facing === 'e') x = (wall + TUNING.room.cols) * size;
       }
 
       // Потолочное — это световое пятно на полу, а не предмет.
@@ -479,9 +487,15 @@ function drawDecor(g: Graphics, w: World): void {
       g.rect(x, y, width, height).fill({ color: PALETTE[spec.color], alpha });
 
       if (spec.detail === undefined) continue;
+      // Деталь садится внутрь предмета, а не режет его верхнюю кромку:
+      // иначе светлая полоса во всю ширину читается не как ярлык на
+      // предмете, а как сам предмет, и доска объявлений превращается в
+      // белое пятно на стене.
       const share = Math.max(0, Math.min(1, spec.detailShare ?? TUNING.render.decorDetailShare));
+      const inset = Math.max(0, Math.min(0.45, TUNING.render.decorDetailInset));
+      const dw = Math.max(1, width * (1 - inset * 2));
       const dh = Math.max(1, height * share);
-      g.rect(x, y, width, dh).fill(PALETTE[spec.detail]);
+      g.rect(x + width * inset, y + height * inset, dw, dh).fill(PALETTE[spec.detail]);
     }
   }
 }
@@ -701,11 +715,14 @@ function drawPanelledWall(
   x: number,
   y: number,
   size: number,
+  warm: boolean,
 ): void {
   // Сплошная заливка без выреза: соседние клетки стены сливаются в одну
   // массу, и сетки тайлов в стене не видно. Раньше у каждой клетки был
   // свой шов, и стена читалась как кладка из кубиков.
-  g.rect(x, y, size, size).fill(PALETTE.wall);
+  // Выше обшивки побелка, а не голый бетон: контора делала ремонт.
+  // Бетонный сектор остаётся бетонным — там ремонта не делали.
+  g.rect(x, y, size, size).fill(warm ? PALETTE.plaster : PALETTE.wall);
 
   const band = TUNING.render.wainscotBand;
   const rail = TUNING.render.brassRail;
@@ -717,11 +734,17 @@ function drawPanelledWall(
     const face = horizontal
       ? { x, y: dy < 0 ? y : y + size - band, w: size, h: band }
       : { x: dx < 0 ? x : x + size - band, y, w: band, h: size };
-    g.rect(face.x, face.y, face.w, face.h).fill(PALETTE.concrete500);
+    // Ореховая обшивка до полутора метров: сверху её видно полосой.
+    g.rect(face.x, face.y, face.w, face.h).fill(warm ? PALETTE.woodDark : PALETTE.concrete500);
     const edge = horizontal
       ? { x, y: dy < 0 ? y + band : y + size - band - rail, w: size, h: rail }
       : { x: dx < 0 ? x + band : x + size - band - rail, y, w: rail, h: size };
-    g.rect(edge.x, edge.y, edge.w, edge.h).fill(PALETTE.concrete300);
+    // Профиль поверх обшивки. Латунь сюда просилась и была примерена:
+    // тон у неё тот же, что у служебного жёлтого, только тусклее, и
+    // золотая рамка по всему периметру помещения начинала спорить с
+    // разметкой дверей. Жёлтое принадлежит должностям и разметке, а не
+    // стене, поэтому профиль серый — тёплым остаётся дерево.
+    g.rect(edge.x, edge.y, edge.w, edge.h).fill(warm ? PALETTE.concrete500 : PALETTE.concrete300);
 
     // Технологический шов опалубки: поперёк стены, раз в несколько
     // тайлов. Он и сообщает масштаб, который раньше сообщала сетка.

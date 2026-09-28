@@ -90,6 +90,14 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
     cover: [{ kind: 'chair', col: 8, row: 5, jitter: 2 }, { kind: 'chair', col: 23, row: 12, jitter: 2 },
       { kind: 'cabinet', col: 6, row: 9, jitter: 1 }, { kind: 'cabinet', col: 25, row: 8, jitter: 1 },
       { kind: 'chair', col: 16, row: 3, jitter: 3, chance: 0.6 }],
+    decor: [
+      { kind: 'evac', col: 2, row: 0, jitter: 0, facing: 'n' },
+      { kind: 'extinguisher', col: 29, row: 0, jitter: 0, facing: 'n' },
+      { kind: 'clock', col: 16, row: 0, jitter: 0, facing: 'n' },
+      { kind: 'arrow', col: 6, row: 0, jitter: 1, facing: 's', chance: 0.7 },
+      { kind: 'portrait', col: 10, row: 0, jitter: 0, facing: 's',
+        repeat: { count: 4, stepCol: 2, stepRow: 0 } },
+    ],
     rows: [
       OPEN,
       OPEN,
@@ -121,6 +129,13 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
     cover: [{ kind: 'cabinet', col: 9, row: 9, jitter: 1 }, { kind: 'cabinet', col: 22, row: 9, jitter: 1 },
       { kind: 'chair', col: 16, row: 4, jitter: 2 }, { kind: 'chair', col: 16, row: 13, jitter: 2 },
       { kind: 'chair', col: 4, row: 9, jitter: 1, chance: 0.5 }],
+    decor: [
+      { kind: 'clock', col: 16, row: 0, jitter: 0, facing: 'n' },
+      { kind: 'board', col: 3, row: 0, jitter: 0, facing: 'n' },
+      { kind: 'calendar', col: 27, row: 0, jitter: 0, facing: 'n', chance: 0.8 },
+      { kind: 'evac', col: 1, row: 0, jitter: 0, facing: 's' },
+      { kind: 'panel', col: 24, row: 0, jitter: 1, facing: 's', chance: 0.6 },
+    ],
     rows: [
       OPEN,
       '..####..####........####..####..',
@@ -151,6 +166,13 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
     staffing: ['patrol'],
     cover: [{ kind: 'cabinet', col: 16, row: 8, jitter: 1 }, { kind: 'chair', col: 8, row: 17, jitter: 2 },
       { kind: 'chair', col: 24, row: 17, jitter: 2, chance: 0.7 }],
+    decor: [
+      { kind: 'clock', col: 4, row: 0, jitter: 0, facing: 'n',
+        repeat: { count: 6, stepCol: 5, stepRow: 0 } },
+      { kind: 'portrait', col: 3, row: 0, jitter: 0, facing: 's',
+        repeat: { count: 5, stepCol: 6, stepRow: 0 } },
+      { kind: 'arrow', col: 15, row: 0, jitter: 0, facing: 'n' },
+    ],
     rows: [
       '....##########....##########....',
       '....##########....##########....',
@@ -182,6 +204,13 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
     cover: [{ kind: 'chair', col: 16, row: 8, jitter: 3 }, { kind: 'cabinet', col: 8, row: 8, jitter: 2 },
       { kind: 'cabinet', col: 23, row: 8, jitter: 2 }, { kind: 'chair', col: 16, row: 16, jitter: 2 },
       { kind: 'chair', col: 16, row: 0, jitter: 2, chance: 0.6 }],
+    decor: [
+      { kind: 'evac', col: 2, row: 0, jitter: 0, facing: 'n' },
+      { kind: 'tube', col: 0, row: 4, jitter: 0, facing: 'w',
+        repeat: { count: 3, stepCol: 0, stepRow: 4 } },
+      { kind: 'extinguisher', col: 31, row: 0, jitter: 0, facing: 'n' },
+      { kind: 'clock', col: 16, row: 0, jitter: 0, facing: 's' },
+    ],
     rows: [
       OPEN,
       '....##....##..........##....##..',
@@ -212,6 +241,13 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
     staffing: ['head_office'],
     cover: [{ kind: 'cabinet', col: 3, row: 9, jitter: 1 }, { kind: 'cabinet', col: 28, row: 9, jitter: 1 },
       { kind: 'chair', col: 16, row: 5, jitter: 2 }, { kind: 'chair', col: 16, row: 12, jitter: 2 }],
+    decor: [
+      { kind: 'portrait', col: 12, row: 0, jitter: 0, facing: 'n',
+        repeat: { count: 5, stepCol: 2, stepRow: 0 } },
+      { kind: 'clock', col: 16, row: 0, jitter: 0, facing: 's' },
+      { kind: 'evac', col: 1, row: 0, jitter: 0, facing: 's' },
+      { kind: 'extinguisher', col: 30, row: 0, jitter: 0, facing: 's' },
+    ],
     rows: [
       OPEN,
       OPEN,
@@ -250,6 +286,14 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
     ],
     // Перегородки ломают линию взгляда, но не останавливают пули:
     // Инспектор здесь почти беспомощен, Регистратор накрывает поверх.
+    decor: [
+      { kind: 'arrow', col: 5, row: 0, jitter: 1, facing: 'n' },
+      { kind: 'clock', col: 16, row: 0, jitter: 0, facing: 'n' },
+      { kind: 'board', col: 25, row: 0, jitter: 0, facing: 'n' },
+      { kind: 'panel', col: 2, row: 0, jitter: 0, facing: 's' },
+      { kind: 'calendar', col: 9, row: 0, jitter: 1, facing: 's',
+        repeat: { count: 3, stepCol: 7, stepRow: 0 } },
+    ],
     rows: [
       '................................',
       '..%%%%%.%%%%%.....%%%%%.%%%%%...',
@@ -288,6 +332,14 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
     ],
     // Кабинет из стекла: видно всё, и тебя тоже. Стены простреливаются
     // и бьются, поэтому укрытие здесь расходуется прямо по ходу боя.
+    decor: [
+      { kind: 'portrait', col: 9, row: 0, jitter: 0, facing: 'n',
+        repeat: { count: 3, stepCol: 3, stepRow: 0 } },
+      { kind: 'clock', col: 20, row: 0, jitter: 0, facing: 'n' },
+      { kind: 'evac', col: 2, row: 0, jitter: 0, facing: 's' },
+      { kind: 'tube', col: 31, row: 3, jitter: 0, facing: 'e',
+        repeat: { count: 2, stepCol: 0, stepRow: 6 } },
+    ],
     rows: [
       '................................',
       '................................',
