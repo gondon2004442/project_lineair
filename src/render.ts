@@ -53,6 +53,7 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
   const roomLayer = new Graphics();
   const decorLayer = new Graphics();
   const flickerLayer = new Graphics();
+  const spillLayer = new Graphics();
   const dustLayer = new Graphics();
   const smokeLayer = new Graphics();
   const entityLayer = new Graphics();
@@ -76,6 +77,7 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
     roomLayer,
     decorLayer,
     flickerLayer,
+    spillLayer,
     dustLayer,
     smokeLayer,
     glowLayer,
@@ -158,6 +160,11 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
       }
       const shake = w.fx.shake;
       shakeLayer.position.set(shakeX * shake, shakeY * shake);
+
+      profiler.begin('КАДР: ПЯТНА');
+      spillLayer.clear();
+      drawSpills(spillLayer, w);
+      profiler.end('КАДР: ПЯТНА');
 
       profiler.begin('КАДР: ПЫЛЬ');
       dust.update(frame);
@@ -556,7 +563,6 @@ function drawDecor(g: Graphics, w: World): void {
  */
 function drawFixture(
   g: Graphics,
-  e: number,
   fixture: { kind: string; toppled: boolean; spillX: number; spillY: number },
   draw: { size: number; color: number },
   x: number,
@@ -578,39 +584,78 @@ function drawFixture(
     return;
   }
 
-  // Пятно: вытянуто по ходу удара, поэтому видно, откуда прилетело.
-  if (spec !== undefined) {
-    const spread = half * spec.spillSpread;
-    const along = spread * cfg.spillStretch;
-    const cx = x + fixture.spillX * spread * 0.4;
-    const cy = y + fixture.spillY * spread * 0.4;
-    const wide = Math.abs(fixture.spillX) >= Math.abs(fixture.spillY);
-    g.ellipse(cx, cy, wide ? along : spread, wide ? spread : along).fill({
-      color: PALETTE[spec.spill as keyof typeof PALETTE],
-      alpha: cfg.spillAlpha,
-    });
-
-    if (spec.spillDetail !== undefined) {
-      // Отметины считаются от номера сущности: они не должны дрожать
-      // от кадра к кадру и не должны трогать поток симуляции.
-      const marks = Math.max(0, Math.round(cfg.spillMarks));
-      const size = cfg.spillMarkSize;
-      for (let i = 0; i < marks; i++) {
-        const seed = Math.sin((e * 7 + i * 31) * 12.9898) * 43758.5453;
-        const a = (seed - Math.floor(seed)) * Math.PI * 2;
-        const r = ((Math.sin((e * 13 + i * 17) * 78.233) + 1) / 2) * spread;
-        g.rect(cx + Math.cos(a) * r - size / 2, cy + Math.sin(a) * r - size / 2, size, size).fill({
-          color: PALETTE[spec.spillDetail as keyof typeof PALETTE],
-          alpha: cfg.spillMarkAlpha,
-        });
-      }
-    }
-  }
+  // Пятно рисуется не здесь: оно лежит НА ПОЛУ, своим слоем под всем
+  // живым. Пока оно шло вместе с сущностью, лужа наезжала на шкафы и
+  // на самого субъекта и читалась как предмет, а не как пролитое.
 
   // Само лежащее: ниже и шире, чем было.
   const lw = half * cfg.lyingWide;
   const lh = half * cfg.lyingFlat;
   block(g, x - lw, y - lh, lw * 2, lh * 2, draw.color);
+}
+
+/**
+ * Детерминированный шум от номера сущности: пятно не должно дрожать от
+ * кадра к кадру и не должно трогать поток симуляции.
+ */
+function spillNoise(e: number, i: number): number {
+  const v = Math.sin((e * 7 + i * 31) * 12.9898) * 43758.5453;
+  return v - Math.floor(v);
+}
+
+/**
+ * Пятна на полу: пролитое из опрокинутого оборудования.
+ *
+ * Это НЕ предмет. Это изменение цвета пола, поэтому пятно лежит своим
+ * слоем сразу за помещением — под мебелью, под штатом, под субъектом, —
+ * и оно почти прозрачно: сквозь кофейную лужу обязана читаться плитка.
+ *
+ * Форма — клякса, а не овал: радиус гуляет по кругу от номера сущности.
+ * Ровный овал читался как накрывающая всё тарелка.
+ */
+function drawSpills(g: Graphics, w: World): void {
+  const cfg = TUNING.fixture;
+  const points = Math.max(3, Math.round(cfg.spillPoints));
+
+  for (const [e, fixture] of w.fixtureC) {
+    if (!fixture.toppled) continue;
+    const t = w.transform.get(e);
+    const draw = w.drawC.get(e);
+    const spec = FIXTURES_BY_ID.get(fixture.kind);
+    if (t === undefined || draw === undefined || spec === undefined) continue;
+
+    // Пятно не шевелится, поэтому интерполяция ему не нужна.
+    const spread = draw.size * spec.spillSpread;
+    const along = spread * cfg.spillStretch;
+    const wide = Math.abs(fixture.spillX) >= Math.abs(fixture.spillY);
+    const rx = wide ? along : spread;
+    const ry = wide ? spread : along;
+    const cx = t.x + fixture.spillX * spread * 0.4;
+    const cy = t.y + fixture.spillY * spread * 0.4;
+
+    const poly: number[] = [];
+    for (let i = 0; i < points; i++) {
+      const a = (i / points) * Math.PI * 2;
+      const wobble = 1 - cfg.spillWobble * spillNoise(e, i);
+      poly.push(cx + Math.cos(a) * rx * wobble, cy + Math.sin(a) * ry * wobble);
+    }
+    g.poly(poly).fill({
+      color: PALETTE[spec.spill as keyof typeof PALETTE],
+      alpha: cfg.spillAlpha,
+    });
+
+    if (spec.spillDetail === undefined) continue;
+    const marks = Math.max(0, Math.round(cfg.spillMarks));
+    const size = cfg.spillMarkSize;
+    for (let i = 0; i < marks; i++) {
+      const a = spillNoise(e, i + 100) * Math.PI * 2;
+      const r = spillNoise(e, i + 200) * spread;
+      g.rect(cx + Math.cos(a) * r - size / 2, cy + Math.sin(a) * r - size / 2, size, size).fill({
+        color: PALETTE[spec.spillDetail as keyof typeof PALETTE],
+        alpha: cfg.spillMarkAlpha,
+      });
+    }
+  }
 }
 
 /**
@@ -1173,7 +1218,7 @@ function drawEntities(g: Graphics, w: World, alpha: number): void {
     // Оборудование: стоящее видно как мебель, лежащее — как след.
     const fixture = w.fixtureC.get(e);
     if (fixture !== undefined) {
-      drawFixture(g, e, fixture, draw, x, y);
+      drawFixture(g, fixture, draw, x, y);
       continue;
     }
 

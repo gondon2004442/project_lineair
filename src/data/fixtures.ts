@@ -38,7 +38,7 @@ export const FIXTURES: FixtureSpec[] = [
     radius: 10,
     color: 'furniture',
     detail: 'glass',
-    spill: 'concrete700',
+    spill: 'coffee',
     spillSpread: 2.6,
   },
   {
@@ -75,7 +75,8 @@ export const FIXTURES: FixtureSpec[] = [
     radius: 12,
     color: 'furniture',
     detail: 'paper',
-    spill: 'woodDark',
+    // Тележка рассыпает бумагу, а не грязь: пятно под ней бумажное.
+    spill: 'worn',
     spillDetail: 'paper',
     spillSpread: 2.8,
   },
