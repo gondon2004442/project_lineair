@@ -22,6 +22,8 @@ export function chiefSystem(w: World, dt: number): void {
     const b = w.body.get(e);
     const staff = w.staffC.get(e);
     if (t === undefined || b === undefined || staff === undefined) continue;
+    // Приостановлен предписанием: ход пропускается целиком.
+    if (staff.frozen > 0) continue;
 
     let desiredVx = 0;
     let desiredVy = 0;

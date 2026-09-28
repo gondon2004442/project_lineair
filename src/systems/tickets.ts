@@ -40,19 +40,26 @@ export function ticketValue(w: World, e: Entity): number {
  * участка влиять не должен.
  */
 export function dropTickets(w: World, e: Entity): void {
-  const count = ticketValue(w, e);
-  if (count <= 0) return;
   const t = w.transform.get(e);
   if (t === undefined) return;
+  scatterTickets(w, t.x, t.y, ticketValue(w, e), e);
+}
+
+/**
+ * Рассыпать талоны в точке. Разлёт считается не из общего потока, а из
+ * seed, участка и соли: порядок событий на содержимое пола не влияет.
+ */
+export function scatterTickets(w: World, x: number, y: number, count: number, salt: number): void {
+  if (count <= 0) return;
   const cfg = TUNING.ticket;
   if (w.ticketC.size >= cfg.maxOnFloor) return;
 
-  const rng = makeRng((w.seed + w.room * TUNING.stash.seedStride + e) >>> 0);
+  const rng = makeRng((w.seed + w.room * TUNING.stash.seedStride + salt) >>> 0);
   for (let i = 0; i < count; i++) {
     const angle = rng.float() * Math.PI * 2;
     const speed = rng.range(cfg.spread * 0.4, cfg.spread);
     const ticket = createEntity(w);
-    w.transform.set(ticket, { x: t.x, y: t.y, px: t.x, py: t.y });
+    w.transform.set(ticket, { x, y, px: x, py: y });
     w.body.set(ticket, {
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,

@@ -15,7 +15,7 @@ import { makeRng, resolveSeed, seedPinned } from './rng';
 import { step } from './step';
 import { STEP, TUNING } from './tuning';
 import { DIRECTIVES, issuedDirectives } from './data/directives';
-import { ITEMS } from './data/items';
+import { ITEMS, ITEM_ID_CLASHES } from './data/items';
 import { spawnStaff } from './spawn';
 import { statAt } from './weapon';
 import { counterInReach, counterOffer } from './systems/counter';
@@ -124,6 +124,7 @@ async function boot(): Promise<void> {
       synergyFactor,
       makeRng,
       items: ITEMS,
+      itemIdClashes: ITEM_ID_CLASHES,
       directives: DIRECTIVES,
       // Антураж и шаблоны нужны стенду: иначе слой декора нечем
       // нагрузить и правило светлоты нечем проверить.

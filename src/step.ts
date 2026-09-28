@@ -10,7 +10,13 @@ import { auditorSystem } from './systems/postAuditor';
 import { chiefSystem } from './systems/postChief';
 import { courierSystem } from './systems/postCourier';
 import { registrarSystem } from './systems/postRegistrar';
-import { metronomeSystem, playerBodySystem, rosterSystem, separationSystem } from './systems/staff';
+import {
+  metronomeSystem,
+  playerBodySystem,
+  rosterSystem,
+  separationSystem,
+  suspensionSystem,
+} from './systems/staff';
 import { feedbackSystem, lifecycleSystem, statusSystem } from './systems/lifecycle';
 import { physicsSystem } from './systems/physics';
 import { propPushSystem, propSystem } from './systems/props';
@@ -55,6 +61,8 @@ export function step(w: World): void {
 
   profiler.begin('СИМ: ШТАТ');
   rosterSystem(w, STEP);
+  // Приостановка считается до должностей: ход пропускают уже по ней.
+  suspensionSystem(w, STEP);
   const beforeBeat = w.beat;
   metronomeSystem(w, STEP);
   const beatStruck = w.beat !== beforeBeat;

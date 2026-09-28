@@ -22,6 +22,8 @@ export function registrarSystem(w: World, dt: number): void {
     const b = w.body.get(e);
     const staff = w.staffC.get(e);
     if (t === undefined || b === undefined || staff === undefined) continue;
+    // Приостановлен предписанием: ход пропускается целиком.
+    if (staff.frozen > 0) continue;
 
     b.vx = approach(b.vx, 0, cfg.friction * dt);
     b.vy = approach(b.vy, 0, cfg.friction * dt);

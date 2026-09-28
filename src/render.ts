@@ -595,6 +595,16 @@ function drawFixture(
 }
 
 /**
+ * Печать: оттиск над приостановленным. Рамка и перекладина — читается
+ * за полвзгляда и ни на что другое в кадре не похоже.
+ */
+function drawStamp(g: Graphics, x: number, y: number): void {
+  const half = TUNING.render.suspendStamp;
+  g.rect(x - half, y - half, half * 2, half * 2).stroke({ width: 2, color: PALETTE.concrete100 });
+  g.rect(x - half * 0.6, y - 1, half * 1.2, 2).fill(PALETTE.concrete100);
+}
+
+/**
  * Детерминированный шум от номера сущности: пятно не должно дрожать от
  * кадра к кадру и не должно трогать поток симуляции.
  */
@@ -1340,6 +1350,9 @@ function drawEntities(g: Graphics, w: World, alpha: number): void {
     }
 
     drawPlates(g, x, y, draw.size, staff);
+    // Приостановлен: печать над головой. Знак неподвижный и глухой —
+    // ровно чтобы отличаться от телеграфа, который означает угрозу.
+    if (staff.frozen > 0) drawStamp(g, x, y - draw.size - TUNING.render.suspendLift);
     if (staff.plateFlash > 0) {
       const inset = TUNING.render.telegraphInset;
       g.rect(x - draw.size - inset, y - draw.size - inset, (draw.size + inset) * 2, (draw.size + inset) * 2)

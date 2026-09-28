@@ -9,17 +9,21 @@
  * Функция вернула false — применения не было, и кулдаун не тратится:
  * нажать E на полной обойме не должно стоить ничего.
  */
+import { PROP_RUBBLE } from '../data/props';
 import { ITEMS_BY_ID, type Item } from '../data/items';
 import { WEAPON_FORMS } from '../data/weaponForms';
-import type { World } from '../ecs';
+import { destroyEntity, type World } from '../ecs';
 import { DIRS, entryPosition } from '../room';
 import { TUNING, getTuning } from '../tuning';
 import { ammoMax } from '../weapon';
+import { scatterTickets } from './tickets';
 
 /** Реестр эффектов. Ключ тот же, что в TUNING.tool. */
 const EFFECTS: Record<string, (w: World) => boolean> = {
   mail: refillClip,
   transfer: toFarDoor,
+  suspend: suspendNearest,
+  writeoff: writeOffProperty,
 };
 
 /** Положить предмет в слот. Занятый слот заменяется: слот один. */
@@ -119,5 +123,67 @@ function toFarDoor(w: World): boolean {
     b.vx = 0;
     b.vy = 0;
   }
+  return true;
+}
+
+/**
+ * ПРЕДПИСАНИЕ О ПРИОСТАНОВКЕ: ближайшая должность замирает.
+ *
+ * Не убивает и не оглушает — останавливает. Ревизор при этом перестаёт
+ * считать, инспектор пропускает доли метронома, курьер стоит у самой
+ * двери. Урон замерший получает как обычно: предписание снимает
+ * давление, а не защищает того, кому вручено.
+ */
+function suspendNearest(w: World): boolean {
+  const pt = w.transform.get(w.player);
+  if (pt === undefined) return false;
+  const reach = TUNING.tool.suspendRange;
+
+  let target = -1;
+  let best = reach * reach;
+  for (const [e, staff] of w.staffC) {
+    if (staff.frozen > 0) continue;
+    const t = w.transform.get(e);
+    if (t === undefined) continue;
+    const d = (t.x - pt.x) ** 2 + (t.y - pt.y) ** 2;
+    if (d > best) continue;
+    best = d;
+    target = e;
+  }
+  if (target < 0) return false;
+
+  const staff = w.staffC.get(target);
+  if (staff === undefined) return false;
+  staff.frozen = TUNING.tool.suspendTime;
+  // Телеграф для этого не годится: тот же контур означает «сейчас
+  // ударит», и приостановленный читался бы как опасный. У предписания
+  // свой знак — печать над головой.
+  return true;
+}
+
+/**
+ * АКТ О СПИСАНИИ: вся мебель участка списывается разом.
+ *
+ * Обломков не остаётся — остаются талоны: списанное имущество и есть
+ * служебная мелочь. Взыскания за это нет, на то и акт: порча оформлена.
+ * Зато и укрытий на участке больше нет, и это настоящая цена.
+ */
+function writeOffProperty(w: World): boolean {
+  const p = w.playerC.get(w.player);
+  let written = 0;
+
+  for (const [e, prop] of [...w.propC]) {
+    // Обломок списывать нечего, а то, что сейчас в руках или в полёте,
+    // списывается вместе со всем: оно тоже имущество участка.
+    if (prop.kind === PROP_RUBBLE) continue;
+    const t = w.transform.get(e);
+    if (t === undefined) continue;
+    if (p !== undefined && p.held === e) p.held = -1;
+    destroyEntity(w, e);
+    scatterTickets(w, t.x, t.y, Math.max(0, Math.round(TUNING.tool.writeoffTickets)), e);
+    written += 1;
+  }
+  if (written === 0) return false;
+  w.sounds.push('impact');
   return true;
 }

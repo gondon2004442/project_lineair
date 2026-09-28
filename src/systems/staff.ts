@@ -53,6 +53,26 @@ export function metronomeSystem(w: World, dt: number): void {
 }
 
 /** Расталкивание: сотрудники не слипаются. Регистратор сидит и не двигается. */
+/**
+ * Приостановка по предписанию. Таймер тикает здесь, в одном месте, а
+ * каждая должность только смотрит на него и пропускает свой ход:
+ * держать отсчёт в шести системах — верный способ рассинхронить их.
+ *
+ * Замерший ещё и стоит: скорость обнуляется, иначе он продолжал бы
+ * ехать по инерции и приостановка читалась бы как «оглушён», а не как
+ * «остановлен предписанием».
+ */
+export function suspensionSystem(w: World, dt: number): void {
+  for (const [e, staff] of w.staffC) {
+    if (staff.frozen <= 0) continue;
+    staff.frozen = Math.max(0, staff.frozen - dt);
+    const b = w.body.get(e);
+    if (b === undefined) continue;
+    b.vx = 0;
+    b.vy = 0;
+  }
+}
+
 export function separationSystem(w: World, dt: number): void {
   for (const [a] of w.staffC) {
     const ta = w.transform.get(a);

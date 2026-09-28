@@ -23,6 +23,8 @@ export function courierSystem(w: World, dt: number): void {
     const b = w.body.get(e);
     const staff = w.staffC.get(e);
     if (t === undefined || b === undefined || staff === undefined || room === undefined) continue;
+    // Приостановлен предписанием: ход пропускается целиком.
+    if (staff.frozen > 0) continue;
 
     if (courier.door < 0 || room.neighbors[courier.door as Dir] < 0) {
       courier.door = nearestDoor(w, t.x, t.y);

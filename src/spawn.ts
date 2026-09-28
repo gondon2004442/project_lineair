@@ -118,6 +118,7 @@ export function spawnStaff(w: World, post: string, priority: number, x: number, 
     silhouette: spec === undefined ? 'sunken' : spec.silhouette,
     plateFlash: 0,
     control,
+    frozen: 0,
   });
   w.drawC.set(e, {
     shape: 'square',
