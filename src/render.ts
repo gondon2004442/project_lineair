@@ -16,7 +16,7 @@ import { counterInReach } from './systems/counter';
 import { dashIFrameWindow, dashSpec } from './systems/playerControl';
 import { COUNTERS_BY_KIND } from './data/counters';
 import { grabCandidate } from './systems/telekinesis';
-import { DIRS, TILE_DOOR, TILE_GATE, TILE_WALL, TILE_WEAK, type TileMap } from './room';
+import { DIRS, TILE_DOOR, TILE_GATE, TILE_WALL, TILE_WEAK, liftOpen, type TileMap } from './room';
 import { roomNumber } from './floor';
 import { currentRoom } from './world';
 import { DECOR_BY_ID } from './data/decor';
@@ -138,6 +138,7 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
         drawnToken = w.mapToken;
         drawRoom(roomLayer, w.map, warmSector(w));
         drawDoorSigns(roomLayer, w);
+        drawLift(roomLayer, w);
         drawDecor(decorLayer, w);
       }
       // Ручка гасит слой целиком и не требует перерисовки: он запечён.
@@ -757,6 +758,50 @@ const GLYPHS: Record<string, string[]> = {
   '-': ['000', '000', '111', '000', '000'],
   'Б': ['111', '100', '110', '101', '110'],
 };
+
+/**
+ * Лифт: решётка поперёк шахты и табло с номером уровня, куда он идёт.
+ *
+ * Он единственное место, где видно, что здание глубже, чем кажется, —
+ * поэтому это не «дверь на следующий уровень», а именно лифт, с
+ * решёткой и с числом на табло.
+ */
+function drawLift(g: Graphics, w: World): void {
+  if (!liftOpen(w.map)) return;
+  const size = w.map.size;
+  const wall = TUNING.room.wall;
+  const midX = wall + Math.floor(TUNING.room.cols / 2) - 1;
+  const midY = wall + Math.floor(TUNING.room.rows / 2) - 1;
+  const x = midX * size;
+  const y = midY * size;
+  const side = size * 2;
+  const cfg = TUNING.render;
+
+  // Решётка: прутья поперёк шахты. Сквозь них видно провал.
+  for (let bx = x + cfg.liftBarStep; bx < x + side; bx += cfg.liftBarStep) {
+    g.rect(bx, y, cfg.liftBarWidth, side).fill({ color: PALETTE.concrete500, alpha: 0.9 });
+  }
+  g.rect(x, y, side, side).stroke({
+    width: cfg.gateWidth,
+    color: PALETTE.yellow,
+    alpha: 0.6,
+    alignment: 1,
+  });
+
+  // Табло: куда поедет. Число отрицательное — вниз, других направлений
+  // у этого здания нет.
+  const text = String(w.depth - 1);
+  const digit = cfg.liftSignDigit;
+  const width = signWidth(text, digit, TUNING.render.signGap);
+  const pad = TUNING.render.signPad;
+  const plateW = width + pad * 2;
+  const plateH = digit * 5 + pad * 2;
+  const plateX = x + side / 2 - plateW / 2;
+  const plateY = y - cfg.liftSignLift;
+  g.rect(plateX, plateY, plateW, plateH).fill(PALETTE.black);
+  g.rect(plateX, plateY, plateW, plateH).stroke({ width: 1, color: PALETTE.concrete500 });
+  drawGlyphs(g, text, plateX + pad, plateY + pad, digit, TUNING.render.signGap, PALETTE.yellow);
+}
 
 /** Ширина набора в пикселях при заданном размере пикселя знака. */
 function signWidth(text: string, digit: number, gap: number): number {

@@ -2,6 +2,7 @@
 import type { World } from './ecs';
 import { POST_COURIER } from './data/posts';
 import { MINI_BOSS_POSTS, STAFFING_BY_ID, type StaffPost } from './data/staffing';
+import { DEEPEST, floorAt } from './data/floors';
 import { generateFloor, roomDoors, type RoomNode } from './floor';
 import type { InputSnapshot } from './input';
 import { pickItem } from './paperwork';
@@ -38,7 +39,7 @@ import { TUNING } from './tuning';
 
 export function createWorld(seed: number, input: InputSnapshot): World {
   const rng = makeRng(seed);
-  const floor = generateFloor(rng);
+  const floor = generateFloor(rng, -1);
   const w: World = {
     seed,
     rng,
@@ -74,6 +75,7 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     passes: TUNING.stash.passesStart,
     reward: { chance: TUNING.reward.base, dry: 0, lastItem: '', lastOrder: '', lastWeight: 1 },
     record: { penalty: 0, service: 0, broken: 0, roomClean: true, controlHere: 0 },
+    depth: -1,
     tickets: 0,
     listed: false,
     commendations: 0,
@@ -154,12 +156,43 @@ export function startRun(w: World): void {
   w.note = [];
   w.noteSlot = -1;
   w.runEnded = '';
+  w.depth = -1;
   w.record.penalty = 0;
   w.record.service = 0;
   w.record.broken = 0;
   w.record.roomClean = true;
   restorePlayer(w);
   enterRoom(w, w.floor.start, null);
+}
+
+/**
+ * Спуск на следующий уровень. Этаж собирается заново от своей посевной,
+ * участки сбрасываются — а субъект едет как есть: дело, талоны,
+ * здоровье, инвентарь, взыскание и выслуга. Поэтому глубина и страшна:
+ * то, чем ты кончил один этаж, и есть то, чем ты начинаешь следующий.
+ *
+ * Бланки и допуски добираются до минимума, как и на входе в забег:
+ * сэкономленное не копится, потраченное возвращается.
+ */
+export function descend(w: World): void {
+  w.depth -= 1;
+  // Своя посевная у каждого уровня: иначе второй этаж повторял бы
+  // первый на той же посевной.
+  const rng = makeRng((w.seed + Math.abs(w.depth) * TUNING.floor.depthSeedStride) >>> 0);
+  w.floor = generateFloor(rng, w.depth);
+  w.listed = false;
+  w.note = [];
+  w.noteSlot = -1;
+  w.blanks = Math.max(w.blanks, TUNING.blank.refillTo);
+  w.passes = Math.max(w.passes, TUNING.stash.passesStart);
+  w.record.roomClean = true;
+  w.status = 'playing';
+  enterRoom(w, w.floor.start, null);
+}
+
+/** Есть ли куда спускаться дальше или этот уровень последний. */
+export function deeperExists(w: World): boolean {
+  return w.depth > DEEPEST;
 }
 
 /** Полный запас хода, полные обоймы, полная энергия. */
@@ -536,7 +569,7 @@ function buildRoster(w: World, room: RoomNode): void {
       post: post.post,
       title: post.title,
       priority: post.priority,
-      quota: quotaFor(post.count),
+      quota: quotaFor(w, post.count),
       occupied: 0,
     });
   }
@@ -569,7 +602,7 @@ function staffRoom(w: World, room: RoomNode, entryX: number, entryY: number): vo
   const posts = [...staffing.posts, ...extra, ...runner].sort((a, b) => a.priority - b.priority);
   for (const post of posts) {
     const single = post.post === room.miniBoss || post.post === POST_COURIER;
-    const quota = single ? post.count : quotaFor(post.count);
+    const quota = single ? post.count : quotaFor(w, post.count);
     for (let i = 0; i < quota; i++) {
       const spot = findSpawnSpot(
         w.map,
@@ -634,8 +667,14 @@ function scatterProps(w: World, room: RoomNode, entryX: number, entryY: number):
   }
 }
 
-function quotaFor(count: number): number {
-  return Math.max(1, Math.round(count * TUNING.floor.staffScale));
+/**
+ * Сколько ставок держит участок. Глубина имеет право голоса: архив злее
+ * участка не тем, что у сотрудников больше здоровья, а тем, что их
+ * больше.
+ */
+function quotaFor(w: World, count: number): number {
+  const scale = TUNING.floor.staffScale * floorAt(w.depth).staffScale;
+  return Math.max(1, Math.round(count * scale));
 }
 
 /**

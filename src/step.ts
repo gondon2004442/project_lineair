@@ -17,7 +17,7 @@ import {
   separationSystem,
   suspensionSystem,
 } from './systems/staff';
-import { feedbackSystem, lifecycleSystem, statusSystem } from './systems/lifecycle';
+import { feedbackSystem, liftSystem, lifecycleSystem, statusSystem } from './systems/lifecycle';
 import { physicsSystem } from './systems/physics';
 import { propPushSystem, propSystem } from './systems/props';
 import { telekinesisSystem } from './systems/telekinesis';
@@ -106,6 +106,10 @@ export function step(w: World): void {
   } else {
     roomSystem(w);
     statusSystem(w);
+    // Лифт после статуса: шахту пробивает он, а шагнуть в неё можно уже
+    // на следующем шаге. И то и другое — шаг в проём, после которого
+    // мир собирается заново.
+    liftSystem(w);
   }
   profiler.end('СИМ: ЦИКЛ ЖИЗНИ');
   w.tick += 1;

@@ -1,13 +1,14 @@
 /** Служебный оверлей: состояние субъекта, схема этажа, отладка, seed. */
 import { TEMPLATES_BY_ID } from './data/roomTemplates';
 import { issuedDirectives } from './data/directives';
+import { floorAt } from './data/floors';
 import { ITEMS_BY_ID } from './data/items';
 import { toolCooldown } from './systems/tool';
 import { WEAPON_FORMS } from './data/weaponForms';
 import { STAFFING_BY_ID } from './data/staffing';
 import { entityCount, type World } from './ecs';
 import { PALETTE } from './palette';
-import { DIRS } from './room';
+import { DIRS, liftOpen } from './room';
 import { formatSeed } from './rng';
 import { STEP, TUNING } from './tuning';
 import { auditInProgress, pendingItems } from './systems/postAuditor';
@@ -249,6 +250,8 @@ function suppliesLine(w: World): string {
  * стоит отойти на шаг, а курьер бежит секунды и виден в кадре сам.
  */
 function promptRow(w: World): string {
+  const lift = liftRow(w);
+  if (lift !== '') return lift;
   const counter = counterRow(w);
   if (counter !== '') return counter;
   const stash = stashRow(w);
@@ -262,6 +265,16 @@ function promptRow(w: World): string {
   if (courier !== '') return courier;
   if (w.note.length > 0) return row('АРХИВ', '<span class="ok">ДЕЛО ПРОЧТЕНО · [I]</span>');
   return '';
+}
+
+/**
+ * Приглашение у лифта. Появляется, когда приёмная сдана: до того шахты
+ * нет вовсе, и говорить не о чем.
+ */
+function liftRow(w: World): string {
+  if (w.scene !== 'run' || w.room !== w.floor.end || !liftOpen(w.map)) return '';
+  const next = floorAt(w.depth - 1);
+  return row('ЛИФТ', `<span class="ok">${next.code} · ${next.title} — ШАГНИ В ШАХТУ</span>`);
 }
 
 /**
@@ -377,6 +390,7 @@ function dashBody(w: World): string {
     row('ПОСЛЕДНЯЯ ВЫДАЧА', lastIssueLine(w)),
     '<div class="profile-split"></div>',
     '<div class="subtitle">ЭТАЖ</div>',
+    row('УРОВЕНЬ', `${floorAt(w.depth).code} · ${floorAt(w.depth).title}`),
     row('СХЕМА', SCHEME_LABEL[w.floor.scheme] ?? w.floor.scheme),
     row('УЗЛОВ · ПЕРЕХОДОВ', nodeLine(w)),
     '<div class="profile-split"></div>',

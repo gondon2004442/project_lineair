@@ -116,6 +116,30 @@ export function buildLobbyMap(): TileMap {
   return map;
 }
 
+/**
+ * Пробить шахту лифта в середине помещения. Те же клетки прохода, что в
+ * вестибюле: шагнул — поехал, никаких кнопок. Ставится, когда приёмная
+ * сдана, и до того её нет вовсе.
+ */
+export function openLift(map: TileMap): void {
+  const midX = WALL + Math.floor(TUNING.room.cols / 2) - 1;
+  const midY = WALL + Math.floor(TUNING.room.rows / 2) - 1;
+  for (let dy = 0; dy < 2; dy++) {
+    for (let dx = 0; dx < 2; dx++) {
+      const at = (midY + dy) * map.cols + midX + dx;
+      map.tiles[at] = TILE_GATE;
+      map.weakHp[at] = 0;
+    }
+  }
+}
+
+/** Пробита ли уже шахта: по ней же решают, надо ли перерисовывать карту. */
+export function liftOpen(map: TileMap): boolean {
+  const midX = WALL + Math.floor(TUNING.room.cols / 2) - 1;
+  const midY = WALL + Math.floor(TUNING.room.rows / 2) - 1;
+  return map.tiles[midY * map.cols + midX] === TILE_GATE;
+}
+
 /** Стоит ли точка на проходе в аномалию. */
 export function isGatePoint(map: TileMap, x: number, y: number): boolean {
   return tileAtPoint(map, x, y) === TILE_GATE;

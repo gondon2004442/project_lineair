@@ -1,5 +1,7 @@
 /** Таймеры тел, смерть и состояние забега. */
 import { destroyEntity, type World } from '../ecs';
+import { isGatePoint, liftOpen, openLift } from '../room';
+import { descend, deeperExists } from '../world';
 import { dropTickets } from './tickets';
 import { TUNING } from '../tuning';
 
@@ -55,10 +57,38 @@ function commend(w: World): void {
 export function statusSystem(w: World): void {
   if (w.status !== 'playing') return;
   const office = w.floor.rooms[w.floor.end];
-  if (office !== undefined && office.cleared) {
+  if (office === undefined || !office.cleared) return;
+
+  // Приёмная сдана — открывается лифт. Забег на этом больше не кончается:
+  // здание глубже, и это единственное место, где видно, насколько.
+  if (w.room === w.floor.end && !liftOpen(w.map)) {
+    openLift(w.map);
+    // Карта запечена: без отметки шахта не появится до смены участка.
+    w.mapToken += 1;
+  }
+  if (!deeperExists(w)) {
     w.status = 'cleared';
     w.runEnded = 'cleared';
   }
+}
+
+/**
+ * Шаг в лифт. Как и в вестибюле: никаких кнопок и подтверждений —
+ * встал в шахту, поехал.
+ */
+export function liftSystem(w: World): void {
+  if (w.scene !== 'run' || w.status !== 'playing') return;
+  if (!deeperExists(w)) return;
+  const office = w.floor.rooms[w.floor.end];
+  if (office === undefined || !office.cleared || w.room !== w.floor.end) return;
+  const t = w.transform.get(w.player);
+  if (t === undefined || !isGatePoint(w.map, t.x, t.y)) return;
+  // В шахту надо ВОЙТИ, а не оказаться в ней. Приёмная сдаётся чаще
+  // всего в середине зала — ровно там, где пробивается шахта, — и лифт
+  // увозил бы субъекта в тот же миг, не спросив.
+  if (isGatePoint(w.map, t.px, t.py)) return;
+  w.sounds.push('gate');
+  descend(w);
 }
 
 export function feedbackSystem(w: World, dt: number): void {

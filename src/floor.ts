@@ -16,6 +16,7 @@ import {
   STAFFING_ORDINARY,
   STAFFING_PASSAGE,
 } from './data/staffing';
+import { floorAt, type FloorSpec } from './data/floors';
 import type { Rng } from './rng';
 import { DIRS, DIR_STEP, opposite, type Dir } from './room';
 import { TUNING } from './tuning';
@@ -56,6 +57,8 @@ export interface Floor {
   /** Размер сетки для мини-карты. */
   width: number;
   height: number;
+  /** Какой это уровень: −1, −2, ... Ставится сборщиком. */
+  depth: number;
 }
 
 interface Draft {
@@ -90,11 +93,20 @@ export function roomNumber(room: RoomNode): string {
   return room.corridor ? `${base}-Б` : String(base);
 }
 
-export function generateFloor(rng: Rng): Floor {
+/**
+ * Какой уровень сейчас собирается. Сборка идёт вглубь через несколько
+ * функций, и таскать описание этажа параметром через все — значит
+ * переписать половину файла ради одного поля. Оно ставится на время
+ * сборки и снимается после: генератор синхронный, перекрыться нечему.
+ */
+let building: FloorSpec = floorAt(-1);
+
+export function generateFloor(rng: Rng, depth = -1): Floor {
+  building = floorAt(depth);
   const scheme = SCHEMES[rng.int(SCHEMES.length)] ?? 'line';
-  if (scheme === 'ring') return buildRing(rng);
-  if (scheme === 'fork') return buildFork(rng);
-  return buildLine(rng);
+  const floor = scheme === 'ring' ? buildRing(rng) : scheme === 'fork' ? buildFork(rng) : buildLine(rng);
+  floor.depth = building.depth;
+  return floor;
 }
 
 /** Линейная схема с ответвлениями: длинный путь и один-два тупика. */
@@ -374,6 +386,7 @@ function finish(drafts: Draft[], rng: Rng, scheme: FloorScheme): Floor {
     end: end < 0 ? 0 : end,
     width: maxX - minX + 1,
     height: maxY - minY + 1,
+    depth: building.depth,
   };
 }
 
@@ -387,8 +400,14 @@ function chooseTemplate(rng: Rng, kind: RoomKind, depth: number): string {
   if (kind === 'end') return TEMPLATE_END;
 
   const want = depth < TUNING.floor.difficultyMid ? 1 : depth < TUNING.floor.difficultyDeep ? 2 : 3;
-  const fits = ROOM_TEMPLATES.filter((t) => t.id !== TEMPLATE_END && t.difficulty <= want && t.weight > 0);
-  const pool = fits.length > 0 ? fits : ROOM_TEMPLATES.filter((t) => t.id !== TEMPLATE_END);
+  // Пул уровня: архив собирается из картотек и копировальных, участок —
+  // из буфетов и приёмных. Пустой пул значит «все подряд».
+  const allowed = building.templates;
+  const here = allowed.length === 0
+    ? ROOM_TEMPLATES
+    : ROOM_TEMPLATES.filter((t) => allowed.includes(t.id));
+  const fits = here.filter((t) => t.id !== TEMPLATE_END && t.difficulty <= want && t.weight > 0);
+  const pool = fits.length > 0 ? fits : here.filter((t) => t.id !== TEMPLATE_END);
   let total = 0;
   for (const t of pool) total += t.weight;
   if (total <= 0) return TEMPLATE_START;

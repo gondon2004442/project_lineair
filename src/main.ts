@@ -24,7 +24,8 @@ import { counterInReach, counterOffer } from './systems/counter';
 import { deskPrice, issueOffer, safeContents } from './systems/issue';
 import { DECOR, DECOR_BY_ID, DECOR_TOO_LIGHT } from './data/decor';
 import { TEMPLATES_BY_ID } from './data/roomTemplates';
-import { createWorld, enterLobby, enterRoom } from './world';
+import { liftOpen } from './room';
+import { createWorld, descend, enterLobby, enterRoom, startRun } from './world';
 
 /** Приоритеты тикера Pixi: наш проход до отрисовки и замер сразу после неё. */
 const TICKER_BEFORE_RENDER = 0;
@@ -112,6 +113,10 @@ async function boot(): Promise<void> {
       world: () => world,
       createWorld,
       enterRoom,
+      // Вертикаль: стенд спускает мир руками и сверяет, что переехало.
+      descend,
+      startRun,
+      liftOpen,
       step,
       spawnStaff,
       statAt,
