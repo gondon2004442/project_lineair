@@ -14,7 +14,7 @@ import { auditInProgress, pendingItems } from './systems/postAuditor';
 import { hasChief } from './systems/postChief';
 import { courierTarget } from './systems/postCourier';
 import { synergyFactor } from './paperwork';
-import { issueOffer, stashInReach } from './systems/issue';
+import { issueOffer, safeContents, stashInReach } from './systems/issue';
 import { counterInReach, counterOffer } from './systems/counter';
 import { dashIFrameWindow, dashSpec } from './systems/playerControl';
 import { hasRegistrar, vacancyCount } from './systems/staff';
@@ -450,8 +450,11 @@ function stashRow(w: World): string {
   const stash = w.stashC.get(target);
   if (stash === undefined || stash.opened) return '';
   const offer = issueOffer(w, target);
-  if (!offer.ok) return row(stash.title, `<span class="warn">${offer.text}</span>`);
-  return row(`F · ${stash.title}`, `<span class="ok">${offer.text}</span>`);
+  // Оплаченная опись дописывается к названию шкафа: за этим её и берут.
+  const listed = w.listed ? safeContents(w, target) : '';
+  const title = listed === '' ? stash.title : `${stash.title} · ${listed}`;
+  if (!offer.ok) return row(title, `<span class="warn">${offer.text}</span>`);
+  return row(`F · ${title}`, `<span class="ok">${offer.text}</span>`);
 }
 
 /**

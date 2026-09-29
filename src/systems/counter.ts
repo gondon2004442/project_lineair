@@ -11,6 +11,7 @@
  */
 import { COUNTERS_BY_KIND } from '../data/counters';
 import type { Entity, World } from '../ecs';
+import { grantItem, pickItem } from '../paperwork';
 import { makeRng } from '../rng';
 import { TUNING } from '../tuning';
 
@@ -62,6 +63,22 @@ export function counterOffer(
     return { offer, price: `${cost} ЗДОРОВЬЯ`, ok: alive };
   }
 
+  if (counter.kind === 'listing') {
+    const price = Math.max(0, Math.round(cfg.listingPrice));
+    // Дважды одно и то же не продают: сведения уже на руках.
+    if (w.listed) return { offer, price: 'ОПИСЬ НА РУКАХ', ok: false };
+    return { offer, price: `${price} ТАЛОНОВ`, ok: w.tickets >= price };
+  }
+
+  if (counter.kind === 'request') {
+    // Платят не ресурсом, а риском: взыскание принимают добровольно.
+    const take = Math.max(1, Math.round(cfg.requestPenalty));
+    if (w.record.penalty >= TUNING.record.penaltyMax) {
+      return { offer, price: 'ВЗЫСКАНИЕ ПРЕДЕЛЬНО', ok: false };
+    }
+    return { offer, price: `${take} ВЗЫСКАНИЯ`, ok: true };
+  }
+
   const price = Math.max(0, Math.round(cfg.reviewPrice));
   return { offer, price: `${price} ТАЛОНОВ`, ok: w.tickets >= price };
 }
@@ -88,6 +105,18 @@ export function counterSystem(w: World): void {
     if (health === undefined) return;
     health.hp = Math.max(1, health.hp - Math.max(1, Math.round(cfg.hrHealth)));
     w.passes = Math.min(TUNING.stash.passesMax, w.passes + Math.max(1, Math.round(cfg.hrPasses)));
+  } else if (counter.kind === 'listing') {
+    w.tickets -= Math.max(0, Math.round(cfg.listingPrice));
+    w.listed = true;
+  } else if (counter.kind === 'request') {
+    w.record.penalty = Math.min(
+      TUNING.record.penaltyMax,
+      w.record.penalty + Math.max(1, Math.round(cfg.requestPenalty)),
+    );
+    // Приложение выдают сразу и бесплатно: цена уже уплачена делом.
+    const rng = makeRng((w.seed + w.room * cfg.seedStride + target) >>> 0);
+    const item = pickItem(w, rng);
+    if (item !== undefined) grantItem(w, item);
   } else {
     w.tickets -= Math.max(0, Math.round(cfg.reviewPrice));
     // Бросок привязан к стойке, а не к моменту: то же окошко на том же

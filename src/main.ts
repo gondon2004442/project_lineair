@@ -21,7 +21,7 @@ import { damageFactorAgainst, statAt } from './weapon';
 import { applyDamage } from './systems/damage';
 import { ticketValue } from './systems/tickets';
 import { counterInReach, counterOffer } from './systems/counter';
-import { deskPrice, issueOffer } from './systems/issue';
+import { deskPrice, issueOffer, safeContents } from './systems/issue';
 import { DECOR, DECOR_BY_ID, DECOR_TOO_LIGHT } from './data/decor';
 import { TEMPLATES_BY_ID } from './data/roomTemplates';
 import { createWorld, enterLobby, enterRoom } from './world';
@@ -129,6 +129,8 @@ async function boot(): Promise<void> {
       issueOffer,
       // Цены прилавка нужны стенду: иначе не сверить надпись со списанным.
       deskPrice,
+      // Опись содержимого: стенд сверяет обещанное с выданным.
+      safeContents,
       issuedDirectives,
       pickItem,
       // Выдача нужна стенду: иначе не проверить, что инвентарь ложится

@@ -75,6 +75,7 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     reward: { chance: TUNING.reward.base, dry: 0, lastItem: '', lastOrder: '', lastWeight: 1 },
     record: { penalty: 0, service: 0, broken: 0, roomClean: true, controlHere: 0 },
     tickets: 0,
+    listed: false,
     commendations: 0,
     runEnded: '',
     note: [],

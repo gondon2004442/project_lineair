@@ -165,6 +165,26 @@ function spendCommendation(w: World): void {
   health.hp = Math.min(health.hp, health.max);
 }
 
+/**
+ * Что лежит в опечатанном шкафу. Бросок тот же самый, что решает
+ * содержимое при вскрытии, — просто прочитанный заранее и без побочных
+ * действий.
+ *
+ * Названия приложения здесь нет и быть не может: приложение выбирается
+ * делопроизводством ПО СОСТАВУ ДЕЛА в момент вскрытия, и заранее оно не
+ * определено. Опись отвечает на тот вопрос, который решает судьбу
+ * допуска: патроны, бланк или всё-таки приложение.
+ */
+export function safeContents(w: World, target: Entity): string {
+  const stash = w.stashC.get(target);
+  if (stash === undefined || stash.kind !== 'safe') return '';
+  const rng = makeRng((w.seed + w.room * TUNING.stash.seedStride + target) >>> 0);
+  const roll = rng.float();
+  if (roll < TUNING.stash.safeAmmoShare) return 'ПАТРОНЫ';
+  if (roll < TUNING.stash.safeAmmoShare + TUNING.stash.safeBlankShare) return 'БЛАНК';
+  return 'ПРИЛОЖЕНИЕ';
+}
+
 export function issueSystem(w: World): void {
   if (!w.input.useQueued) return;
   w.input.useQueued = false;
