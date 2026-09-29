@@ -51,8 +51,10 @@ export function issueCost(
 ): 'pass' | 'blank' | 'free' | 'ticket' | 'commendation' | '' {
   const stash = w.stashC.get(target);
   if (stash === undefined || stash.opened) return '';
-  // Чужое дело ничего не стоит: его читают, а не оформляют.
-  if (stash.kind === 'case') return 'free';
+  // Чужое дело ничего не стоит: его читают, а не оформляют. План
+  // эвакуации тоже даром: это починка схемы, а не добыча, и платить за
+  // то, чтобы интерфейс перестал врать, игрок не должен.
+  if (stash.kind === 'case' || stash.kind === 'evac') return 'free';
 
   // Стол выдачи: платят талонами, и только пока кладовщик обслуживает.
   if (stash.kind === 'cell' || stash.kind === 'special' || isService(stash.kind)) {
@@ -204,6 +206,11 @@ export function issueSystem(w: World): void {
 
   stash.opened = true;
   w.sounds.push('door.unlock');
+
+  if (stash.kind === 'evac') {
+    w.evacPlan = true;
+    return;
+  }
 
   if (stash.kind === 'case') {
     // Симуляция не знает, что лежит в архиве: она помечает, какое дело

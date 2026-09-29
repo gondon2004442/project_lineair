@@ -19,19 +19,24 @@ export interface PropSpec {
   stopsBullets?: boolean;
   /** Ломает линию взгляда: из-за него штат не стреляет. */
   blocksSight?: boolean;
+  /**
+   * Может ли встать на рельс. Архив переставляет стеллажи и короба, а
+   * столы и стулья стоят: ездит хранение, а не рабочее место.
+   */
+  railed?: boolean;
   /** Даёт облако при ударе. */
   cloud?: boolean;
 }
 
 export const PROPS: PropSpec[] = [
   { id: 'chair', title: 'СТУЛ', hollow: true, scatter: 5 },
-  { id: 'cabinet', title: 'ШКАФ', hollow: false, scatter: 3 },
+  { id: 'cabinet', title: 'ШКАФ', hollow: false, scatter: 3, railed: true },
   { id: 'rubble', title: 'БЕТОННЫЙ ОБЛОМОК', hollow: false, scatter: 0 },
 
   // --- Пять предметов с разной массой. Импульс считается как масса на
   // скорость, поэтому масса — это уже готовая ручка различия.
   { id: 'typewriter', title: 'ПЕЧАТНАЯ МАШИНКА', hollow: false, scatter: 0 },
-  { id: 'cardbox', title: 'ЯЩИК КАРТОТЕКИ', hollow: false, scatter: 0 },
+  { id: 'cardbox', title: 'ЯЩИК КАРТОТЕКИ', hollow: false, scatter: 0, railed: true },
   { id: 'desk', title: 'СТОЛ', hollow: false, scatter: 0 },
   {
     id: 'faxstand',

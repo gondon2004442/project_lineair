@@ -218,6 +218,20 @@ export interface PropC {
 }
 
 /**
+ * Рельс: укрытие, которое едет само. Архив переставляет стеллажи, и
+ * укрытие, на которое ты рассчитывал, через несколько секунд уезжает.
+ * Ведёт его своя система напрямую, а не физика: тележке на рельсе стены
+ * не указ, она от них разворачивается.
+ */
+export interface RailC {
+  /** Единичное направление хода. Меняется на разворотах. */
+  dirX: number;
+  dirY: number;
+  /** Пикселей в секунду. */
+  speed: number;
+}
+
+/**
  * Добыча: опечатанный шкаф или ячейка стола выдачи. Шкаф отдаёт
  * случайное, ячейка — то, что в ней названо.
  */
@@ -234,7 +248,8 @@ export type StashKind =
   | 'pass'
   | 'blank'
   | 'ammo'
-  | 'heal';
+  | 'heal'
+  | 'evac';
 
 export interface StashC {
   kind: StashKind;
@@ -424,6 +439,12 @@ export interface World {
    * этажа. Держится до конца забега — сведения не портятся.
    */
   listed: boolean;
+  /**
+   * План эвакуации найден: схема этажа снова показывает тот участок, в
+   * котором субъект стоит. До того она врёт на один — это искажение
+   * архива, а не поломка.
+   */
+  evacPlan: boolean;
   /** Благодарности: приёмные, взятые без единого попадания. */
   commendations: number;
   /**
@@ -456,6 +477,7 @@ export interface World {
   chiefC: Map<Entity, ChiefC>;
   courierC: Map<Entity, CourierC>;
   propC: Map<Entity, PropC>;
+  railC: Map<Entity, RailC>;
   stashC: Map<Entity, StashC>;
   ticketC: Map<Entity, TicketC>;
   counterC: Map<Entity, CounterC>;

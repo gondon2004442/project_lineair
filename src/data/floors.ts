@@ -44,7 +44,9 @@ export const FLOORS: FloorSpec[] = [
     // Хранение и размножение бумаги: ряды, ящики, аппараты.
     templates: ['cabinets', 'copy', 'cubicles', 'corridor', 'atrium'],
     staffScale: 1.25,
-    distortion: '',
+    // Перестановка: стеллажи едут сами, а схема этажа врёт на один
+    // участок, пока не найден план эвакуации.
+    distortion: 'shuffle',
   },
 ];
 

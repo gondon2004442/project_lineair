@@ -25,6 +25,7 @@ import { deskPrice, issueOffer, safeContents } from './systems/issue';
 import { DECOR, DECOR_BY_ID, DECOR_TOO_LIGHT } from './data/decor';
 import { TEMPLATES_BY_ID } from './data/roomTemplates';
 import { liftOpen } from './room';
+import { shownRoom } from './hud';
 import { createWorld, descend, enterLobby, enterRoom, startRun } from './world';
 
 /** Приоритеты тикера Pixi: наш проход до отрисовки и замер сразу после неё. */
@@ -117,6 +118,9 @@ async function boot(): Promise<void> {
       descend,
       startRun,
       liftOpen,
+      // Искажение схемы проверяется только так: на экране это метка,
+      // а числом — номер участка, который она показывает.
+      shownRoom,
       step,
       spawnStaff,
       statAt,

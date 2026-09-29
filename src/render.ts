@@ -1785,6 +1785,12 @@ function drawStash(
       // Подача: два патрона в ряд.
       g.rect(x - mark, y - mark * 0.5, mark * 0.7, mark).fill(PALETTE.concrete100);
       g.rect(x + mark * 0.3, y - mark * 0.5, mark * 0.7, mark).fill(PALETTE.concrete100);
+    } else if (kind === 'evac') {
+      // План эвакуации: рамка со стрелкой наружу. Схема, а не предмет.
+      const m = half * 0.55;
+      g.rect(x - m, y - m, m * 2, m * 2).stroke(pen);
+      g.rect(x - m * 0.2, y - m * 0.5, m * 1.1, 2).fill(PALETTE.concrete100);
+      g.rect(x + m * 0.5, y - m * 0.9, 2, m * 0.8).fill(PALETTE.concrete100);
     } else if (kind === 'heal') {
       // Освидетельствование: крест. Серый, не красный: красное — субъект.
       g.rect(x - mark * 0.25, y - mark, mark * 0.5, mark * 2).fill(PALETTE.concrete100);

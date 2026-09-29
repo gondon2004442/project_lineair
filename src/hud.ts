@@ -566,6 +566,26 @@ function gauge(current: number, max: number): string {
 }
 
 /** Схема этажа: квадрат — помещение, черта — дверь. */
+/**
+ * Какой участок схема считает текущим. В архиве она врёт на один — это
+ * искажение уровня, а не поломка, — и перестаёт врать, как только
+ * найден план эвакуации.
+ *
+ * Врёт она устойчиво: сосед берётся первый по порядку сторон, а не
+ * случайный, иначе метка прыгала бы каждый кадр и читалась бы как
+ * помеха, а не как неверная схема.
+ */
+export function shownRoom(w: World): number {
+  if (w.evacPlan || floorAt(w.depth).distortion !== 'shuffle') return w.room;
+  const room = w.floor.rooms[w.room];
+  if (room === undefined) return w.room;
+  for (const dir of DIRS) {
+    const other = room.neighbors[dir];
+    if (other >= 0) return other;
+  }
+  return w.room;
+}
+
 function schematic(w: World): string {
   const step = TUNING.hud.mapStep;
   const cell = TUNING.hud.mapCell;
@@ -591,7 +611,7 @@ function schematic(w: World): string {
   for (const room of w.floor.rooms) {
     const x = room.gx * step;
     const y = room.gy * step;
-    const current = room.index === w.room;
+    const current = room.index === shownRoom(w);
     let fill = hex(PALETTE.black);
     let stroke = hex(PALETTE.concrete700);
     // Схема различает участки светлотой, а не цветом: красный и жёлтый

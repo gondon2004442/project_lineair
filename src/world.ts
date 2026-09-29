@@ -17,7 +17,7 @@ import {
   type TileMap,
 } from './room';
 import { ITEMS, type Item } from './data/items';
-import { PROPS } from './data/props';
+import { PROPS, PROPS_BY_ID } from './data/props';
 import { TEMPLATES_BY_ID, type CoverSlot, type Scene } from './data/roomTemplates';
 import { WEAPON_FORMS } from './data/weaponForms';
 import { ammoMax, reserveMax } from './weapon';
@@ -78,6 +78,7 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     depth: -1,
     tickets: 0,
     listed: false,
+    evacPlan: false,
     commendations: 0,
     runEnded: '',
     note: [],
@@ -99,6 +100,7 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     chiefC: new Map(),
     courierC: new Map(),
     propC: new Map(),
+    railC: new Map(),
     stashC: new Map(),
     ticketC: new Map(),
     counterC: new Map(),
@@ -181,6 +183,7 @@ export function descend(w: World): void {
   const rng = makeRng((w.seed + Math.abs(w.depth) * TUNING.floor.depthSeedStride) >>> 0);
   w.floor = generateFloor(rng, w.depth);
   w.listed = false;
+  w.evacPlan = false;
   w.note = [];
   w.noteSlot = -1;
   w.blanks = Math.max(w.blanks, TUNING.blank.refillTo);
@@ -272,6 +275,8 @@ export function enterRoom(w: World, index: number, fromDir: Dir | null): void {
   placeStash(w, room, spot.x, spot.y);
   placeCounter(w, room, spot.x, spot.y);
   placeFixtures(w, room, spot.x, spot.y);
+  placeRails(w, room);
+  placeEvacPlan(w, room, spot.x, spot.y);
   if (!room.cleared) staffRoom(w, room, spot.x, spot.y);
   if (w.staffC.size === 0 && !room.cleared) {
     room.cleared = true;
@@ -306,6 +311,58 @@ function coverSpot(
     return { x, y };
   }
   return null;
+}
+
+/**
+ * Поставить шкафы участка на рельсы. Только там, где этаж этого просит:
+ * на участке перестановка — это искажение архива, а не свойство мебели.
+ *
+ * Направление своё у каждого шкафа и считается от номера участка, а не
+ * от порядка обхода: вернувшись, застанешь ту же перестановку.
+ */
+function placeRails(w: World, room: RoomNode): void {
+  if (floorAt(w.depth).distortion !== 'shuffle') return;
+  const cfg = TUNING.rail;
+  const rng = makeRng((w.seed + room.index * cfg.seedStride) >>> 0);
+
+  for (const [e, prop] of w.propC) {
+    if (PROPS_BY_ID.get(prop.kind)?.railed !== true) continue;
+    // Бросок делается всегда: поток не должен зависеть от того, сколько
+    // шкафов уцелело к этому моменту.
+    const roll = rng.float();
+    const axis = rng.float();
+    if (roll >= cfg.share) continue;
+    const along = axis < 0.5;
+    w.railC.set(e, {
+      dirX: along ? (axis < 0.25 ? -1 : 1) : 0,
+      dirY: along ? 0 : axis < 0.75 ? -1 : 1,
+      speed: cfg.speed,
+    });
+  }
+}
+
+/**
+ * План эвакуации: один на этаж, на случайном рядовом участке. Берётся
+ * даром — это не добыча, а починка схемы, и платить за то, чтобы
+ * интерфейс перестал врать, игрок не должен.
+ */
+function placeEvacPlan(w: World, room: RoomNode, entryX: number, entryY: number): void {
+  if (floorAt(w.depth).distortion !== 'shuffle') return;
+  if (w.evacPlan || room.index !== evacRoom(w)) return;
+  const cfg = TUNING.stash;
+  const rng = makeRng((w.seed + room.index * cfg.seedStride + 7) >>> 0);
+  const spot = findSpawnSpot(w.map, rng, entryX, entryY, cfg.clearance, cfg.cellRadius);
+  spawnStash(w, 'evac', '', 'ПЛАН ЭВАКУАЦИИ', spot.x, spot.y);
+}
+
+/** На каком участке этажа лежит план. Считается от посевной, не хранится. */
+function evacRoom(w: World): number {
+  const rng = makeRng((w.seed + Math.abs(w.depth) * TUNING.rail.seedStride) >>> 0);
+  const pool = w.floor.rooms
+    .filter((r) => r.kind !== 'start' && r.index !== w.floor.end && !r.corridor)
+    .map((r) => r.index);
+  if (pool.length === 0) return -1;
+  return pool[rng.int(pool.length)] ?? -1;
 }
 
 /**
@@ -765,6 +822,7 @@ function clearExceptPlayer(w: World): void {
     w.chiefC.delete(e);
     w.courierC.delete(e);
     w.propC.delete(e);
+    w.railC.delete(e);
     w.stashC.delete(e);
     w.ticketC.delete(e);
     w.counterC.delete(e);

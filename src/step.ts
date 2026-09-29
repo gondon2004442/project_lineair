@@ -20,6 +20,7 @@ import {
 import { feedbackSystem, liftSystem, lifecycleSystem, statusSystem } from './systems/lifecycle';
 import { physicsSystem } from './systems/physics';
 import { propPushSystem, propSystem } from './systems/props';
+import { railSystem } from './systems/rails';
 import { telekinesisSystem } from './systems/telekinesis';
 import { ticketSystem } from './systems/tickets';
 import { fixtureSystem } from './systems/fixtures';
@@ -79,6 +80,9 @@ export function step(w: World): void {
 
   profiler.begin('СИМ: ТЕЛЕКИНЕЗ');
   telekinesisSystem(w, STEP);
+  // Рельс до разбора предметов: стеллаж сначала едет, потом уже
+  // расталкивает тех, кто попался.
+  railSystem(w, STEP);
   propSystem(w, STEP);
   propPushSystem(w, STEP);
   profiler.end('СИМ: ТЕЛЕКИНЕЗ');

@@ -204,7 +204,10 @@ export const ROOM_TEMPLATES: RoomTemplate[] = [
     cover: [
       { kind: 'cardbox', col: 10, row: 4, jitter: 2 },
       { kind: 'cardbox', col: 21, row: 13, jitter: 2 },
-      { kind: 'typewriter', col: 16, row: 9, jitter: 2, chance: 0.8 },{ kind: 'cabinet', col: 9, row: 9, jitter: 1 }, { kind: 'cabinet', col: 22, row: 9, jitter: 1 },
+      { kind: 'typewriter', col: 16, row: 9, jitter: 2, chance: 0.8 },
+      // Ряды стеллажей: этаж называется архивом не за название комнаты.
+      { kind: 'cabinet', col: 7, row: 8, jitter: 0, repeat: { count: 4, stepCol: 6, stepRow: 0 } },
+      { kind: 'cabinet', col: 7, row: 10, jitter: 0, repeat: { count: 4, stepCol: 6, stepRow: 0 } },
       { kind: 'chair', col: 16, row: 4, jitter: 2 }, { kind: 'chair', col: 16, row: 13, jitter: 2 },
       { kind: 'chair', col: 4, row: 9, jitter: 1, chance: 0.5 }],
     fixtures: [
