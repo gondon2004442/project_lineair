@@ -42,9 +42,29 @@ export function statAt(w: World, path: string): number {
   // Распоряжение — такая же правка, как приложение, просто выпущена
   // конторой в ответ на состав дела. Считается тем же порядком, поэтому
   // результат по-прежнему не зависит от того, что нашли раньше.
-  for (const directive of issuedDirectives(w.build)) apply(directive.mods);
+  for (const directive of issuedDirectives(w.build)) {
+    // Ось «пока форма в руках»: колесо впервые становится решением, а
+    // не только вопросом обоймы.
+    if (directive.whileForm !== undefined && directive.whileForm !== currentForm(w).id) continue;
+    apply(directive.mods);
+  }
 
   return (getTuning(path) + add) * mul;
+}
+
+/**
+ * Множитель урона по конкретной должности. Ось «против должности»
+ * считается здесь, а не через statAt: путь тюнинга не знает, в кого
+ * прилетело, а точка урона знает.
+ */
+export function damageFactorAgainst(w: World, post: string): number {
+  if (w.build.length === 0) return 1;
+  let factor = 1;
+  for (const directive of issuedDirectives(w.build)) {
+    if (directive.againstPost !== post) continue;
+    factor *= directive.damageMul ?? 1;
+  }
+  return factor;
 }
 
 /** Потолок боезапаса формы — целое, не меньше единицы. */

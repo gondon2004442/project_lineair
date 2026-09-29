@@ -17,7 +17,8 @@ import { STEP, TUNING } from './tuning';
 import { DIRECTIVES, issuedDirectives } from './data/directives';
 import { ITEMS, ITEM_ID_CLASHES } from './data/items';
 import { spawnStaff } from './spawn';
-import { statAt } from './weapon';
+import { damageFactorAgainst, statAt } from './weapon';
+import { applyDamage } from './systems/damage';
 import { counterInReach, counterOffer } from './systems/counter';
 import { issueOffer } from './systems/issue';
 import { DECOR, DECOR_BY_ID, DECOR_TOO_LIGHT } from './data/decor';
@@ -113,6 +114,12 @@ async function boot(): Promise<void> {
       step,
       spawnStaff,
       statAt,
+      // Ось «против должности» проверяется только так: путь тюнинга
+      // про цель ничего не знает.
+      damageFactorAgainst,
+      // Урон нужен стенду: иначе не проверить, что множитель доходит
+      // до здоровья, а не только до формулы.
+      applyDamage,
       counterInReach,
       counterOffer,
       issueOffer,
