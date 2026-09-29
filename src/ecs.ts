@@ -221,7 +221,20 @@ export interface PropC {
  * Добыча: опечатанный шкаф или ячейка стола выдачи. Шкаф отдаёт
  * случайное, ячейка — то, что в ней названо.
  */
-export type StashKind = 'safe' | 'cell' | 'case' | 'special';
+/**
+ * Что стоит на участке под оформление. Первые четыре были всегда,
+ * остальные — позиции прилавка: стол выдачи торгует не только
+ * приложениями, иначе у талонов один сток и никакого решения.
+ */
+export type StashKind =
+  | 'safe'
+  | 'cell'
+  | 'case'
+  | 'special'
+  | 'pass'
+  | 'blank'
+  | 'ammo'
+  | 'heal';
 
 export interface StashC {
   kind: StashKind;

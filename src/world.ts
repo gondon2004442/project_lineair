@@ -390,6 +390,20 @@ function placeStash(w: World, room: RoomNode, entryX: number, entryY: number): v
   const special = centre.x + ((cells + 1) - (cells - 1) / 2 - 1) * cfg.deskGap;
   spawnStash(w, 'special', '', 'ОСОБАЯ ВЫДАЧА', special, centre.y);
 
+  // Прилавок: второй ряд перед ячейками. Стол выдачи на этаже один,
+  // поэтому каждая позиция достаётся за забег ровно раз — ассортимент
+  // ограничен не счётчиком, а самой раскладкой.
+  const services: { kind: 'pass' | 'blank' | 'ammo' | 'heal'; title: string }[] = [
+    { kind: 'pass', title: 'ДОПУСК' },
+    { kind: 'blank', title: 'БЛАНК' },
+    { kind: 'ammo', title: 'ПОДАЧА' },
+    { kind: 'heal', title: 'ОСВИДЕТЕЛЬСТВОВАНИЕ' },
+  ];
+  services.forEach((service, i) => {
+    const x = centre.x + (i - (services.length - 1) / 2) * cfg.deskGap;
+    spawnStash(w, service.kind, '', service.title, x, centre.y + TUNING.clerk.deskRow);
+  });
+
   // Кладовщик стоит позади ряда: к столу подходят, а не натыкаются.
   spawnClerk(w, centre.x, centre.y - TUNING.clerk.standBack);
 }

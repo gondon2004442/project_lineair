@@ -55,13 +55,14 @@ export function issueCost(
   if (stash.kind === 'case') return 'free';
 
   // Стол выдачи: платят талонами, и только пока кладовщик обслуживает.
-  if (stash.kind === 'cell' || stash.kind === 'special') {
+  if (stash.kind === 'cell' || stash.kind === 'special' || isService(stash.kind)) {
     if (deskClosed(w)) return '';
     if (stash.kind === 'special') {
       const need = Math.max(1, Math.round(TUNING.clerk.specialCommendations));
       return w.commendations >= need ? 'commendation' : '';
     }
-    return w.tickets >= cellPrice(w) ? 'ticket' : '';
+    if (isService(stash.kind) && servicePointless(w, stash.kind) !== '') return '';
+    return w.tickets >= deskPrice(w, stash.kind) ? 'ticket' : '';
   }
 
   if (w.passes > 0) return 'pass';
@@ -76,7 +77,52 @@ export function issueCost(
  * совпадать с той, что спишут.
  */
 export function cellPrice(w: World): number {
-  return Math.max(0, Math.round(statAt(w, 'clerk.cellPrice')));
+  return deskPrice(w, 'cell');
+}
+
+/**
+ * Цена позиции прилавка в талонах. Все цены идут через statAt: их правит
+ * должностная инструкция кладовщика, и цена на табличке обязана
+ * совпадать с той, что спишут.
+ */
+export function deskPrice(w: World, kind: string): number {
+  const path =
+    kind === 'pass' ? 'clerk.passPrice'
+    : kind === 'blank' ? 'clerk.blankPrice'
+    : kind === 'ammo' ? 'clerk.ammoPrice'
+    : kind === 'heal' ? 'clerk.healPrice'
+    : 'clerk.cellPrice';
+  return Math.max(0, Math.round(statAt(w, path)));
+}
+
+/** Позиции прилавка: их продают за талоны и только за них. */
+function isService(kind: string): boolean {
+  return kind === 'pass' || kind === 'blank' || kind === 'ammo' || kind === 'heal';
+}
+
+/**
+ * Есть ли смысл в этой позиции прямо сейчас. Полный запас бланков или
+ * целое здоровье — не повод списывать талоны: окошко должно отказывать,
+ * а не брать деньги ни за что.
+ */
+function servicePointless(w: World, kind: string): string {
+  if (kind === 'pass') {
+    return w.passes >= TUNING.stash.passesMax ? 'ДОПУСКОВ ПОЛНО' : '';
+  }
+  if (kind === 'blank') {
+    return w.blanks >= TUNING.blank.carryMax ? 'БЛАНКОВ ПОЛНО' : '';
+  }
+  if (kind === 'heal') {
+    const health = w.health.get(w.player);
+    if (health === undefined) return 'НЕКОМУ';
+    return health.hp >= health.max ? 'ЖАЛОБ НЕТ' : '';
+  }
+  // ПОДАЧА: табельной форме запас не нужен, а полный запас не пополнить.
+  const p = w.playerC.get(w.player);
+  const form = p === undefined ? undefined : WEAPON_FORMS[p.form];
+  if (p === undefined || form === undefined) return 'НЕКОМУ';
+  if (infiniteReserve(w, form.id)) return 'ЗАПАС ТАБЕЛЬНЫЙ';
+  return (p.reserve[p.form] ?? 0) >= reserveMax(w, form.id) ? 'ЗАПАС ПОЛОН' : '';
 }
 
 /** Что написать у добычи: чем платят и хватает ли. */
@@ -85,7 +131,7 @@ export function issueOffer(w: World, target: Entity): { text: string; ok: boolea
   if (stash === undefined || stash.opened) return { text: '', ok: false };
   const cost = issueCost(w, target);
   if (cost !== '') {
-    if (cost === 'ticket') return { text: `${cellPrice(w)} ТАЛОНОВ`, ok: true };
+    if (cost === 'ticket') return { text: `${deskPrice(w, stash.kind)} ТАЛОНОВ`, ok: true };
     if (cost === 'commendation') return { text: 'БЛАГОДАРНОСТЬ', ok: true };
     if (cost === 'blank') return { text: 'БЛАНК', ok: true };
     if (cost === 'pass') return { text: 'ДОПУСК', ok: true };
@@ -95,7 +141,13 @@ export function issueOffer(w: World, target: Entity): { text: string; ok: boolea
     return { text: 'СТОЛ ЗАКРЫТ', ok: false };
   }
   if (stash.kind === 'special') return { text: 'НУЖНА БЛАГОДАРНОСТЬ', ok: false };
-  if (stash.kind === 'cell') return { text: `НУЖНО ${cellPrice(w)} ТАЛОНОВ`, ok: false };
+  if (isService(stash.kind)) {
+    const idle = servicePointless(w, stash.kind);
+    if (idle !== '') return { text: idle, ok: false };
+  }
+  if (stash.kind === 'cell' || isService(stash.kind)) {
+    return { text: `НУЖНО ${deskPrice(w, stash.kind)} ТАЛОНОВ`, ok: false };
+  }
   return { text: 'НЕЧЕМ ОФОРМИТЬ', ok: false };
 }
 
@@ -127,7 +179,7 @@ export function issueSystem(w: World): void {
   if (cost === '') return;
   if (cost === 'pass') w.passes -= 1;
   else if (cost === 'blank') w.blanks -= 1;
-  else if (cost === 'ticket') w.tickets -= cellPrice(w);
+  else if (cost === 'ticket') w.tickets -= deskPrice(w, stash.kind);
   else if (cost === 'commendation') spendCommendation(w);
 
   stash.opened = true;
@@ -144,6 +196,30 @@ export function issueSystem(w: World): void {
   if (stash.kind === 'cell') {
     const found = ITEMS_BY_ID.get(stash.item);
     if (found !== undefined) grantItem(w, found);
+    return;
+  }
+
+  // Прилавок: талоны в расходники. Это и есть вторые стоки талона,
+  // без которых он был валютой с одной покупкой.
+  if (stash.kind === 'pass') {
+    w.passes = Math.min(TUNING.stash.passesMax, w.passes + 1);
+    return;
+  }
+  if (stash.kind === 'blank') {
+    w.blanks = Math.min(TUNING.blank.carryMax, w.blanks + 1);
+    return;
+  }
+  if (stash.kind === 'ammo') {
+    const p = w.playerC.get(w.player);
+    const form = p === undefined ? undefined : WEAPON_FORMS[p.form];
+    if (p !== undefined && form !== undefined) p.reserve[p.form] = reserveMax(w, form.id);
+    return;
+  }
+  if (stash.kind === 'heal') {
+    const health = w.health.get(w.player);
+    if (health !== undefined) {
+      health.hp = Math.min(health.max, health.hp + health.max * TUNING.clerk.healShare);
+    }
     return;
   }
 

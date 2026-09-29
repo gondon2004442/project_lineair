@@ -19,8 +19,9 @@ import { ITEMS, ITEM_ID_CLASHES } from './data/items';
 import { spawnStaff } from './spawn';
 import { damageFactorAgainst, statAt } from './weapon';
 import { applyDamage } from './systems/damage';
+import { ticketValue } from './systems/tickets';
 import { counterInReach, counterOffer } from './systems/counter';
-import { issueOffer } from './systems/issue';
+import { deskPrice, issueOffer } from './systems/issue';
 import { DECOR, DECOR_BY_ID, DECOR_TOO_LIGHT } from './data/decor';
 import { TEMPLATES_BY_ID } from './data/roomTemplates';
 import { createWorld, enterLobby, enterRoom } from './world';
@@ -120,9 +121,14 @@ async function boot(): Promise<void> {
       // Урон нужен стенду: иначе не проверить, что множитель доходит
       // до здоровья, а не только до формулы.
       applyDamage,
+      // Номинал ставки нужен стенду: по нему считается доход этажа,
+      // а от дохода — цены прилавка.
+      ticketValue,
       counterInReach,
       counterOffer,
       issueOffer,
+      // Цены прилавка нужны стенду: иначе не сверить надпись со списанным.
+      deskPrice,
       issuedDirectives,
       pickItem,
       // Выдача нужна стенду: иначе не проверить, что инвентарь ложится

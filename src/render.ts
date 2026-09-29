@@ -1724,6 +1724,27 @@ function drawStash(
     } else {
       g.rect(x - half, y - half - seal, half * 2, seal).fill(PALETTE.yellow);
     }
+
+    // Позиции прилавка различаются знаком на лицевой стороне: подпись
+    // читается только вплотную, а выбирать, к какой идти, надо издали.
+    const mark = half * 0.5;
+    const pen = { width: TUNING.render.stashEdge, color: PALETTE.concrete100 };
+    if (kind === 'pass') {
+      // Допуск: вертикальная прорезь, как на пропуске.
+      g.rect(x - mark * 0.25, y - mark, mark * 0.5, mark * 2).fill(PALETTE.concrete100);
+    } else if (kind === 'blank') {
+      // Бланк: лист с линией.
+      g.rect(x - mark, y - mark, mark * 2, mark * 2).stroke(pen);
+      g.rect(x - mark * 0.6, y - 1, mark * 1.2, 2).fill(PALETTE.concrete100);
+    } else if (kind === 'ammo') {
+      // Подача: два патрона в ряд.
+      g.rect(x - mark, y - mark * 0.5, mark * 0.7, mark).fill(PALETTE.concrete100);
+      g.rect(x + mark * 0.3, y - mark * 0.5, mark * 0.7, mark).fill(PALETTE.concrete100);
+    } else if (kind === 'heal') {
+      // Освидетельствование: крест. Серый, не красный: красное — субъект.
+      g.rect(x - mark * 0.25, y - mark, mark * 0.5, mark * 2).fill(PALETTE.concrete100);
+      g.rect(x - mark, y - mark * 0.25, mark * 2, mark * 0.5).fill(PALETTE.concrete100);
+    }
   }
 
   // В зоне оформления — светлый контур. Он не мигает: мигание занято
