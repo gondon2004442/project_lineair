@@ -19,7 +19,16 @@ import { counterInReach, counterOffer } from './systems/counter';
 import { dashIFrameWindow, dashSpec } from './systems/playerControl';
 import { hasRegistrar, vacancyCount } from './systems/staff';
 import type { Profiler } from './profiler';
-import { ammoMax, currentForm, formStat, infiniteReserve, reserveOf, statAt } from './weapon';
+import {
+  ammoMax,
+  cursedItems,
+  currentForm,
+  formStat,
+  infiniteReserve,
+  penaltyOf,
+  reserveOf,
+  statAt,
+} from './weapon';
 import { clearedCount, currentRoom } from './world';
 
 export interface Hud {
@@ -192,6 +201,17 @@ function weaponRows(w: World): string {
  * Инвентарь: что в слоте и можно ли этим сейчас воспользоваться. Пустой
  * слот строки не занимает — сводка и так на шесть строк.
  */
+/**
+ * Взыскание: заработанное и то, что висит за приложения «не подлежит
+ * выдаче». Второе показывается отдельно — иначе непонятно, откуда цифра
+ * и почему она не снимается у регистрации.
+ */
+function penaltyLine(w: World): string {
+  const cursed = cursedItems(w).length;
+  if (cursed === 0) return String(w.record.penalty);
+  return `${penaltyOf(w)} · ИЗ НИХ ${cursed * TUNING.record.cursedPenalty} ЗА НЕВЫДАЧУ`;
+}
+
 function toolRow(w: World): string {
   const slot = w.tool;
   if (slot.id === '') return '';
@@ -361,7 +381,7 @@ function dashBody(w: World): string {
     row('УЗЛОВ · ПЕРЕХОДОВ', nodeLine(w)),
     '<div class="profile-split"></div>',
     '<div class="subtitle">ЛИЧНОЕ ДЕЛО</div>',
-    row('ВЗЫСКАНИЕ', String(w.record.penalty)),
+    row('ВЗЫСКАНИЕ', penaltyLine(w)),
     row('ВЫСЛУГА', String(w.record.service)),
     row('ИСПОРЧЕНО ИМУЩЕСТВА', `${w.record.broken} · НОРМА ${statAt(w, 'record.breakAllowance')}`),
     row('ШАНС ПРОВЕРКИ', `${Math.round(controlChance(w) * 100)}%`),
@@ -397,7 +417,7 @@ function nodeLine(w: World): string {
 /** Текущий шанс, что очередной сотрудник выйдет «на контроле». */
 function controlChance(w: World): number {
   const cfg = TUNING.record;
-  return Math.min(cfg.controlChanceCap, w.record.penalty * cfg.controlChancePerPoint);
+  return Math.min(cfg.controlChanceCap, penaltyOf(w) * cfg.controlChancePerPoint);
 }
 
 function ms(value: number): string {

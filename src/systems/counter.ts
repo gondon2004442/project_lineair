@@ -14,6 +14,7 @@ import type { Entity, World } from '../ecs';
 import { grantItem, pickItem } from '../paperwork';
 import { makeRng } from '../rng';
 import { TUNING } from '../tuning';
+import { cursedItems } from '../weapon';
 
 /** Ближайшая стойка в пределах вытянутой руки. */
 export function counterInReach(w: World): Entity {
@@ -48,6 +49,18 @@ export function counterOffer(
   const cfg = TUNING.counter;
 
   if (counter.kind === 'registry') {
+    // Приложение «не подлежит выдаче» идёт вперёд очереди: пока оно в
+    // деле, снимать взыскание бессмысленно — оно висит за бумагу, а не
+    // за проступок, и вернётся на следующем же шаге.
+    const cursed = cursedItems(w)[0];
+    if (cursed !== undefined) {
+      const seize = Math.max(0, Math.round(cfg.seizePrice));
+      return {
+        offer: `ИЗЪЯТЬ ${cursed.code}`,
+        price: `${seize} ТАЛОНОВ`,
+        ok: w.tickets >= seize,
+      };
+    }
     const price = Math.max(0, Math.round(cfg.registryPrice));
     // Снимать нечего — окошко всё равно не примет: пустая подача это
     // потраченные талоны ни за что.
@@ -98,8 +111,16 @@ export function counterSystem(w: World): void {
   const cfg = TUNING.counter;
 
   if (counter.kind === 'registry') {
-    w.tickets -= Math.max(0, Math.round(cfg.registryPrice));
-    w.record.penalty = Math.max(0, w.record.penalty - Math.max(1, Math.round(cfg.registryClear)));
+    const cursed = cursedItems(w)[0];
+    if (cursed !== undefined) {
+      // Изъятие: приложение уходит из дела вместе со своими правками.
+      w.tickets -= Math.max(0, Math.round(cfg.seizePrice));
+      const at = w.build.indexOf(cursed.id);
+      if (at >= 0) w.build.splice(at, 1);
+    } else {
+      w.tickets -= Math.max(0, Math.round(cfg.registryPrice));
+      w.record.penalty = Math.max(0, w.record.penalty - Math.max(1, Math.round(cfg.registryClear)));
+    }
   } else if (counter.kind === 'hr') {
     const health = w.health.get(w.player);
     if (health === undefined) return;

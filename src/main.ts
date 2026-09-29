@@ -17,7 +17,7 @@ import { STEP, TUNING } from './tuning';
 import { DIRECTIVES, issuedDirectives } from './data/directives';
 import { ITEMS, ITEM_ID_CLASHES } from './data/items';
 import { spawnStaff } from './spawn';
-import { damageFactorAgainst, statAt } from './weapon';
+import { damageFactorAgainst, penaltyOf, statAt } from './weapon';
 import { applyDamage } from './systems/damage';
 import { ticketValue } from './systems/tickets';
 import { counterInReach, counterOffer } from './systems/counter';
@@ -118,6 +118,8 @@ async function boot(): Promise<void> {
       // Ось «против должности» проверяется только так: путь тюнинга
       // про цель ничего не знает.
       damageFactorAgainst,
+      // Действующее взыскание: стенд сверяет его с заработанным.
+      penaltyOf,
       // Урон нужен стенду: иначе не проверить, что множитель доходит
       // до здоровья, а не только до формулы.
       applyDamage,

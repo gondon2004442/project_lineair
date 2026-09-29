@@ -6,10 +6,10 @@
  * на результат не влияет.
  */
 import { issuedDirectives } from './data/directives';
-import { ITEMS_BY_ID, type ItemMod } from './data/items';
+import { ITEMS_BY_ID, type Item, type ItemMod } from './data/items';
 import { WEAPON_FORMS, type WeaponForm } from './data/weaponForms';
 import type { World } from './ecs';
-import { getTuning } from './tuning';
+import { TUNING, getTuning } from './tuning';
 
 export function currentForm(w: World): WeaponForm {
   const player = w.playerC.get(w.player);
@@ -50,6 +50,29 @@ export function statAt(w: World, path: string): number {
   }
 
   return (getTuning(path) + add) * mul;
+}
+
+/**
+ * Приложения «не подлежит выдаче», которые сейчас в деле.
+ */
+export function cursedItems(w: World): Item[] {
+  const out: Item[] = [];
+  for (const id of w.build) {
+    const item = ITEMS_BY_ID.get(id);
+    if (item?.cursed === true) out.push(item);
+  }
+  return out;
+}
+
+/**
+ * Действующее взыскание: заработанное плюс то, что висит за каждое
+ * приложение «не подлежит выдаче». Всё, что читает взыскание — шанс
+ * проверки, щедрость выдачи, окошко регистрации, — обязано читать
+ * именно эту величину, иначе проклятие было бы бесплатным.
+ */
+export function penaltyOf(w: World): number {
+  const extra = cursedItems(w).length * TUNING.record.cursedPenalty;
+  return Math.min(TUNING.record.penaltyMax, w.record.penalty + extra);
 }
 
 /**

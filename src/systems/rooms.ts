@@ -9,7 +9,7 @@ import { makeRng, type Rng } from '../rng';
 import { DIRS, opposite, standingInDoor } from '../room';
 import { TUNING } from '../tuning';
 import { enterRoom } from '../world';
-import { formStat, infiniteReserve, reserveMax, statAt } from '../weapon';
+import { formStat, infiniteReserve, penaltyOf, reserveMax, statAt } from '../weapon';
 
 export function roomSystem(w: World): void {
   const room = w.floor.rooms[w.room];
@@ -98,7 +98,8 @@ function rollReward(w: World, roomIndex: number): void {
 export function rewardBase(w: World): number {
   const cfg = TUNING.reward;
   const rec = TUNING.record;
-  const raw = cfg.base + w.record.service * rec.serviceRewardStep - w.record.penalty * rec.penaltyRewardStep;
+  const raw =
+    cfg.base + w.record.service * rec.serviceRewardStep - penaltyOf(w) * rec.penaltyRewardStep;
   return Math.max(0.02, Math.min(cfg.cap, raw));
 }
 

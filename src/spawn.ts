@@ -15,6 +15,7 @@ import { PALETTE } from './palette';
 import type { CounterSpec } from './data/counters';
 import type { FixtureSpec } from './data/fixtures';
 import { TUNING } from './tuning';
+import { penaltyOf } from './weapon';
 
 /** Числа должности. Опознание берётся из данных, поведение — отсюда. */
 export interface PostNumbers {
@@ -100,7 +101,9 @@ export function spawnStaff(w: World, post: string, priority: number, x: number, 
   // Внеплановая проверка. Чем выше взыскание, тем чаще она случается;
   // бросок идёт через тот же единственный PRNG, что и всё остальное.
   const cfg = TUNING.record;
-  const chance = Math.min(cfg.controlChanceCap, w.record.penalty * cfg.controlChancePerPoint);
+  // Взыскание читается действующее: за приложение «не подлежит
+  // выдаче» проверка приходит так же, как за порчу имущества.
+  const chance = Math.min(cfg.controlChanceCap, penaltyOf(w) * cfg.controlChancePerPoint);
   const control = chance > 0 && w.rng.float() < chance;
   if (control) w.record.controlHere += 1;
   const hp = control ? Math.round(numbers.hp * cfg.controlHp + cfg.controlHpAdd) : numbers.hp;
