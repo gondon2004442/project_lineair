@@ -56,7 +56,8 @@ export const FLOORS: FloorSpec[] = [
     // Стекла и кубиклов здесь нет, отделку сюда не доводили.
     templates: ['hall', 'atrium', 'corridor', 'cabinets'],
     staffScale: 1.5,
-    distortion: '',
+    // Темнота: видно только вокруг ламп, субъекта и своего выстрела.
+    distortion: 'dark',
   },
   {
     depth: -4,

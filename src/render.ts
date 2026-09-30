@@ -19,6 +19,7 @@ import { grabCandidate } from './systems/telekinesis';
 import { DIRS, TILE_DOOR, TILE_GATE, TILE_WALL, TILE_WEAK, liftOpen, type TileMap } from './room';
 import { roomNumber } from './floor';
 import { currentRoom } from './world';
+import { floorAt } from './data/floors';
 import { DECOR_BY_ID } from './data/decor';
 import { FIXTURES_BY_ID } from './data/fixtures';
 import { TEMPLATES_BY_ID } from './data/roomTemplates';
@@ -57,6 +58,7 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
   const dustLayer = new Graphics();
   const smokeLayer = new Graphics();
   const entityLayer = new Graphics();
+  const darkLayer = new Graphics();
   const debugLayer = new Graphics();
 
   // Свечение: те же красные силуэты, только размытые и сложенные поверх.
@@ -82,6 +84,8 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
     smokeLayer,
     glowLayer,
     entityLayer,
+    // Темнота идёт ПОВЕРХ всего живого: она и есть то, чего не видно.
+    darkLayer,
     debugLayer,
   );
   root.addChild(shakeLayer);
@@ -182,6 +186,11 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
 
       entityLayer.clear();
       drawEntities(entityLayer, w, alpha);
+
+      profiler.begin('КАДР: ТЕМНОТА');
+      darkLayer.clear();
+      drawDark(darkLayer, w, alpha);
+      profiler.end('КАДР: ТЕМНОТА');
 
       // Свечение и аберрация на нуле снимаются целиком: слабой машине
       // важно, чтобы выключенный эффект ничего не стоил.
@@ -461,6 +470,7 @@ const WALK_LIFT = [0, 1, 0, 1];
 function drawDecor(g: Graphics, w: World): void {
   g.clear();
   flickers.length = 0;
+  lamps.length = 0;
   const room = currentRoom(w);
   if (room === undefined) return;
   const template = TEMPLATES_BY_ID.get(room.template);
@@ -528,7 +538,10 @@ function drawDecor(g: Graphics, w: World): void {
         height = y1 - y0;
       }
 
-      // Потолочное — это световое пятно на полу, а не предмет.
+      // Потолочное — это световое пятно на полу, а не предмет, и в
+      // темноте оно же единственный неподвижный источник света.
+      if (spec.mount === 'ceiling') lamps.push({ x: x + width / 2, y: y + height / 2 });
+
       const alpha =
         spec.alpha ?? (spec.mount === 'ceiling' ? TUNING.render.decorCeilingAlpha : 1);
 
@@ -713,6 +726,13 @@ interface Flicker {
 const flickers: Flicker[] = [];
 
 /**
+ * Где на участке горит потолочный свет. Собирается при запекании
+ * антуража: в тепловом узле лампы — единственное, что стоит на месте и
+ * светит, и искать их заново каждый кадр незачем.
+ */
+const lamps: { x: number; y: number }[] = [];
+
+/**
  * Мигание считается по реальному времени кадра, а не по шагу симуляции:
  * это картинка, и в детерминизм забега ей попадать незачем. Состояния
  * нет вовсе — решение «гореть или нет» берётся хешем от номера отрезка,
@@ -801,6 +821,85 @@ function drawLift(g: Graphics, w: World): void {
   g.rect(plateX, plateY, plateW, plateH).fill(PALETTE.black);
   g.rect(plateX, plateY, plateW, plateH).stroke({ width: 1, color: PALETTE.concrete500 });
   drawGlyphs(g, text, plateX + pad, plateY + pad, digit, TUNING.render.signGap, PALETTE.yellow);
+}
+
+/** Источники света на участке в текущем кадре. */
+function lights(w: World, alpha: number): { x: number; y: number; r: number }[] {
+  const cfg = TUNING.dark;
+  const out: { x: number; y: number; r: number }[] = [];
+  const t = w.transform.get(w.player);
+  if (t !== undefined && w.status !== 'dead') {
+    out.push({ x: lerp(t.px, t.x, alpha), y: lerp(t.py, t.y, alpha), r: cfg.player });
+  }
+  // Горят не все: в тепловом узле свет держится через раз. Решение
+  // берётся хешем от номера панели — оно не мигает и не зависит от
+  // порядка обхода.
+  lamps.forEach((lamp, i) => {
+    const v = Math.sin((i + 1) * 12.9898) * 43758.5453;
+    if (v - Math.floor(v) >= cfg.lampShare) return;
+    out.push({ x: lamp.x, y: lamp.y, r: cfg.lamp });
+  });
+  // Вспышка читается по тому же правилу, что кольцо бланка: иначе она
+  // держалась бы ровно один шаг симуляции и мигала рвано.
+  if (fxLeft(w.fx.shotTime, alpha) > 0) {
+    out.push({ x: w.fx.shotX, y: w.fx.shotY, r: cfg.shot });
+  }
+  return out;
+}
+
+/**
+ * ТЕМНОТА. Видно только вокруг источников света.
+ *
+ * Считается по клеткам и заливается прямоугольниками, слитыми в строки:
+ * у нас плоские заливки и никаких градиентов, и темнота обязана быть
+ * такой же — резкой границей, а не мягким пятном. Заодно это и дешевле
+ * любого размытия.
+ *
+ * Сотрудник в темноте виден только табличкой: жёлтое пятно без силуэта.
+ * Поэтому таблички рисуются ПОВЕРХ тьмы, а не под ней.
+ */
+function drawDark(g: Graphics, w: World, alpha: number): void {
+  if (floorAt(w.depth).distortion !== 'dark' || w.scene !== 'run') return;
+  const cfg = TUNING.dark;
+  const src = lights(w, alpha);
+  const map = w.map;
+  const size = map.size;
+
+  const lit = (x: number, y: number): boolean => {
+    for (const l of src) {
+      const dx = x - l.x;
+      const dy = y - l.y;
+      if (dx * dx + dy * dy <= l.r * l.r) return true;
+    }
+    return false;
+  };
+
+  for (let cy = 0; cy < map.rows; cy++) {
+    let runFrom = -1;
+    for (let cx = 0; cx <= map.cols; cx++) {
+      const dark = cx < map.cols && !lit((cx + 0.5) * size, (cy + 0.5) * size);
+      if (dark && runFrom < 0) runFrom = cx;
+      if (dark || runFrom < 0) continue;
+      // Строка кончилась: заливаем одним прямоугольником, а не клетками.
+      g.rect(runFrom * size, cy * size, (cx - runFrom) * size, size)
+        .fill({ color: PALETTE.black, alpha: cfg.alpha });
+      runFrom = -1;
+    }
+  }
+
+  // Таблички: единственное, что видно во тьме.
+  const plate = cfg.plate;
+  for (const [e, staff] of w.staffC) {
+    const t = w.transform.get(e);
+    if (t === undefined) continue;
+    const x = lerp(t.px, t.x, alpha);
+    const y = lerp(t.py, t.y, alpha);
+    if (lit(x, y)) continue;
+    const marks = Math.max(1, staff.plateMarks);
+    for (let i = 0; i < marks; i++) {
+      g.rect(x - plate + i * (plate * 0.9), y - plate / 2, plate * 0.6, plate).fill(PALETTE.yellow);
+    }
+  }
 }
 
 /** Ширина набора в пикселях при заданном размере пикселя знака. */

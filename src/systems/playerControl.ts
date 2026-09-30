@@ -368,6 +368,16 @@ function muzzleAt(x: number, y: number, dirX: number, dirY: number): [number, nu
   return [x + dirX * TUNING.weapon.muzzle, y + dirY * TUNING.weapon.muzzle];
 }
 
+/**
+ * Дульная вспышка. Нужна не для красоты: в тепловом узле это
+ * единственный свет, который субъект носит с собой.
+ */
+function flash(w: World, x: number, y: number): void {
+  w.fx.shotTime = TUNING.dark.shotTime;
+  w.fx.shotX = x;
+  w.fx.shotY = y;
+}
+
 function recoil(w: World, dirX: number, dirY: number, shake: number): void {
   const b = w.body.get(w.player);
   if (b !== undefined) {
@@ -393,6 +403,7 @@ function launchPrecise(w: World, p: PlayerC, x: number, y: number): void {
     shape: 'dot',
   };
   const [mx, my] = muzzleAt(x, y, dirX, dirY);
+  flash(w, mx, my);
   spawnBullet(w, 'player', spec, mx, my, dirX, dirY);
   recoil(w, dirX, dirY, TUNING.feel.shakeShoot);
 }
@@ -414,6 +425,7 @@ function launchScatter(w: World, p: PlayerC, x: number, y: number): void {
       shape: 'dot',
     };
     const [mx, my] = muzzleAt(x, y, dirX, dirY);
+  flash(w, mx, my);
     spawnBullet(w, 'player', spec, mx, my, dirX, dirY);
   }
   recoil(w, p.aimX, p.aimY, TUNING.feel.shakeEnemyHit);
@@ -433,6 +445,7 @@ function launchLance(w: World, p: PlayerC, x: number, y: number, charge: number)
     shape: 'bar',
   };
   const [mx, my] = muzzleAt(x, y, p.aimX, p.aimY);
+  flash(w, mx, my);
   spawnBullet(w, 'player', spec, mx, my, p.aimX, p.aimY);
   recoil(w, p.aimX, p.aimY, TUNING.feel.shakeEnemyKill * ratio);
 }
@@ -450,6 +463,7 @@ function launchVolleyShot(w: World, p: PlayerC, x: number, y: number): void {
     shape: 'diamond',
   };
   const [mx, my] = muzzleAt(x, y, dirX, dirY);
+  flash(w, mx, my);
   spawnBullet(w, 'player', spec, mx, my, dirX, dirY);
   // Залповая тоже отдаёт, хоть и слабее всех: раз отдача стала
   // позиционным инструментом, форма без неё выпадала бы из правила.

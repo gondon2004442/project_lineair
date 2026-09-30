@@ -382,6 +382,14 @@ export interface Feedback {
   cloudTime: number;
   cloudX: number;
   cloudY: number;
+  /**
+   * Дульная вспышка: остаток и место. В тепловом узле это не украшение,
+   * а единственный свет, который субъект носит с собой, — и потому
+   * стрелять вслепую там дорого вдвойне.
+   */
+  shotTime: number;
+  shotX: number;
+  shotY: number;
 }
 
 export interface World {
