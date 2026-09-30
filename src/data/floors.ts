@@ -48,6 +48,26 @@ export const FLOORS: FloorSpec[] = [
     // участок, пока не найден план эвакуации.
     distortion: 'shuffle',
   },
+  {
+    depth: -3,
+    code: 'НИВО -3',
+    title: 'ТЕПЛОВОЙ УЗЕЛ',
+    // Бетон без отделки: залы, коридоры и ряды — ничего кабинетного.
+    // Стекла и кубиклов здесь нет, отделку сюда не доводили.
+    templates: ['hall', 'atrium', 'corridor', 'cabinets'],
+    staffScale: 1.5,
+    distortion: '',
+  },
+  {
+    depth: -4,
+    code: 'НИВО -4',
+    title: 'НАТУРНАЯ ЧАСТЬ',
+    // Здание перестало притворяться: планировки перемешаны все подряд,
+    // потому что назначений у этих помещений больше нет.
+    templates: [],
+    staffScale: 1.8,
+    distortion: '',
+  },
 ];
 
 export const FLOORS_BY_DEPTH = new Map(FLOORS.map((f) => [f.depth, f]));
