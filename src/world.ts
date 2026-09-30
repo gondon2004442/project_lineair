@@ -1,5 +1,5 @@
 /** Сборка этажа и вход в помещение. Всё случайное — из seeded PRNG. */
-import type { World } from './ecs';
+import { destroyEntity, type World } from './ecs';
 import { POST_COURIER } from './data/posts';
 import { MINI_BOSS_POSTS, STAFFING_BY_ID, type StaffPost } from './data/staffing';
 import { DEEPEST, floorAt } from './data/floors';
@@ -15,10 +15,19 @@ import {
   roomCenter,
   type Dir,
   type TileMap,
+  liftOpen,
+  openLift,
 } from './room';
 import { ITEMS, type Item } from './data/items';
 import { PROPS, PROPS_BY_ID } from './data/props';
-import { TEMPLATES_BY_ID, type CoverSlot, type Scene } from './data/roomTemplates';
+import {
+  ROOM_TEMPLATES,
+  TEMPLATES_BY_ID,
+  TEMPLATE_END,
+  TEMPLATE_START,
+  type CoverSlot,
+  type Scene,
+} from './data/roomTemplates';
 import { WEAPON_FORMS } from './data/weaponForms';
 import { ammoMax, reserveMax } from './weapon';
 import { COUNTERS, type CounterSpec } from './data/counters';
@@ -82,6 +91,8 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     tickets: 0,
     listed: false,
     evacPlan: false,
+    rebuildIn: 0,
+    rebuilds: 0,
     commendations: 0,
     runEnded: '',
     note: [],
@@ -270,6 +281,9 @@ export function enterRoom(w: World, index: number, fromDir: Dir | null): void {
 
   w.metronome = TUNING.post.inspector.metronomeInterval;
   w.beat = 0;
+  // Отсчёт перестройки начинается заново в каждом помещении.
+  w.rebuildIn = 0;
+  w.rebuilds = 0;
 
   const spot = fromDir === null ? roomCenter(w.map) : entryPosition(w.map, fromDir);
   placePlayer(w, spot.x, spot.y);
@@ -314,6 +328,131 @@ function coverSpot(
     return { x, y };
   }
   return null;
+}
+
+/**
+ * ПЕРЕСТРОЙКА. Помещение меняет планировку, не меняя дверей.
+ *
+ * Переезжает мебель и встают по-новому стены; штат, добыча, стойки,
+ * оборудование и талоны остаются — это уже след забега, а не планировка.
+ * Тела выталкивает из нового бетона, а не защемляет в нём: застрявший
+ * сотрудник читался бы как поломка, а не как приём.
+ *
+ * Двери те же, потому что участок остаётся тем же участком: перестройка
+ * меняет комнату, а не этаж.
+ */
+export function rebuildRoom(w: World): void {
+  const room = w.floor.rooms[w.room];
+  if (room === undefined) return;
+  const cfg = TUNING.rebuild;
+  w.rebuilds += 1;
+
+  // Новая планировка из пула уровня. Своя посевная и номер перестройки:
+  // одно и то же помещение на одной посевной перестраивается одинаково.
+  const rng = makeRng((w.seed + room.index * cfg.seedStride + w.rebuilds) >>> 0);
+  const allowed = floorAt(w.depth).templates;
+  const pool = ROOM_TEMPLATES.filter(
+    (t) =>
+      t.id !== TEMPLATE_END &&
+      t.id !== TEMPLATE_START &&
+      t.weight > 0 &&
+      (allowed.length === 0 || allowed.includes(t.id)),
+  );
+  const pick = pool[rng.int(Math.max(1, pool.length))];
+  if (pick === undefined) return;
+
+  // Мебель переезжает: старую снимаем целиком, вместе с рельсами.
+  const player = w.playerC.get(w.player);
+  if (player !== undefined) player.held = -1;
+  for (const [e] of [...w.propC]) {
+    w.propC.delete(e);
+    w.railC.delete(e);
+    destroyEntity(w, e);
+  }
+
+  const locked = w.map.doorsLocked;
+  const lift = liftOpen(w.map);
+  w.map = buildRoomMap(pick.id, roomDoors(room));
+  w.map.doorsLocked = locked;
+  if (lift) openLift(w.map);
+  w.mapToken += 1;
+
+  // Мебель новой планировки. Точка отсчёта — середина: входа сейчас нет,
+  // а отступ от входа в перестройке и не нужен.
+  const centre = roomCenter(w.map);
+  scatterPropsFor(w, room, pick.id, centre.x, centre.y);
+  placeRails(w, room);
+  ejectBodies(w);
+
+  w.fx.shake = Math.min(TUNING.feel.shakeMax, w.fx.shake + cfg.shake);
+  w.sounds.push('glass');
+}
+
+/**
+ * Вытолкнуть все тела из бетона. Ищем по расходящемуся кольцу вокруг
+ * того места, где тело оказалось: так сотрудник выходит из стены в ту
+ * сторону, где стоял, а не улетает через всю комнату.
+ */
+function ejectBodies(w: World): void {
+  const tile = TUNING.room.tile;
+  for (const e of w.alive) {
+    const t = w.transform.get(e);
+    const b = w.body.get(e);
+    if (t === undefined || b === undefined) continue;
+    if (bodyFits(w.map, t.x, t.y, b.radius)) continue;
+
+    let moved = false;
+    for (let ring = 1; ring <= TUNING.room.cols && !moved; ring++) {
+      for (let a = 0; a < 12 && !moved; a++) {
+        const angle = (a / 12) * Math.PI * 2;
+        const x = t.x + Math.cos(angle) * ring * tile;
+        const y = t.y + Math.sin(angle) * ring * tile;
+        if (!bodyFits(w.map, x, y, b.radius)) continue;
+        t.x = x;
+        t.y = y;
+        moved = true;
+      }
+    }
+    // Кольцо не помогло: обходим все клетки помещения. Такое случается
+    // с крупной мебелью в узкой планировке — столу шириной в полторы
+    // клетки в коридоре может быть некуда встать вовсе.
+    if (!moved) moved = toAnyFreeCell(w, t, b.radius);
+    // И некуда — значит, этой мебели после перестройки просто нет.
+    // Сотрудника и субъекта бросать в бетоне нельзя, их ставим в
+    // середину: она свободна по правилу планировок.
+    if (!moved) {
+      if (w.propC.has(e)) {
+        w.propC.delete(e);
+        w.railC.delete(e);
+        destroyEntity(w, e);
+        continue;
+      }
+      const centre = roomCenter(w.map);
+      t.x = centre.x;
+      t.y = centre.y;
+    }
+    t.px = t.x;
+    t.py = t.y;
+    b.vx = 0;
+    b.vy = 0;
+  }
+}
+
+/** Любая свободная клетка помещения, начиная от середины наружу. */
+function toAnyFreeCell(w: World, t: { x: number; y: number }, radius: number): boolean {
+  const tile = TUNING.room.tile;
+  const wall = TUNING.room.wall;
+  for (let row = 0; row < TUNING.room.rows; row++) {
+    for (let col = 0; col < TUNING.room.cols; col++) {
+      const x = (wall + col + 0.5) * tile;
+      const y = (wall + row + 0.5) * tile;
+      if (!bodyFits(w.map, x, y, radius)) continue;
+      t.x = x;
+      t.y = y;
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -682,13 +821,31 @@ function staffRoom(w: World, room: RoomNode, entryX: number, entryY: number): vo
  * не зависит от порядка обхода и восстанавливается при возврате.
  */
 function scatterProps(w: World, room: RoomNode, entryX: number, entryY: number): void {
+  scatterPropsFor(w, room, room.template, entryX, entryY);
+}
+
+/**
+ * Мебель под названную планировку. Обычно это планировка самого участка,
+ * но перестройка подставляет другую, не трогая узел этажа.
+ */
+function scatterPropsFor(
+  w: World,
+  room: RoomNode,
+  templateId: string,
+  entryX: number,
+  entryY: number,
+): void {
   if (room.kind === 'start') return;
-  const rng = makeRng((w.seed + room.index * TUNING.floor.propSeedStride) >>> 0);
+  // Номер перестройки входит в посевную: иначе новая планировка
+  // раскладывала бы мебель по тем же местам, что и прошлая.
+  const rng = makeRng(
+    (w.seed + room.index * TUNING.floor.propSeedStride + w.rebuilds * TUNING.rebuild.seedStride) >>> 0,
+  );
 
   // Мебель по слотам планировки: рука дизайнера в самой комнате, а
   // случайность — внутри слота. Одна и та же планировка не должна
   // играться дважды одинаково, но и не должна играться как попало.
-  const template = TEMPLATES_BY_ID.get(room.template);
+  const template = TEMPLATES_BY_ID.get(templateId);
   if (template !== undefined && template.cover.length > 0) {
     for (const slot of template.cover) {
       const count = Math.max(1, Math.round(slot.repeat?.count ?? 1));

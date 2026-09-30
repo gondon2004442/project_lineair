@@ -67,7 +67,8 @@ export const FLOORS: FloorSpec[] = [
     // потому что назначений у этих помещений больше нет.
     templates: [],
     staffScale: 1.8,
-    distortion: '',
+    // Перестройка: помещение меняет планировку прямо посреди боя.
+    distortion: 'rebuild',
   },
 ];
 
