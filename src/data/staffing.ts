@@ -63,12 +63,26 @@ export const STAFFING: Staffing[] = [
       { post: 'intern', title: 'СТАЖЁР', count: 4, priority: 3 },
     ],
   },
+  {
+    /**
+     * Приёмная архива. Архивариус вместо заведующего, и штата при нём
+     * меньше: весь бой — это стеллажи, а не подчинённые.
+     */
+    id: 'head_archive',
+    label: 'КОНТОРКА ГЛАВНОГО АРХИВАРИУСА',
+    posts: [
+      { post: 'archivist', title: 'ГЛАВНЫЙ АРХИВАРИУС', count: 1, priority: 0 },
+      { post: 'inspector', title: 'ИНСПЕКТОР', count: 2, priority: 2 },
+    ],
+  },
 ];
 
 export const STAFFING_BY_ID = new Map(STAFFING.map((s) => [s.id, s]));
 
 export const STAFFING_LOBBY = 'lobby';
 export const STAFFING_HEAD = 'head_office';
+/** Приёмная архива: там сидит архивариус. */
+export const STAFFING_ARCHIVE = 'head_archive';
 /** Переход между узлами: штат вдвое меньше, чем на участке. */
 export const STAFFING_PASSAGE = 'passage';
 /** Расписания, которые генератор раздаёт рядовым помещениям. */

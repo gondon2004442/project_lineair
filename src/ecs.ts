@@ -184,6 +184,25 @@ export interface ChiefC {
   reshuffleTimer: number;
 }
 
+/**
+ * Главный архивариус. Не ходит: сидит за конторкой и держит вокруг себя
+ * кольцо стеллажей. Пока кольцо сомкнуто, он закрыт от выстрела; чтобы
+ * открылся, игроку надо ломать картотеки — тогда архивариус лезет за
+ * делом сам и на это время становится уязвим.
+ */
+export interface ArchivistC {
+  /** 'closed' — за стеллажами, 'open' — достаёт дело и уязвим. */
+  phase: 'closed' | 'open';
+  /** Сколько секунд ещё открыт. */
+  openTimer: number;
+  /** Сколько стеллажей кольца сломано с прошлого открытия. */
+  broken: number;
+  /** Угол кольца: стеллажи медленно обходят конторку. */
+  angle: number;
+  /** Пауза перед тем, как поставить новое кольцо. */
+  raiseTimer: number;
+}
+
 export type AuditorPhase = 'audit' | 'open' | 'shot';
 
 export interface AuditorC {
@@ -229,6 +248,12 @@ export interface RailC {
   dirY: number;
   /** Пикселей в секунду. */
   speed: number;
+  /**
+   * Чьё это кольцо. Отрицательное — ничьё, стеллаж едет сам по себе;
+   * иначе им распоряжается архивариус, и по этому полю же считается,
+   * сколько его кольца осталось.
+   */
+  owner?: Entity;
 }
 
 /**
@@ -491,6 +516,7 @@ export interface World {
   registrarC: Map<Entity, RegistrarC>;
   auditorC: Map<Entity, AuditorC>;
   chiefC: Map<Entity, ChiefC>;
+  archivistC: Map<Entity, ArchivistC>;
   courierC: Map<Entity, CourierC>;
   propC: Map<Entity, PropC>;
   railC: Map<Entity, RailC>;

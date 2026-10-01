@@ -19,7 +19,8 @@ export type Silhouette =
   | 'wide' // вдвое шире, чем выше, плюс боковые руки
   | 'bulk' // вдвое крупнее субъекта, масса смещена влево
   | 'desk' // самый крупный, за столом
-  | 'slim'; // узкий и лёгкий, всё время в движении
+  | 'slim' // узкий и лёгкий, всё время в движении
+  | 'counter'; // неподвижный, за конторкой: шире стола и ниже его
 
 export interface PostSpec {
   id: string;
@@ -42,6 +43,20 @@ export const POSTS: PostSpec[] = [
   { id: 'auditor', title: 'РЕВИЗОР', skin: 12, silhouette: 'bulk', plateMarks: 3, plates: 1, desk: false },
   { id: 'chief', title: 'ЗАВЕДУЮЩИЙ СЕКТОРОМ', skin: 4, silhouette: 'desk', plateMarks: 4, plates: 2, desk: true },
   { id: 'courier', title: 'КУРЬЕР', skin: 70, silhouette: 'slim', plateMarks: 2, plates: 1, desk: false },
+  {
+    /**
+     * Главный архивариус. Не ходит вовсе: сидит за конторкой и
+     * переставляет вокруг себя стеллажи. Кожи почти не осталось — ниже
+     * него по шкале только центральный архив.
+     */
+    id: 'archivist',
+    title: 'ГЛАВНЫЙ АРХИВАРИУС',
+    skin: 2,
+    silhouette: 'counter',
+    plateMarks: 4,
+    plates: 2,
+    desk: true,
+  },
 ];
 
 export const POSTS_BY_ID = new Map(POSTS.map((p) => [p.id, p]));
@@ -52,3 +67,5 @@ export const POST_REGISTRAR = 'registrar';
 export const POST_AUDITOR = 'auditor';
 export const POST_CHIEF = 'chief';
 export const POST_COURIER = 'courier';
+
+export const POST_ARCHIVIST = 'archivist';

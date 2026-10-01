@@ -2,6 +2,7 @@
 import type { Entity, World } from '../ecs';
 import { TUNING } from '../tuning';
 import { damageFactorAgainst } from '../weapon';
+import { archivistOpen } from './postArchivist';
 
 export function applyDamage(w: World, target: Entity, amount: number): boolean {
   const h = w.health.get(target);
@@ -9,6 +10,9 @@ export function applyDamage(w: World, target: Entity, amount: number): boolean {
   // Ревизор неуязвим, пока не закончил опись имущества участка.
   const auditor = w.auditorC.get(target);
   if (auditor !== undefined && auditor.phase !== 'open') return false;
+  // Архивариус — пока не полез за делом. Окно открывает игрок, ломая
+  // картотеки вокруг него.
+  if (!archivistOpen(w, target)) return false;
 
   // Распоряжение против должности: множитель знает только эта точка,
   // потому что только здесь известно, в кого прилетело.

@@ -1670,6 +1670,18 @@ function drawSilhouette(
       }
       break;
     }
+    case 'counter': {
+      // Архивариус: он не силуэт, а конторка. Широкая, низкая, со
+      // столешницей поверх — и ни одной руки: этот ничего не делает
+      // руками, за него работают стеллажи.
+      const wide = half * TUNING.render.counterDeskWide;
+      const tall = half * TUNING.render.counterDeskTall;
+      block(g, x - wide, y - tall, wide * 2, tall * 2, color);
+      const lift = half * TUNING.render.counterTopLift;
+      g.rect(x - wide, y - tall - lift, wide * 2, lift).fill(PALETTE.concrete500);
+      headShadow(g, x, y, tall);
+      break;
+    }
     case 'slim': {
       // Курьер: вытянут по ходу движения, через плечо — сумка. Она и
       // показывает, куда он бежит, без всякой подсветки пути.

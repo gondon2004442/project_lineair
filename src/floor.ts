@@ -427,7 +427,9 @@ function chooseTemplate(rng: Rng, kind: RoomKind, depth: number): string {
  */
 function staffingFor(kind: RoomKind, rng: Rng, templateId: string): string {
   if (kind === 'start') return STAFFING_LOBBY;
-  if (kind === 'end') return STAFFING_HEAD;
+  // Кто сидит в конце этажа, решает сам этаж: на первом уровне
+  // заведующий, в архиве — архивариус.
+  if (kind === 'end') return building.headStaffing === '' ? STAFFING_HEAD : building.headStaffing;
   const template = TEMPLATES_BY_ID.get(templateId);
   const wanted = template === undefined ? [] : template.staffing.filter((id) => id !== STAFFING_HEAD);
   const pool = wanted.length > 0 ? wanted : STAFFING_ORDINARY;

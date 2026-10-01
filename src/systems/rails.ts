@@ -33,6 +33,8 @@ export function railSystem(w: World, dt: number): void {
     // Схваченный или брошенный стеллаж едет не по рельсу, а по воле
     // субъекта. Приземлится — поедет снова.
     if (prop.phase !== 'idle') continue;
+    // Кольцо архивариуса ведёт он сам: рельс для него только метка.
+    if (rail.owner !== undefined || rail.speed <= 0) continue;
 
     const step = rail.speed * dt;
     const nx = t.x + rail.dirX * step;

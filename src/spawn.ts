@@ -6,8 +6,7 @@ import {
   POST_COURIER,
   POST_INSPECTOR,
   POST_INTERN,
-  POST_REGISTRAR,
-} from './data/posts';
+  POST_REGISTRAR, POST_ARCHIVIST } from './data/posts';
 import { PROPS_BY_ID } from './data/props';
 import { WEAPON_FORMS } from './data/weaponForms';
 import { createEntity, type Entity, type Faction, type Shape, type StashKind, type World } from './ecs';
@@ -33,6 +32,8 @@ export function postNumbers(post: string): PostNumbers {
       return TUNING.post.auditor;
     case POST_CHIEF:
       return TUNING.post.chief;
+    case POST_ARCHIVIST:
+      return TUNING.post.archivist;
     case POST_COURIER:
       return TUNING.post.courier;
     default:
@@ -195,6 +196,15 @@ function attachBehaviour(w: World, e: Entity, post: string, x: number, y: number
         door: -1,
         timer: TUNING.post.courier.deliverTime,
         approachTimer: TUNING.post.courier.reachTimeout,
+      });
+      break;
+    case POST_ARCHIVIST:
+      w.archivistC.set(e, {
+        phase: 'closed',
+        openTimer: 0,
+        broken: 0,
+        angle: 0,
+        raiseTimer: 0,
       });
       break;
     case POST_CHIEF:

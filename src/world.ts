@@ -1,6 +1,6 @@
 /** Сборка этажа и вход в помещение. Всё случайное — из seeded PRNG. */
 import { destroyEntity, type World } from './ecs';
-import { POST_COURIER } from './data/posts';
+import { POST_COURIER, POST_ARCHIVIST } from './data/posts';
 import { MINI_BOSS_POSTS, STAFFING_BY_ID, type StaffPost } from './data/staffing';
 import { DEEPEST, floorAt } from './data/floors';
 import { generateFloor, roomDoors, type RoomNode } from './floor';
@@ -112,6 +112,7 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     registrarC: new Map(),
     auditorC: new Map(),
     chiefC: new Map(),
+    archivistC: new Map(),
     courierC: new Map(),
     propC: new Map(),
     railC: new Map(),
@@ -764,11 +765,15 @@ function buildRoster(w: World, room: RoomNode): void {
   w.roster = [];
   if (staffing === undefined) return;
   for (const post of staffing.posts) {
+    // Начальник на этаже один, сколько бы глубина ни множила штат: двое
+    // заведующих в одной приёмной — это не трудный бой, а поломка.
+    // Признак — нулевой приоритет: его закрывают первым и он один.
+    const single = post.priority <= 0;
     w.roster.push({
       post: post.post,
       title: post.title,
       priority: post.priority,
-      quota: quotaFor(w, post.count),
+      quota: single ? post.count : quotaFor(w, post.count),
       occupied: 0,
     });
   }
@@ -800,17 +805,26 @@ function staffRoom(w: World, room: RoomNode, entryX: number, entryY: number): vo
     : [];
   const posts = [...staffing.posts, ...extra, ...runner].sort((a, b) => a.priority - b.priority);
   for (const post of posts) {
-    const single = post.post === room.miniBoss || post.post === POST_COURIER;
+    // Одиночная ставка: мини-босс, курьер и начальник этажа. Множитель
+    // глубины их не касается — двое заведующих в одной приёмной это не
+    // трудный бой, а поломка. Признак начальника — нулевой приоритет.
+    const single = post.post === room.miniBoss || post.post === POST_COURIER || post.priority <= 0;
     const quota = single ? post.count : quotaFor(w, post.count);
     for (let i = 0; i < quota; i++) {
-      const spot = findSpawnSpot(
-        w.map,
-        rng,
-        entryX,
-        entryY,
-        TUNING.staff.spawnMinDistance,
-        postNumbers(post.post).radius,
-      );
+      // Архивариус садится ровно в середину: он не ходит, а вокруг него
+      // кольцо стеллажей радиусом в четыре клетки. В углу половина
+      // кольца оказалась бы в стене.
+      const spot =
+        post.post === POST_ARCHIVIST
+          ? roomCenter(w.map)
+          : findSpawnSpot(
+              w.map,
+              rng,
+              entryX,
+              entryY,
+              TUNING.staff.spawnMinDistance,
+              postNumbers(post.post).radius,
+            );
       spawnStaff(w, post.post, post.priority, spot.x, spot.y);
     }
   }
@@ -980,6 +994,7 @@ function clearExceptPlayer(w: World): void {
     w.registrarC.delete(e);
     w.auditorC.delete(e);
     w.chiefC.delete(e);
+    w.archivistC.delete(e);
     w.courierC.delete(e);
     w.propC.delete(e);
     w.railC.delete(e);

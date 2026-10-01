@@ -25,6 +25,11 @@ export interface FloorSpec {
   staffScale: number;
   /** Ключ искажения. Пусто — этаж честный. */
   distortion: string;
+  /**
+   * Расписание приёмной: кто сидит в конце этажа. Пусто — заведующий,
+   * как на первом уровне.
+   */
+  headStaffing: string;
 }
 
 export const FLOORS: FloorSpec[] = [
@@ -36,6 +41,7 @@ export const FLOORS: FloorSpec[] = [
     templates: ['hall', 'corridor', 'office', 'glass', 'atrium'],
     staffScale: 1,
     distortion: '',
+    headStaffing: '',
   },
   {
     depth: -2,
@@ -47,6 +53,7 @@ export const FLOORS: FloorSpec[] = [
     // Перестановка: стеллажи едут сами, а схема этажа врёт на один
     // участок, пока не найден план эвакуации.
     distortion: 'shuffle',
+    headStaffing: 'head_archive',
   },
   {
     depth: -3,
@@ -58,6 +65,7 @@ export const FLOORS: FloorSpec[] = [
     staffScale: 1.5,
     // Темнота: видно только вокруг ламп, субъекта и своего выстрела.
     distortion: 'dark',
+    headStaffing: '',
   },
   {
     depth: -4,
@@ -69,6 +77,7 @@ export const FLOORS: FloorSpec[] = [
     staffScale: 1.8,
     // Перестройка: помещение меняет планировку прямо посреди боя.
     distortion: 'rebuild',
+    headStaffing: '',
   },
 ];
 
