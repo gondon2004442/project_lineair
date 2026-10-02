@@ -1,5 +1,5 @@
 /** Сборка этажа и вход в помещение. Всё случайное — из seeded PRNG. */
-import { destroyEntity, type World } from './ecs';
+import { destroyEntity, type World, componentStores } from './ecs';
 import { POST_COURIER, POST_ARCHIVIST, POST_KEEPER } from './data/posts';
 import { MINI_BOSS_POSTS, STAFFING_BY_ID, type StaffPost } from './data/staffing';
 import { DEEPEST, floorAt } from './data/floors';
@@ -1020,32 +1020,14 @@ function clearExceptPlayer(w: World): void {
   // Удерживаемое остаётся на прошлом участке.
   const player = w.playerC.get(w.player);
   if (player !== undefined) player.held = -1;
+  // Хранилища перечисляет ecs одним списком: пока их перечисляли здесь
+  // и в flushDoomed порознь, списки разъезжались, и часть компонентов
+  // при смерти не удалялась вовсе.
+  const stores = componentStores(w);
   for (const e of [...w.alive]) {
     if (e === w.player) continue;
     w.alive.delete(e);
-    w.transform.delete(e);
-    w.body.delete(e);
-    w.health.delete(e);
-    w.playerC.delete(e);
-    w.staffC.delete(e);
-    w.internC.delete(e);
-    w.inspectorC.delete(e);
-    w.registrarC.delete(e);
-    w.auditorC.delete(e);
-    w.chiefC.delete(e);
-    w.archivistC.delete(e);
-    w.keeperC.delete(e);
-    w.commissionC.delete(e);
-    w.courierC.delete(e);
-    w.propC.delete(e);
-    w.railC.delete(e);
-    w.stashC.delete(e);
-    w.ticketC.delete(e);
-    w.counterC.delete(e);
-    w.clerkC.delete(e);
-    w.fixtureC.delete(e);
-    w.bulletC.delete(e);
-    w.drawC.delete(e);
+    for (const store of stores) store.delete(e);
   }
   w.doomed.length = 0;
 }

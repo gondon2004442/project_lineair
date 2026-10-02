@@ -67,8 +67,9 @@ export function archivistSystem(w: World, dt: number): void {
     }
     spinRing(w, ring, t.x, t.y, boss.angle);
 
-    // Сломано достаточно — полез за делом.
-    boss.broken = want - ring.length;
+    // Сломано достаточно — полез за делом. Считаем по недостаче кольца:
+    // так число не зависит от того, в каком порядке их ломали.
+    boss.broken = Math.max(0, want - ring.length);
     if (boss.broken >= Math.max(1, Math.round(cfg.breakToOpen))) {
       boss.phase = 'open';
       boss.openTimer = cfg.openTime;
@@ -89,11 +90,18 @@ function ringOf(w: World, boss: Entity): Entity[] {
   return out;
 }
 
-/** Поставить кольцо стеллажей заново. */
+/**
+ * Восполнить кольцо до полного. Именно восполнить, а не поставить
+ * заново: уцелевшие стеллажи остаются на местах, он только закрывает
+ * проломы. Ставить полный комплект поверх уцелевших — это как раз то,
+ * от чего кольцо за шесть циклов разрасталось с семи до сорока двух.
+ */
 function raiseRing(w: World, boss: Entity, x: number, y: number): void {
   const cfg = TUNING.archivist;
   const count = Math.max(1, Math.round(cfg.ring));
-  for (let i = 0; i < count; i++) {
+  const нехватает = count - ringOf(w, boss).length;
+  if (нехватает <= 0) return;
+  for (let i = 0; i < нехватает; i++) {
     const angle = (i / count) * Math.PI * 2;
     const px = x + Math.cos(angle) * cfg.ringRadius;
     const py = y + Math.sin(angle) * cfg.ringRadius;

@@ -589,29 +589,52 @@ export function destroyEntity(w: World, e: Entity): void {
   w.doomed.push(e);
 }
 
+/**
+ * Все хранилища компонентов одним списком.
+ *
+ * Список здесь не для красоты: чистка сущностей делается в двух местах —
+ * при смерти и при смене участка, — и пока каждое перечисляло хранилища
+ * само, они разъезжались. Так и вышло: railC, archivistC, keeperC и
+ * commissionC не удалялись при смерти вовсе. Рельсы копились мёртвыми
+ * записями, а председательство комиссии могло перейти к убитому, и двое
+ * живых становились неуязвимы навсегда.
+ *
+ * Новое хранилище добавляется сюда, и обе чистки подхватывают его сами.
+ */
+export function componentStores(w: World): Map<Entity, unknown>[] {
+  return [
+    w.transform,
+    w.body,
+    w.health,
+    w.playerC,
+    w.staffC,
+    w.internC,
+    w.inspectorC,
+    w.registrarC,
+    w.auditorC,
+    w.chiefC,
+    w.archivistC,
+    w.keeperC,
+    w.commissionC,
+    w.courierC,
+    w.propC,
+    w.railC,
+    w.stashC,
+    w.ticketC,
+    w.counterC,
+    w.clerkC,
+    w.fixtureC,
+    w.bulletC,
+    w.drawC,
+  ] as Map<Entity, unknown>[];
+}
+
 export function flushDoomed(w: World): void {
   profiler.countDestroy(w.doomed.length);
+  const stores = componentStores(w);
   for (const e of w.doomed) {
     w.alive.delete(e);
-    w.transform.delete(e);
-    w.body.delete(e);
-    w.health.delete(e);
-    w.playerC.delete(e);
-    w.staffC.delete(e);
-    w.internC.delete(e);
-    w.inspectorC.delete(e);
-    w.registrarC.delete(e);
-    w.auditorC.delete(e);
-    w.chiefC.delete(e);
-    w.courierC.delete(e);
-    w.propC.delete(e);
-    w.stashC.delete(e);
-    w.ticketC.delete(e);
-    w.counterC.delete(e);
-    w.clerkC.delete(e);
-    w.fixtureC.delete(e);
-    w.bulletC.delete(e);
-    w.drawC.delete(e);
+    for (const store of stores) store.delete(e);
   }
   w.doomed.length = 0;
 }
