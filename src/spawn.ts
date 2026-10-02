@@ -360,7 +360,9 @@ export function spawnClerk(w: World, x: number, y: number): Entity {
   w.body.set(e, { vx: 0, vy: 0, radius: cfg.radius });
   // Здоровья у кладовщика нет намеренно: он не цель, и ни один путь
   // урона не должен уметь его тронуть.
-  w.clerkC.set(e, { title: 'КЛАДОВЩИК', offended: false, noteTime: 0 });
+  // Обида помнится миром: кладовщик ставится заново при каждом входе, и
+  // без этого выход за дверь открывал бы закрытый стол.
+  w.clerkC.set(e, { title: 'КЛАДОВЩИК', offended: w.deskOffended, noteTime: 0 });
   w.drawC.set(e, {
     shape: 'square',
     size: cfg.radius,

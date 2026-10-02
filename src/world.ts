@@ -97,6 +97,8 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     filed: [],
     precedents: [],
     forms: WEAPON_FORMS.map(() => true),
+    spent: [],
+    deskOffended: false,
     tickets: 0,
     listed: false,
     evacPlan: false,
@@ -194,6 +196,8 @@ export function startRun(w: World): void {
   w.reward.lastOrder = '';
   w.reward.lastWeight = 1;
   w.tickets = 0;
+  w.spent = [];
+  w.deskOffended = false;
   w.commendations = 0;
   w.note = [];
   w.noteSlot = -1;
@@ -586,6 +590,9 @@ function evacRoom(w: World): number {
 function placeWalled(w: World, room: RoomNode, entryX: number, entryY: number): void {
   const spec = walledAt(w.depth);
   if (spec === undefined || w.freed.includes(spec.id)) return;
+  // Собой играть и себя же освобождать нельзя: тем, кем вышли, в стене
+  // никого не держат.
+  if (spec.id === w.subject) return;
   const cfg = TUNING.walled;
   const rng = makeRng((w.seed + Math.abs(w.depth) * cfg.seedStride) >>> 0);
   // Бросок делается всегда и до выбора участка: иначе шанс зависел бы
@@ -644,6 +651,7 @@ function placeForm(w: World, room: RoomNode, entryX: number, entryY: number): vo
   const where = rooms.length === 0 ? -1 : (rooms[rng.int(rooms.length)] ?? -1);
   const pick = pool[rng.int(pool.length)];
   if (!wanted || where !== room.index || pick === undefined) return;
+  if (w.spent.includes(formKey(w))) return;
   const spot = findSpawnSpot(w.map, rng, entryX, entryY, TUNING.stash.clearance, cfg.radius);
   spawnStash(w, 'form', pick.f.id, `${pick.f.code} · ${pick.f.title}`, spot.x, spot.y);
 }
@@ -743,6 +751,9 @@ function placeStash(w: World, room: RoomNode, entryX: number, entryY: number): v
   const rng = makeRng((w.seed + room.index * cfg.seedStride) >>> 0);
 
   if (room.safe) {
+    // Вскрытый шкаф не появляется снова: выйти и вернуться — не способ
+    // получить его содержимое второй раз.
+    if (w.spent.includes(safeKey(w, room.index))) return;
     const spot = findSpawnSpot(w.map, rng, entryX, entryY, cfg.clearance, cfg.safeRadius);
     spawnStash(w, 'safe', '', 'ОПЕЧАТАННЫЙ ШКАФ', spot.x, spot.y);
     return;
@@ -754,8 +765,14 @@ function placeStash(w: World, room: RoomNode, entryX: number, entryY: number): v
   const cells = Math.max(1, Math.round(cfg.deskCells));
   // Ячейки набираются тем же делопроизводством: одна из трёх почти
   // всегда оказывается той, что завершает распоряжение.
+  // Сколько ячеек с этого стола уже выдали. Ограничение именно на их
+  // число, а не на названия: ячейка предлагает то, чего в деле ещё нет,
+  // и после выдачи на её месте нашлось бы новое приложение — стол
+  // торговал бы без конца.
+  const issued = w.spent.filter((k) => k === cellsKey(w)).length;
+  const left = Math.max(0, cells - issued);
   const taken = new Set<string>();
-  for (let i = 0; i < cells; i++) {
+  for (let i = 0; i < left; i++) {
     const pick = pickCell(w, rng, taken);
     if (pick === undefined) break;
     taken.add(pick.id);
@@ -765,7 +782,9 @@ function placeStash(w: World, room: RoomNode, entryX: number, entryY: number): v
 
   // Особая выдача: крайняя ячейка справа, платят за неё благодарностью.
   const special = centre.x + ((cells + 1) - (cells - 1) / 2 - 1) * cfg.deskGap;
-  spawnStash(w, 'special', '', 'ОСОБАЯ ВЫДАЧА', special, centre.y);
+  if (!w.spent.includes(serviceKey(w, 'special'))) {
+    spawnStash(w, 'special', '', 'ОСОБАЯ ВЫДАЧА', special, centre.y);
+  }
 
   // Прилавок: второй ряд перед ячейками. Стол выдачи на этаже один,
   // поэтому каждая позиция достаётся за забег ровно раз — ассортимент
@@ -777,12 +796,33 @@ function placeStash(w: World, room: RoomNode, entryX: number, entryY: number): v
     { kind: 'heal', title: 'ОСВИДЕТЕЛЬСТВОВАНИЕ' },
   ];
   services.forEach((service, i) => {
+    if (w.spent.includes(serviceKey(w, service.kind))) return;
     const x = centre.x + (i - (services.length - 1) / 2) * cfg.deskGap;
     spawnStash(w, service.kind, '', service.title, x, centre.y + TUNING.clerk.deskRow);
   });
 
   // Кладовщик стоит позади ряда: к столу подходят, а не натыкаются.
   spawnClerk(w, centre.x, centre.y - TUNING.clerk.standBack);
+}
+
+/** Ключ вскрытого шкафа: уровень и участок. Индексы участков повторяются. */
+export function safeKey(w: World, room: number): string {
+  return `safe:${w.depth}:${room}`;
+}
+
+/** Ключ позиции прилавка: уровень и вид. Стол выдачи на этаже один. */
+export function serviceKey(w: World, kind: string): string {
+  return `svc:${w.depth}:${kind}`;
+}
+
+/** Ключ выданной ячейки стола: уровень. Ячеек на этаж ровно deskCells. */
+export function cellsKey(w: World): string {
+  return `cells:${w.depth}`;
+}
+
+/** Ключ ящика с формой: уровень. Ящик на этаже один. */
+export function formKey(w: World): string {
+  return `form:${w.depth}`;
 }
 
 /**

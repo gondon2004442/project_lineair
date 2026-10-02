@@ -162,6 +162,7 @@ function offendClerk(w: World, clerk: { offended: boolean; noteTime: number }): 
   clerk.noteTime = TUNING.clerk.noteTime;
   if (clerk.offended) return;
   clerk.offended = true;
+  w.deskOffended = true;
   w.record.penalty = Math.min(
     TUNING.record.penaltyMax,
     w.record.penalty + Math.max(0, Math.round(TUNING.clerk.offencePenalty)),

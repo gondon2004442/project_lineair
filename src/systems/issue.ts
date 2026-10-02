@@ -15,6 +15,7 @@ import type { Entity, World } from '../ecs';
 import { ITEMS_BY_ID } from '../data/items';
 import { grantItem, pickItem } from '../paperwork';
 import { spawnStaff } from '../spawn';
+import { cellsKey, formKey, safeKey, serviceKey } from '../world';
 import { makeRng } from '../rng';
 import { TUNING } from '../tuning';
 import { ammoMax, formStat, infiniteReserve, reserveMax, statAt } from '../weapon';
@@ -293,6 +294,14 @@ function decide(w: World, id: string): void {
   w.sounds.push('stamp');
 }
 
+/** Отметить выданное на забег. Ключи разбирает расстановка добычи. */
+function noteSpent(w: World, kind: string): void {
+  if (kind === 'safe') w.spent.push(safeKey(w, w.room));
+  else if (kind === 'form') w.spent.push(formKey(w));
+  else if (kind === 'cell') w.spent.push(cellsKey(w));
+  else if (kind === 'special' || isService(kind)) w.spent.push(serviceKey(w, kind));
+}
+
 export function issueSystem(w: World): void {
   if (!w.input.useQueued) return;
   w.input.useQueued = false;
@@ -311,6 +320,10 @@ export function issueSystem(w: World): void {
   else if (cost === 'commendation') spendCommendation(w);
 
   stash.opened = true;
+  // Выданное записывается в забег, а не только в сущность: сущности
+  // участка стираются при выходе, и без записи та же добыча стояла бы
+  // там снова.
+  noteSpent(w, stash.kind);
   w.sounds.push('door.unlock');
 
   if (stash.kind === 'evac') {
@@ -391,10 +404,16 @@ export function issueSystem(w: World): void {
   if (roll < TUNING.stash.safeAmmoShare) {
     // Выбор идёт среди тех форм, которым запас вообще нужен: бросок
     // тратится тот же самый, поэтому поток случайности не съезжает.
-    // Выбор только среди выписанных форм: патроны к ненайденной были бы
-    // выдачей в пустоту.
+    // Выбор только среди выписанных форм, которым запас и нужен, и есть
+    // куда лечь: патроны к ненайденной форме были бы выдачей в пустоту,
+    // а к полному запасу — обещанием без выдачи. Опись в обоих случаях
+    // сказала бы ПАТРОНЫ, и шкаф обязан их дать.
+    const stock = w.playerC.get(w.player);
     const pool = WEAPON_FORMS.filter(
-      (f, i) => w.forms[i] === true && !infiniteReserve(w, f.id),
+      (f, i) =>
+        w.forms[i] === true &&
+        !infiniteReserve(w, f.id) &&
+        (stock?.reserve[i] ?? 0) < reserveMax(w, f.id),
     );
     const picked = pool[rng.int(Math.max(1, pool.length))];
     const index = WEAPON_FORMS.findIndex((f) => f.id === picked?.id);
