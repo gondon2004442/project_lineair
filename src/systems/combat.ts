@@ -45,6 +45,10 @@ export function bulletSystem(w: World, dt: number): void {
       // Стойка с факсами пуль не держит: сквозь неё стреляют, но
       // из-за неё не видят. В этом вся её ценность.
       if (PROPS_BY_ID.get(propC.kind)?.stopsBullets === false) continue;
+      // Кольцо архивариуса своим огнём не ломается: иначе его же
+      // инспекторы простреливают стеллажи, окно открывается само, и
+      // игроку остаётся ждать. Открывать его должен он, а не они.
+      if (bullet.faction !== 'player' && w.railC.get(prop)?.owner !== undefined) continue;
       if (prop === bullet.lastHit || !hit(w, e, b.radius, prop)) continue;
       const health = w.health.get(prop);
       if (health !== undefined) {
