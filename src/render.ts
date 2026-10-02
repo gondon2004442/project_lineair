@@ -20,6 +20,7 @@ import { DIRS, TILE_DOOR, TILE_GATE, TILE_WALL, TILE_WEAK, liftOpen, type TileMa
 import { roomNumber } from './floor';
 import { currentRoom } from './world';
 import { floorAt } from './data/floors';
+import { litAt } from './systems/postKeeper';
 import { DECOR_BY_ID } from './data/decor';
 import { FIXTURES_BY_ID } from './data/fixtures';
 import { TEMPLATES_BY_ID } from './data/roomTemplates';
@@ -185,6 +186,7 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
       profiler.end('КАДР: ДЫМ');
 
       entityLayer.clear();
+      drawSections(entityLayer, w);
       drawEntities(entityLayer, w, alpha);
 
       profiler.begin('КАДР: ТЕМНОТА');
@@ -823,6 +825,38 @@ function drawLift(g: Graphics, w: World): void {
   drawGlyphs(g, text, plateX + pad, plateY + pad, digit, TUNING.render.signGap, PALETTE.yellow);
 }
 
+/**
+ * Секции освещения: щиток на полу. Горящий — жёлтая рамка со светлым
+ * нутром, погашенный — пустая рамка. Пока субъект его держит, рамка
+ * наливается снизу: видно, сколько осталось.
+ */
+function drawSections(g: Graphics, w: World): void {
+  if (w.sections.length === 0) return;
+  const cfg = TUNING.keeper;
+  const half = TUNING.render.sectionSize;
+  for (const section of w.sections) {
+    const x = section.x;
+    const y = section.y;
+    g.rect(x - half, y - half, half * 2, half * 2).fill(PALETTE.black);
+    g.rect(x - half, y - half, half * 2, half * 2).stroke({
+      width: TUNING.render.sectionEdge,
+      color: section.lit ? PALETTE.yellow : PALETTE.concrete500,
+      alignment: 1,
+    });
+    if (section.lit) {
+      const inset = half * TUNING.render.sectionCore;
+      g.rect(x - inset, y - inset, inset * 2, inset * 2).fill(PALETTE.yellow);
+      continue;
+    }
+    const done = Math.max(0, Math.min(1, section.charge / Math.max(0.001, cfg.relightTime)));
+    if (done <= 0) continue;
+    g.rect(x - half, y + half - half * 2 * done, half * 2, half * 2 * done).fill({
+      color: PALETTE.yellow,
+      alpha: 0.5,
+    });
+  }
+}
+
 /** Источники света на участке в текущем кадре. */
 function lights(w: World, alpha: number): { x: number; y: number; r: number }[] {
   const cfg = TUNING.dark;
@@ -839,6 +873,11 @@ function lights(w: World, alpha: number): { x: number; y: number; r: number }[] 
     if (v - Math.floor(v) >= cfg.lampShare) return;
     out.push({ x: lamp.x, y: lamp.y, r: cfg.lamp });
   });
+  // Секции щитовой: пока горят, они и есть свет этого помещения.
+  for (const section of w.sections) {
+    if (!section.lit) continue;
+    out.push({ x: section.x, y: section.y, r: TUNING.keeper.sectionLight });
+  }
   // Вспышка читается по тому же правилу, что кольцо бланка: иначе она
   // держалась бы ровно один шаг симуляции и мигала рвано.
   if (fxLeft(w.fx.shotTime, alpha) > 0) {
@@ -1680,6 +1719,37 @@ function drawSilhouette(
       const lift = half * TUNING.render.counterTopLift;
       g.rect(x - wide, y - tall - lift, wide * 2, lift).fill(PALETTE.concrete500);
       headShadow(g, x, y, tall);
+      break;
+    }
+    case 'lamp': {
+      // Смотритель: узкий столб, вместо головы — фонарь. Под лампой
+      // фонарь светлый, в темноте глухой: по нему и видно, открыт он
+      // сейчас или нет.
+      const wide = half * TUNING.render.keeperWidth;
+      const tall = half * TUNING.render.keeperTall;
+      block(g, x - wide, y - tall, wide * 2, tall * 2, color);
+      const lamp = half * TUNING.render.keeperLamp;
+      const open = litAt(w, x, y);
+      g.rect(x - lamp, y - tall - lamp * 2, lamp * 2, lamp * 2).fill(
+        open ? PALETTE.yellow : PALETTE.concrete700,
+      );
+      headShadow(g, x, y, tall);
+      break;
+    }
+    case 'seat': {
+      // Член комиссии: три одинаковых силуэта, и это нарочно. Отличает
+      // их только то, кто сейчас молчит, — а молчащего видно по кайме.
+      block(g, x - half, y - half, half * 2, half * 2, color);
+      const head = half * TUNING.render.bulkHead;
+      block(g, x - head, y - half - head, head * 2, head * 2, color);
+      headShadow(g, x, y, half);
+      if (w.commissionC.get(e)?.chair === true) {
+        const pad = TUNING.render.chairOutline;
+        g.rect(x - half - pad, y - half - pad, (half + pad) * 2, (half + pad) * 2).stroke({
+          width: TUNING.render.stashEdge,
+          color: PALETTE.concrete100,
+        });
+      }
       break;
     }
     case 'slim': {

@@ -20,7 +20,9 @@ export type Silhouette =
   | 'bulk' // вдвое крупнее субъекта, масса смещена влево
   | 'desk' // самый крупный, за столом
   | 'slim' // узкий и лёгкий, всё время в движении
-  | 'counter'; // неподвижный, за конторкой: шире стола и ниже его
+  | 'counter' // неподвижный, за конторкой: шире стола и ниже его
+  | 'lamp' // смотритель: узкий столб с фонарём вместо головы
+  | 'seat'; // член комиссии: три одинаковых, различаются только местом
 
 export interface PostSpec {
   id: string;
@@ -57,6 +59,26 @@ export const POSTS: PostSpec[] = [
     plates: 2,
     desk: true,
   },
+  {
+    /** Смотритель узла. Не стреляет: гасит свет и бьёт в упор. */
+    id: 'keeper',
+    title: 'СМОТРИТЕЛЬ УЗЛА',
+    skin: 6,
+    silhouette: 'lamp',
+    plateMarks: 4,
+    plates: 1,
+    desk: false,
+  },
+  {
+    /** Член комиссии. Их трое, и они неотличимы — в этом и дело. */
+    id: 'commission',
+    title: 'ЧЛЕН КОМИССИИ',
+    skin: 3,
+    silhouette: 'seat',
+    plateMarks: 4,
+    plates: 2,
+    desk: false,
+  },
 ];
 
 export const POSTS_BY_ID = new Map(POSTS.map((p) => [p.id, p]));
@@ -69,3 +91,5 @@ export const POST_CHIEF = 'chief';
 export const POST_COURIER = 'courier';
 
 export const POST_ARCHIVIST = 'archivist';
+export const POST_KEEPER = 'keeper';
+export const POST_COMMISSION = 'commission';

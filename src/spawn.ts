@@ -6,7 +6,7 @@ import {
   POST_COURIER,
   POST_INSPECTOR,
   POST_INTERN,
-  POST_REGISTRAR, POST_ARCHIVIST } from './data/posts';
+  POST_REGISTRAR, POST_ARCHIVIST, POST_KEEPER, POST_COMMISSION } from './data/posts';
 import { PROPS_BY_ID } from './data/props';
 import { WEAPON_FORMS } from './data/weaponForms';
 import { createEntity, type Entity, type Faction, type Shape, type StashKind, type World } from './ecs';
@@ -34,6 +34,10 @@ export function postNumbers(post: string): PostNumbers {
       return TUNING.post.chief;
     case POST_ARCHIVIST:
       return TUNING.post.archivist;
+    case POST_KEEPER:
+      return TUNING.post.keeper;
+    case POST_COMMISSION:
+      return TUNING.post.commission;
     case POST_COURIER:
       return TUNING.post.courier;
     default:
@@ -198,6 +202,20 @@ function attachBehaviour(w: World, e: Entity, post: string, x: number, y: number
         approachTimer: TUNING.post.courier.reachTimeout,
       });
       break;
+    case POST_KEEPER:
+      w.keeperC.set(e, { douseTimer: TUNING.keeper.douseEvery, target: -1, touchTimer: 0 });
+      break;
+    case POST_COMMISSION: {
+      // Место в комиссии: по нему же решают, кто сейчас председатель.
+      const seat = w.commissionC.size;
+      w.commissionC.set(e, {
+        seat,
+        chair: seat === 0,
+        swapTimer: TUNING.commission.swapEvery,
+        shotTimer: TUNING.commission.shotEvery + seat * TUNING.commission.shotStagger,
+      });
+      break;
+    }
     case POST_ARCHIVIST:
       w.archivistC.set(e, {
         phase: 'closed',

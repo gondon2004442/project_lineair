@@ -1,6 +1,6 @@
 /** Сборка этажа и вход в помещение. Всё случайное — из seeded PRNG. */
 import { destroyEntity, type World } from './ecs';
-import { POST_COURIER, POST_ARCHIVIST } from './data/posts';
+import { POST_COURIER, POST_ARCHIVIST, POST_KEEPER } from './data/posts';
 import { MINI_BOSS_POSTS, STAFFING_BY_ID, type StaffPost } from './data/staffing';
 import { DEEPEST, floorAt } from './data/floors';
 import { generateFloor, roomDoors, type RoomNode } from './floor';
@@ -93,6 +93,7 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     evacPlan: false,
     rebuildIn: 0,
     rebuilds: 0,
+    sections: [],
     commendations: 0,
     runEnded: '',
     note: [],
@@ -113,6 +114,8 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     auditorC: new Map(),
     chiefC: new Map(),
     archivistC: new Map(),
+    keeperC: new Map(),
+    commissionC: new Map(),
     courierC: new Map(),
     propC: new Map(),
     railC: new Map(),
@@ -295,6 +298,7 @@ export function enterRoom(w: World, index: number, fromDir: Dir | null): void {
   placeFixtures(w, room, spot.x, spot.y);
   placeRails(w, room);
   placeEvacPlan(w, room, spot.x, spot.y);
+  placeSections(w, room);
   if (!room.cleared) staffRoom(w, room, spot.x, spot.y);
   if (w.staffC.size === 0 && !room.cleared) {
     room.cleared = true;
@@ -436,6 +440,41 @@ function ejectBodies(w: World): void {
     t.py = t.y;
     b.vx = 0;
     b.vy = 0;
+  }
+}
+
+/**
+ * Секции освещения щитовой. Ставятся по углам и в середине: субъекту
+ * надо бегать между ними, иначе гонка за светом превращается в стояние
+ * на одном месте.
+ *
+ * Зажжены с самого начала — гасит их Смотритель, и это его работа, а не
+ * стартовое условие.
+ */
+function placeSections(w: World, room: RoomNode): void {
+  w.sections = [];
+  if (STAFFING_BY_ID.get(room.staffing)?.posts.some((p) => p.post === POST_KEEPER) !== true) return;
+  const cfg = TUNING.keeper;
+  const tile = TUNING.room.tile;
+  const wall = TUNING.room.wall;
+  const inset = Math.max(1, Math.round(cfg.sectionInset));
+  const left = (wall + inset + 0.5) * tile;
+  const right = (wall + TUNING.room.cols - inset - 0.5) * tile;
+  const top = (wall + inset + 0.5) * tile;
+  const bottom = (wall + TUNING.room.rows - inset - 0.5) * tile;
+  const centre = roomCenter(w.map);
+  const spots = [
+    { x: left, y: top },
+    { x: right, y: top },
+    { x: left, y: bottom },
+    { x: right, y: bottom },
+    { x: centre.x, y: centre.y },
+  ];
+  const want = Math.max(1, Math.round(cfg.sections));
+  for (let i = 0; i < want; i++) {
+    const at = spots[i % spots.length];
+    if (at === undefined) continue;
+    w.sections.push({ x: at.x, y: at.y, lit: true, charge: 0 });
   }
 }
 
@@ -995,6 +1034,8 @@ function clearExceptPlayer(w: World): void {
     w.auditorC.delete(e);
     w.chiefC.delete(e);
     w.archivistC.delete(e);
+    w.keeperC.delete(e);
+    w.commissionC.delete(e);
     w.courierC.delete(e);
     w.propC.delete(e);
     w.railC.delete(e);

@@ -75,6 +75,21 @@ export const STAFFING: Staffing[] = [
       { post: 'inspector', title: 'ИНСПЕКТОР', count: 2, priority: 2 },
     ],
   },
+  {
+    /** Узел: смотритель и никого больше. Весь бой — это свет. */
+    id: 'head_node',
+    label: 'ЩИТОВАЯ ТЕПЛОВОГО УЗЛА',
+    posts: [{ post: 'keeper', title: 'СМОТРИТЕЛЬ УЗЛА', count: 1, priority: 0 }],
+  },
+  {
+    /**
+     * Комиссия. Трое с нулевым приоритетом: ставка одиночная по
+     * признаку, но здесь их по уставу трое, и count это говорит прямо.
+     */
+    id: 'head_commission',
+    label: 'ЗАСЕДАНИЕ КОМИССИИ',
+    posts: [{ post: 'commission', title: 'ЧЛЕН КОМИССИИ', count: 3, priority: 0 }],
+  },
 ];
 
 export const STAFFING_BY_ID = new Map(STAFFING.map((s) => [s.id, s]));

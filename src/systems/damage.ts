@@ -3,6 +3,8 @@ import type { Entity, World } from '../ecs';
 import { TUNING } from '../tuning';
 import { damageFactorAgainst } from '../weapon';
 import { archivistOpen } from './postArchivist';
+import { commissionOpen } from './postCommission';
+import { keeperOpen } from './postKeeper';
 
 export function applyDamage(w: World, target: Entity, amount: number): boolean {
   const h = w.health.get(target);
@@ -13,6 +15,11 @@ export function applyDamage(w: World, target: Entity, amount: number): boolean {
   // Архивариус — пока не полез за делом. Окно открывает игрок, ломая
   // картотеки вокруг него.
   if (!archivistOpen(w, target)) return false;
+  // Смотритель — только под зажжённой лампой: в темноте по нему не
+  // навести. Член комиссии — только пока председательствует, то есть
+  // пока молчит.
+  if (!keeperOpen(w, target)) return false;
+  if (!commissionOpen(w, target)) return false;
 
   // Распоряжение против должности: множитель знает только эта точка,
   // потому что только здесь известно, в кого прилетело.

@@ -203,6 +203,47 @@ export interface ArchivistC {
   raiseTimer: number;
 }
 
+/**
+ * Секция освещения. Тепловой узел разбит на секции, и Смотритель их
+ * гасит. Свет — его оружие и его слабость: в темноте он быстр и
+ * неуязвим, под лампой медленный и открытый.
+ */
+export interface LightSection {
+  x: number;
+  y: number;
+  lit: boolean;
+  /** Сколько субъект уже держит её под рукой, чтобы зажечь. */
+  charge: number;
+}
+
+/**
+ * Смотритель узла. Не стреляет вовсе: он гасит свет и бьёт в упор. Весь
+ * бой — гонка за освещением.
+ */
+export interface KeeperC {
+  /** Обратный отсчёт до следующей погашенной секции. */
+  douseTimer: number;
+  /** Куда идёт сейчас: номер секции или -1. */
+  target: number;
+  /** Обратный отсчёт до следующего касания: бьёт он только в упор. */
+  touchTimer: number;
+}
+
+/**
+ * Комиссия. Три существа, действующие как один орган: кто сейчас молчит,
+ * тот и председатель, и только по нему проходит урон.
+ */
+export interface CommissionC {
+  /** Номер места в комиссии: 0, 1, 2. */
+  seat: number;
+  /** Председательствует ли сейчас — то есть молчит. */
+  chair: boolean;
+  /** Обратный отсчёт до смены председателя. */
+  swapTimer: number;
+  /** Обратный отсчёт до собственного выстрела. */
+  shotTimer: number;
+}
+
 export type AuditorPhase = 'audit' | 'open' | 'shot';
 
 export interface AuditorC {
@@ -486,6 +527,11 @@ export interface World {
   rebuildIn: number;
   /** Сколько раз это помещение уже перестраивалось. */
   rebuilds: number;
+  /**
+   * Секции освещения текущего помещения. Пусто — помещение не разбито
+   * на секции, и гасить в нём нечего.
+   */
+  sections: LightSection[];
   /** Благодарности: приёмные, взятые без единого попадания. */
   commendations: number;
   /**
@@ -517,6 +563,8 @@ export interface World {
   auditorC: Map<Entity, AuditorC>;
   chiefC: Map<Entity, ChiefC>;
   archivistC: Map<Entity, ArchivistC>;
+  keeperC: Map<Entity, KeeperC>;
+  commissionC: Map<Entity, CommissionC>;
   courierC: Map<Entity, CourierC>;
   propC: Map<Entity, PropC>;
   railC: Map<Entity, RailC>;

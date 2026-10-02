@@ -65,7 +65,7 @@ export const FLOORS: FloorSpec[] = [
     staffScale: 1.5,
     // Темнота: видно только вокруг ламп, субъекта и своего выстрела.
     distortion: 'dark',
-    headStaffing: '',
+    headStaffing: 'head_node',
   },
   {
     depth: -4,
@@ -77,7 +77,7 @@ export const FLOORS: FloorSpec[] = [
     staffScale: 1.8,
     // Перестройка: помещение меняет планировку прямо посреди боя.
     distortion: 'rebuild',
-    headStaffing: '',
+    headStaffing: 'head_commission',
   },
 ];
 
