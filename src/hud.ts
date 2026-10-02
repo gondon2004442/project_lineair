@@ -2,6 +2,7 @@
 import { TEMPLATES_BY_ID } from './data/roomTemplates';
 import { issuedDirectives } from './data/directives';
 import { floorAt } from './data/floors';
+import { POSTS_BY_ID } from './data/posts';
 import { ITEMS_BY_ID } from './data/items';
 import { toolCooldown } from './systems/tool';
 import { WEAPON_FORMS } from './data/weaponForms';
@@ -273,6 +274,11 @@ function promptRow(w: World): string {
  */
 function liftRow(w: World): string {
   if (w.scene !== 'run' || w.room !== w.floor.end || !liftOpen(w.map)) return '';
+  // Без печати лифт стоит: распоряжение о спуске нечем подписать.
+  if (!w.seals.includes(w.depth)) {
+    const holder = POSTS_BY_ID.get(floorAt(w.depth).sealHolder)?.title ?? 'ДЕРЖАТЕЛЬ ПЕЧАТИ';
+    return row('ЛИФТ', `<span class="warn">СПУСК НЕ ПОДПИСАН · ПЕЧАТЬ У: ${holder}</span>`);
+  }
   const next = floorAt(w.depth - 1);
   return row('ЛИФТ', `<span class="ok">${next.code} · ${next.title} — ШАГНИ В ШАХТУ</span>`);
 }
@@ -391,6 +397,7 @@ function dashBody(w: World): string {
     '<div class="profile-split"></div>',
     '<div class="subtitle">ЭТАЖ</div>',
     row('УРОВЕНЬ', `${floorAt(w.depth).code} · ${floorAt(w.depth).title}`),
+    row('ПЕЧАТИ', w.seals.length === 0 ? 'НЕТ' : w.seals.map((d) => floorAt(d).code).join(' · ')),
     row('СХЕМА', SCHEME_LABEL[w.floor.scheme] ?? w.floor.scheme),
     row('УЗЛОВ · ПЕРЕХОДОВ', nodeLine(w)),
     '<div class="profile-split"></div>',

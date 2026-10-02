@@ -30,6 +30,11 @@ export interface FloorSpec {
    * как на первом уровне.
    */
   headStaffing: string;
+  /**
+   * Должность, которая держит печать этого уровня. Пока она жива, лифт
+   * вниз не подпишут.
+   */
+  sealHolder: string;
 }
 
 export const FLOORS: FloorSpec[] = [
@@ -42,6 +47,7 @@ export const FLOORS: FloorSpec[] = [
     staffScale: 1,
     distortion: '',
     headStaffing: '',
+    sealHolder: 'chief',
   },
   {
     depth: -2,
@@ -54,6 +60,7 @@ export const FLOORS: FloorSpec[] = [
     // участок, пока не найден план эвакуации.
     distortion: 'shuffle',
     headStaffing: 'head_archive',
+    sealHolder: 'archivist',
   },
   {
     depth: -3,
@@ -66,6 +73,7 @@ export const FLOORS: FloorSpec[] = [
     // Темнота: видно только вокруг ламп, субъекта и своего выстрела.
     distortion: 'dark',
     headStaffing: 'head_node',
+    sealHolder: 'keeper',
   },
   {
     depth: -4,
@@ -78,6 +86,7 @@ export const FLOORS: FloorSpec[] = [
     // Перестройка: помещение меняет планировку прямо посреди боя.
     distortion: 'rebuild',
     headStaffing: 'head_commission',
+    sealHolder: 'commission',
   },
 ];
 

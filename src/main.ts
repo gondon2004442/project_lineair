@@ -25,6 +25,7 @@ import { deskPrice, issueOffer, safeContents } from './systems/issue';
 import { DECOR, DECOR_BY_ID, DECOR_TOO_LIGHT } from './data/decor';
 import { TEMPLATES_BY_ID } from './data/roomTemplates';
 import { liftOpen } from './room';
+import { floorAt } from './data/floors';
 import { shownRoom } from './hud';
 import { createWorld, descend, enterLobby, enterRoom, startRun } from './world';
 
@@ -118,6 +119,8 @@ async function boot(): Promise<void> {
       descend,
       startRun,
       liftOpen,
+      // Описание уровня нужно стенду печатей: кто держит печать.
+      floorAt,
       // Искажение схемы проверяется только так: на экране это метка,
       // а числом — номер участка, который она показывает.
       shownRoom,

@@ -1,5 +1,6 @@
 /** Таймеры тел, смерть и состояние забега. */
-import { destroyEntity, type World } from '../ecs';
+import { destroyEntity, type Entity, type World } from '../ecs';
+import { floorAt } from '../data/floors';
 import { isGatePoint, liftOpen, openLift } from '../room';
 import { descend, deeperExists } from '../world';
 import { dropTickets } from './tickets';
@@ -33,6 +34,9 @@ export function lifecycleSystem(w: World, dt: number): void {
       // перманентный контейнер здоровья на забег. Награда не за победу,
       // а за качество победы.
       if (w.chiefC.has(e) && w.record.roomClean) commend(w);
+      // Печать уровня: снимается с того, кто им заведует. Это и есть
+      // единственная причина убивать начальника — не добыча, а подпись.
+      takeSeal(w, e);
       // Талоны сыплются до удаления: место ставки ещё известно.
       dropTickets(w, e);
       destroyEntity(w, e);
@@ -73,6 +77,33 @@ export function statusSystem(w: World): void {
 }
 
 /**
+ * Снять печать с убитого держателя. Печать одна на уровень: комиссия
+ * из троих отдаёт её, когда ляжет последний, — орган один, и полномочия
+ * у него тоже одни.
+ */
+function takeSeal(w: World, e: Entity): void {
+  const staff = w.staffC.get(e);
+  if (staff === undefined) return;
+  if (staff.post !== floorAt(w.depth).sealHolder) return;
+  // Орган из нескольких лиц: печать отдаёт последний. Живой — значит с
+  // прочностью выше нуля, а не просто числящийся: все трое гибнут в
+  // одном шаге, из хранилища их вычёркивают только в конце его, и по
+  // одному лишь списку выходило, что последнего нет никогда.
+  for (const [other, s] of w.staffC) {
+    if (other === e || s.post !== staff.post) continue;
+    if ((w.health.get(other)?.hp ?? 0) > 0) return;
+  }
+  if (w.seals.includes(w.depth)) return;
+  w.seals.push(w.depth);
+  w.sounds.push('stamp');
+}
+
+/** Подписан ли спуск с этого уровня: печать в деле. */
+export function descentSigned(w: World): boolean {
+  return w.seals.includes(w.depth);
+}
+
+/**
  * Шаг в лифт. Как и в вестибюле: никаких кнопок и подтверждений —
  * встал в шахту, поехал.
  */
@@ -81,6 +112,8 @@ export function liftSystem(w: World): void {
   if (!deeperExists(w)) return;
   const office = w.floor.rooms[w.floor.end];
   if (office === undefined || !office.cleared || w.room !== w.floor.end) return;
+  // Распоряжение о спуске действительно только с печатью уровня.
+  if (!descentSigned(w)) return;
   const t = w.transform.get(w.player);
   if (t === undefined || !isGatePoint(w.map, t.x, t.y)) return;
   // В шахту надо ВОЙТИ, а не оказаться в ней. Приёмная сдаётся чаще

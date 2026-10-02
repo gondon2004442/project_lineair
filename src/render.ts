@@ -811,8 +811,10 @@ function drawLift(g: Graphics, w: World): void {
   });
 
   // Табло: куда поедет. Число отрицательное — вниз, других направлений
-  // у этого здания нет.
-  const text = String(w.depth - 1);
+  // у этого здания нет. Без печати на табло прочерк: распоряжение о
+  // спуске не подписано, и лифт не поедет никуда.
+  const signed = w.seals.includes(w.depth);
+  const text = signed ? String(w.depth - 1) : '--';
   const digit = cfg.liftSignDigit;
   const width = signWidth(text, digit, TUNING.render.signGap);
   const pad = TUNING.render.signPad;
@@ -822,7 +824,15 @@ function drawLift(g: Graphics, w: World): void {
   const plateY = y - cfg.liftSignLift;
   g.rect(plateX, plateY, plateW, plateH).fill(PALETTE.black);
   g.rect(plateX, plateY, plateW, plateH).stroke({ width: 1, color: PALETTE.concrete500 });
-  drawGlyphs(g, text, plateX + pad, plateY + pad, digit, TUNING.render.signGap, PALETTE.yellow);
+  drawGlyphs(
+    g,
+    text,
+    plateX + pad,
+    plateY + pad,
+    digit,
+    TUNING.render.signGap,
+    signed ? PALETTE.yellow : PALETTE.concrete500,
+  );
 }
 
 /**

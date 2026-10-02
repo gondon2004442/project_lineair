@@ -88,6 +88,7 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     reward: { chance: TUNING.reward.base, dry: 0, lastItem: '', lastOrder: '', lastWeight: 1 },
     record: { penalty: 0, service: 0, broken: 0, roomClean: true, controlHere: 0 },
     depth: -1,
+    seals: [],
     tickets: 0,
     listed: false,
     evacPlan: false,
@@ -177,6 +178,8 @@ export function startRun(w: World): void {
   w.noteSlot = -1;
   w.runEnded = '';
   w.depth = -1;
+  // Печати аннулируются вместе с допуском: подписывать спуск заново.
+  w.seals = [];
   w.record.penalty = 0;
   w.record.service = 0;
   w.record.broken = 0;
