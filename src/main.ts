@@ -16,7 +16,7 @@ import { step } from './step';
 import { STEP, TUNING } from './tuning';
 import { DIRECTIVES, issuedDirectives } from './data/directives';
 import { ITEMS, ITEM_ID_CLASHES } from './data/items';
-import { spawnStaff } from './spawn';
+import { spawnProp, spawnStaff } from './spawn';
 import { damageFactorAgainst, hasTrait, penaltyOf, statAt } from './weapon';
 import { applyDamage } from './systems/damage';
 import { ticketValue } from './systems/tickets';
@@ -24,7 +24,7 @@ import { counterInReach, counterOffer } from './systems/counter';
 import { deskPrice, issueOffer, safeContents } from './systems/issue';
 import { DECOR, DECOR_BY_ID, DECOR_TOO_LIGHT } from './data/decor';
 import { TEMPLATES_BY_ID } from './data/roomTemplates';
-import { liftOpen } from './room';
+import { isSolidPoint, liftOpen } from './room';
 import { floorAt } from './data/floors';
 import { SUBJECTS, SUBJECT_START, subjectAt } from './data/subjects';
 import { shownRoom } from './hud';
@@ -151,6 +151,8 @@ async function boot(): Promise<void> {
       descend,
       startRun,
       liftOpen,
+      // Бетон нужен стенду скобы: иначе не измерить, к чему пришило.
+      isSolidPoint,
       // Описание уровня нужно стенду печатей: кто держит печать.
       floorAt,
       // Субъекты нужны стенду: иначе не проверить, что свойство доходит
@@ -164,6 +166,8 @@ async function boot(): Promise<void> {
       shownRoom,
       step,
       spawnStaff,
+      // Мебель нужна стенду скобы: к ней пришивают так же, как к стене.
+      spawnProp,
       statAt,
       // Ось «против должности» проверяется только так: путь тюнинга
       // про цель ничего не знает.

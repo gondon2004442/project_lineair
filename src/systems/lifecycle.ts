@@ -4,6 +4,8 @@ import { floorAt } from '../data/floors';
 import { isGatePoint, liftOpen, openLift } from '../room';
 import { descend, deeperExists } from '../world';
 import { dropTickets } from './tickets';
+import { WEAPON_FORMS } from '../data/weaponForms';
+import { spawnStash } from '../spawn';
 import { TUNING } from '../tuning';
 
 export function lifecycleSystem(w: World, dt: number): void {
@@ -34,6 +36,10 @@ export function lifecycleSystem(w: World, dt: number): void {
       // перманентный контейнер здоровья на забег. Награда не за победу,
       // а за качество победы.
       if (w.chiefC.has(e) && w.record.roomClean) commend(w);
+      // Циркулярная остаётся там, где стоял начальник. Она его
+      // инструмент: не выдаётся по описи, а снимается с него — заодно и
+      // причина драться с ним помимо печати.
+      if (w.chiefC.has(e)) dropCircular(w, e);
       // Печать уровня: снимается с того, кто им заведует. Это и есть
       // единственная причина убивать начальника — не добыча, а подпись.
       takeSeal(w, e);
@@ -42,6 +48,21 @@ export function lifecycleSystem(w: World, dt: number): void {
       destroyEntity(w, e);
     }
   }
+}
+
+/**
+ * Циркулярная форма на месте убитого начальника. Ящик с инструментом, а
+ * не предмет в деле: её ещё надо оформить допуском, как и всё, что
+ * контора выдаёт.
+ */
+function dropCircular(w: World, e: Entity): void {
+  const index = WEAPON_FORMS.findIndex((f) => f.id === 'circular');
+  const form = WEAPON_FORMS[index];
+  if (form === undefined || w.forms[index] === true) return;
+  const t = w.transform.get(e);
+  if (t === undefined) return;
+  spawnStash(w, 'form', form.id, `${form.code} · ${form.title}`, t.x, t.y);
+  w.sounds.push('ring');
 }
 
 /** Благодарность: контейнер здоровья, который остаётся до конца забега. */

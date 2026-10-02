@@ -393,6 +393,79 @@ export const TUNING = {
       /** Множитель отдачи к player.recoil. Залповая почти не толкает: её дело доворот, а не вес. */
       recoilFactor: 0.6,
     },
+
+    /**
+     * Подшивающая: скоба пришивает сотрудника к ближайшей стене или
+     * мебели. Урон почти нулевой — это инструмент положения, а не
+     * поражения: единственный надёжный ответ Курьеру, способ развести
+     * инспекторов по такту, способ удержать Ревизора вне мебели.
+     *
+     * Расход обоймы высокий сознательно: иначе ей играли бы весь забег,
+     * а остальные формы стали бы необязательными.
+     */
+    staple: {
+      /** Урон почти нулевой: убивать ею нельзя и не нужно. */
+      damage: 0.25,
+      speed: 1150,
+      radius: 4,
+      life: 0.8,
+      spreadDeg: 1.2,
+      interval: 0.42,
+      cost: 5,
+      ammoMax: 14,
+      reloadTime: 1.3,
+      reserveMax: 42,
+      infiniteReserve: 0,
+      pickup: 12,
+      pickupWeight: 2,
+      recoilFactor: 0.8,
+      /** Сколько держит скоба. Документ просит полторы секунды. */
+      pinTime: 1.5,
+      /**
+       * С какого расстояния ищется стена или мебель, к которой пришьют.
+       * Не нашлось ничего — сотрудник всё равно стоит: скоба держит его
+       * саму себя, просто без опоры.
+       */
+      pinReach: 90,
+    },
+
+    /**
+     * Циркулярная: кольцо снарядов во все стороны, каждое следующее
+     * провёрнуто. Это инструмент Заведующего, и берут его с него:
+     * не выдаётся, а находится после первого начальника.
+     */
+    circular: {
+      damage: 1,
+      speed: 620,
+      radius: 3.5,
+      life: 0.9,
+      /** Снарядов в кольце и на сколько градусов провёрнуто следующее. */
+      count: 12,
+      turnDeg: 7,
+      interval: 0.7,
+      cost: 7,
+      ammoMax: 14,
+      reloadTime: 1.7,
+      reserveMax: 24,
+      infiniteReserve: 0,
+      pickup: 7,
+      pickupWeight: 1,
+      recoilFactor: 0.4,
+    },
+  },
+
+  /**
+   * ФОРМЫ КАК НАХОДКА. Забег начинается с того, что выписано наряду;
+   * остальное лежит на этажах как инструмент, выданный по описи. Отсюда
+   * прогрессия внутри забега: ранние этажи и правда другие.
+   */
+  form: {
+    /** Вероятность, что инструмент попадётся на этаже. */
+    chance: 0.75,
+    /** Смещение seed: свой поток, чтобы не сдвинуть прочую добычу. */
+    seedStride: 0x1b873593,
+    /** Габарит ящика с инструментом. */
+    radius: 14,
   },
 
 
@@ -1353,6 +1426,10 @@ export const TUNING = {
     liftSignLift: 26,
     liftSignDigit: 3,
     /** Печать над приостановленным: полсторона и подъём над головой. */
+    /** Скоба на пришитом: полуразмах, лапки и толщина линии. */
+    stapleSpan: 0.7,
+    stapleLeg: 0.5,
+    stapleWidth: 2,
     suspendStamp: 7,
     suspendLift: 16,
     counterWide: 1.5,
@@ -1704,6 +1781,34 @@ export const PANEL: TuningGroup[] = [
       { path: 'weapon.volley.cost', label: 'РАСХОД', min: 0, max: 14, step: 1 },
       { path: 'weapon.volley.ammoMax', label: 'ОБОЙМА', min: 1, max: 60, step: 1 },
       { path: 'weapon.volley.reloadTime', label: 'ПЕРЕЗАРЯДКА', min: 0.1, max: 5, step: 0.05 },
+    ],
+  },
+  {
+    title: 'ФОРМА: ПОДШИВАЮЩАЯ',
+    fields: [
+      { path: 'weapon.staple.pinTime', label: 'ДЕРЖИТ СКОБА', min: 0.2, max: 6, step: 0.1 },
+      { path: 'weapon.staple.pinReach', label: 'ИЩЕТ ОПОРУ', min: 10, max: 300, step: 5 },
+      { path: 'weapon.staple.damage', label: 'УРОН', min: 0, max: 5, step: 0.05 },
+      { path: 'weapon.staple.speed', label: 'СКОРОСТЬ', min: 150, max: 1800, step: 10 },
+      { path: 'weapon.staple.interval', label: 'ТЕМП', min: 0.1, max: 2, step: 0.02 },
+      { path: 'weapon.staple.life', label: 'ДАЛЬНОБОЙНОСТЬ', min: 0.1, max: 3, step: 0.05 },
+      { path: 'weapon.staple.cost', label: 'РАСХОД', min: 0, max: 14, step: 1 },
+      { path: 'weapon.staple.ammoMax', label: 'ОБОЙМА', min: 1, max: 60, step: 1 },
+      { path: 'weapon.staple.reloadTime', label: 'ПЕРЕЗАРЯДКА', min: 0.1, max: 5, step: 0.05 },
+    ],
+  },
+  {
+    title: 'ФОРМА: ЦИРКУЛЯРНАЯ',
+    fields: [
+      { path: 'weapon.circular.count', label: 'СНАРЯДОВ В КОЛЬЦЕ', min: 3, max: 40, step: 1 },
+      { path: 'weapon.circular.turnDeg', label: 'ПРОВОРОТ, ГРАД', min: 0, max: 60, step: 1 },
+      { path: 'weapon.circular.damage', label: 'УРОН', min: 0, max: 10, step: 0.5 },
+      { path: 'weapon.circular.speed', label: 'СКОРОСТЬ', min: 100, max: 1600, step: 10 },
+      { path: 'weapon.circular.life', label: 'ДАЛЬНОБОЙНОСТЬ', min: 0.1, max: 4, step: 0.05 },
+      { path: 'weapon.circular.interval', label: 'ТЕМП', min: 0.1, max: 3, step: 0.05 },
+      { path: 'weapon.circular.cost', label: 'РАСХОД', min: 0, max: 14, step: 1 },
+      { path: 'weapon.circular.ammoMax', label: 'ОБОЙМА', min: 1, max: 60, step: 1 },
+      { path: 'weapon.circular.reloadTime', label: 'ПЕРЕЗАРЯДКА', min: 0.1, max: 5, step: 0.05 },
     ],
   },
   {

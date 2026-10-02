@@ -64,6 +64,9 @@ export function metronomeSystem(w: World, dt: number): void {
  */
 export function suspensionSystem(w: World, dt: number): void {
   for (const [e, staff] of w.staffC) {
+    // Скоба считается тем же отсчётом: пришитый — это тот же замерший,
+    // только знак над ним другой.
+    if (staff.pinned > 0) staff.pinned = Math.max(0, staff.pinned - dt);
     if (staff.frozen <= 0) continue;
     staff.frozen = Math.max(0, staff.frozen - dt);
     const b = w.body.get(e);

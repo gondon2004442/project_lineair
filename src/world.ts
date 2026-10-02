@@ -175,8 +175,12 @@ export function startRun(w: World): void {
   // остальные формы ему ещё не выписаны.
   w.freed = [];
   const subject = subjectAt(w.subject);
-  const forms = Math.max(1, Math.min(WEAPON_FORMS.length, Math.round(subject.forms)));
-  w.forms = WEAPON_FORMS.map((_, i) => i < forms);
+  w.forms = WEAPON_FORMS.map((f) => subject.forms.includes(f.id));
+  // Табельная точная одиночная есть у всякого: без неё забег начинался
+  // бы без оружия вовсе, если наряд выписан неверно.
+  if (!w.forms.some((f) => f)) w.forms[0] = true;
+  const player = w.playerC.get(w.player);
+  if (player !== undefined) player.form = w.forms.findIndex((f) => f);
   // Бланки пополняются на входе на этаж, но только до потолка: сэкономил
   // прошлый этаж — запас не копится, потратил весь — получишь полный.
   w.blanks = Math.max(w.blanks, TUNING.blank.refillTo);
@@ -316,6 +320,7 @@ export function enterRoom(w: World, index: number, fromDir: Dir | null): void {
   placeRails(w, room);
   placeEvacPlan(w, room, spot.x, spot.y);
   placeWalled(w, room, spot.x, spot.y);
+  placeForm(w, room, spot.x, spot.y);
   placeSections(w, room);
   if (!room.cleared) staffRoom(w, room, spot.x, spot.y);
   if (w.staffC.size === 0 && !room.cleared) {
@@ -588,6 +593,37 @@ function placeWalled(w: World, room: RoomNode, entryX: number, entryY: number): 
   if (!wanted || where !== room.index) return;
   const spot = findSpawnSpot(w.map, rng, entryX, entryY, TUNING.stash.clearance, cfg.radius);
   spawnStash(w, 'walled', spec.id, `ЗАМУРОВАННЫЙ · ${spec.title}`, spot.x, spot.y);
+}
+
+/**
+ * ИНСТРУМЕНТ, ВЫДАННЫЙ ПО ОПИСИ. Форма оружия как находка.
+ *
+ * Забег начинается с того, что выписано наряду, а прочие формы лежат на
+ * этажах — по одной на уровень и с шансом. Отсюда прогрессия внутри
+ * забега: ранние этажи и правда другие, а не те же с другим числом
+ * здоровья.
+ *
+ * Циркулярная сюда не попадает никогда: её берут с Заведующего, и в
+ * этом её смысл.
+ */
+function placeForm(w: World, room: RoomNode, entryX: number, entryY: number): void {
+  const cfg = TUNING.form;
+  const pool = WEAPON_FORMS.map((f, i) => ({ f, i })).filter(
+    ({ f, i }) => w.forms[i] !== true && f.id !== 'circular',
+  );
+  if (pool.length === 0) return;
+  const rng = makeRng((w.seed + Math.abs(w.depth) * cfg.seedStride) >>> 0);
+  // Броски делаются всегда и до выбора участка: иначе и шанс, и находка
+  // зависели бы от того, в каком порядке обходят этаж.
+  const wanted = rng.float() < cfg.chance;
+  const rooms = w.floor.rooms
+    .filter((r) => r.kind !== 'start' && r.index !== w.floor.end && !r.corridor)
+    .map((r) => r.index);
+  const where = rooms.length === 0 ? -1 : (rooms[rng.int(rooms.length)] ?? -1);
+  const pick = pool[rng.int(pool.length)];
+  if (!wanted || where !== room.index || pick === undefined) return;
+  const spot = findSpawnSpot(w.map, rng, entryX, entryY, TUNING.stash.clearance, cfg.radius);
+  spawnStash(w, 'form', pick.f.id, `${pick.f.code} · ${pick.f.title}`, spot.x, spot.y);
 }
 
 /**

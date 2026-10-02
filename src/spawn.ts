@@ -75,6 +75,7 @@ export function spawnPlayer(w: World, x: number, y: number): Entity {
     reloading: false,
     reloadTimer: 0,
     charge: 0,
+    ring: 0,
     queued: 0,
     queueTimer: 0,
     energy: TUNING.telekinesis.energyMax,
@@ -127,6 +128,7 @@ export function spawnStaff(w: World, post: string, priority: number, x: number, 
     plateFlash: 0,
     control,
     frozen: 0,
+    pinned: 0,
   });
   w.drawC.set(e, {
     shape: 'square',
@@ -415,6 +417,8 @@ export interface BulletSpec {
   pierce?: number;
   /** Доворот на цель, радиан в секунду. */
   homing?: number;
+  /** Сколько секунд держит скоба. Нуль — снаряд не пришивает. */
+  pin?: number;
   shape?: Shape;
 }
 
@@ -440,6 +444,7 @@ export function spawnBullet(
     life: spec.life,
     pierce: spec.pierce ?? 0,
     homing: spec.homing ?? 0,
+    pin: spec.pin ?? 0,
     lastHit: -1,
   });
   w.drawC.set(e, {

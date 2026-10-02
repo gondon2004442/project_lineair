@@ -622,6 +622,20 @@ function drawStamp(g: Graphics, x: number, y: number): void {
 }
 
 /**
+ * Скоба в теле: две лапки и перекладина поперёк силуэта. Знак лежит на
+ * самом сотруднике, а не над ним, — пришит ведь он, а не бумага.
+ */
+function drawStaple(g: Graphics, x: number, y: number, size: number): void {
+  const cfg = TUNING.render;
+  const half = size * cfg.stapleSpan;
+  const leg = size * cfg.stapleLeg;
+  const pen = { width: cfg.stapleWidth, color: PALETTE.concrete100 };
+  g.moveTo(x - half, y + leg).lineTo(x - half, y - leg).stroke(pen);
+  g.moveTo(x + half, y + leg).lineTo(x + half, y - leg).stroke(pen);
+  g.moveTo(x - half, y - leg).lineTo(x + half, y - leg).stroke(pen);
+}
+
+/**
  * Детерминированный шум от номера сущности: пятно не должно дрожать от
  * кадра к кадру и не должно трогать поток симуляции.
  */
@@ -1549,7 +1563,11 @@ function drawEntities(g: Graphics, w: World, alpha: number): void {
     drawPlates(g, x, y, draw.size, staff);
     // Приостановлен: печать над головой. Знак неподвижный и глухой —
     // ровно чтобы отличаться от телеграфа, который означает угрозу.
-    if (staff.frozen > 0) drawStamp(g, x, y - draw.size - TUNING.render.suspendLift);
+    // Пришитый скобой читается иначе, чем приостановленный: печать
+    // означает предписание, а скоба — что он прибит к опоре и сейчас
+    // выдернется. Два знака на одном отсчёте путали бы оба.
+    if (staff.pinned > 0) drawStaple(g, x, y, draw.size);
+    else if (staff.frozen > 0) drawStamp(g, x, y - draw.size - TUNING.render.suspendLift);
     if (staff.plateFlash > 0) {
       const inset = TUNING.render.telegraphInset;
       g.rect(x - draw.size - inset, y - draw.size - inset, (draw.size + inset) * 2, (draw.size + inset) * 2)
@@ -1989,6 +2007,12 @@ function drawStash(
       g.rect(x - m, y - m, m * 2, m * 2).stroke(pen);
       g.rect(x - m * 0.2, y - m * 0.5, m * 1.1, 2).fill(PALETTE.concrete100);
       g.rect(x + m * 0.5, y - m * 0.9, 2, m * 0.8).fill(PALETTE.concrete100);
+    } else if (kind === 'form') {
+      // Ящик с инструментом: уголок с перекладиной. Знак служебный и
+      // прямой — это не предмет в дело, это выданное по описи.
+      const m = half * 0.55;
+      g.rect(x - m, y - m * 0.9, m * 2, m * 0.5).fill(PALETTE.concrete100);
+      g.rect(x - m * 0.2, y - m * 0.4, m * 0.4, m * 1.3).fill(PALETTE.concrete100);
     } else if (walled) {
       // Фигура в кладке: голова и плечи. Её видно издали, и по ней
       // сразу понятно, что в стене человек, а не шкаф.

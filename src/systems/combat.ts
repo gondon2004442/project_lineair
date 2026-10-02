@@ -81,6 +81,7 @@ export function bulletSystem(w: World, dt: number): void {
       for (const [target] of w.staffC) {
         if (target === bullet.lastHit || !hit(w, e, b.radius, target)) continue;
         applyDamage(w, target, bullet.damage);
+        if (bullet.pin > 0) pinTo(w, target, b.vx, b.vy, bullet.pin);
         bullet.lastHit = target;
         // Пробивающий снаряд идёт дальше, пока не выберет запас.
         if (bullet.pierce <= 0) {
@@ -93,6 +94,63 @@ export function bulletSystem(w: World, dt: number): void {
       if (applyDamage(w, w.player, bullet.damage)) destroyEntity(w, e);
     }
   }
+}
+
+/**
+ * ПОДШИТЬ. Скоба пришивает сотрудника к ближайшей опоре — стене или
+ * мебели — по ходу своего полёта.
+ *
+ * Опора ищется вперёд по направлению снаряда, а не по сторонам: иначе
+ * сотрудника дёргало бы назад, к стене за спиной, и выстрел читался бы
+ * как притяжение. Не нашлось опоры — он всё равно стоит: скоба держит,
+ * просто упереть её не во что.
+ */
+function pinTo(w: World, target: Entity, vx: number, vy: number, time: number): void {
+  const staff = w.staffC.get(target);
+  const t = w.transform.get(target);
+  const b = w.body.get(target);
+  if (staff === undefined || t === undefined || b === undefined) return;
+  staff.pinned = Math.max(staff.pinned, time);
+  staff.frozen = Math.max(staff.frozen, time);
+  b.vx = 0;
+  b.vy = 0;
+
+  const len = Math.hypot(vx, vy);
+  if (len === 0) return;
+  const dirX = vx / len;
+  const dirY = vy / len;
+  const reach = Math.max(0, TUNING.weapon.staple.pinReach);
+  const step = Math.max(2, b.radius / 2);
+  // Идём вперёд до первой опоры и останавливаемся вплотную перед ней.
+  let lastX = t.x;
+  let lastY = t.y;
+  for (let d = step; d <= reach; d += step) {
+    const x = t.x + dirX * d;
+    const y = t.y + dirY * d;
+    if (isSolidPoint(w.map, x + dirX * b.radius, y + dirY * b.radius) || propAt(w, x, y, b.radius)) {
+      t.x = lastX;
+      t.y = lastY;
+      t.px = lastX;
+      t.py = lastY;
+      w.sounds.push('impact');
+      return;
+    }
+    lastX = x;
+    lastY = y;
+  }
+}
+
+/** Есть ли мебель в этой точке: к ней пришивают так же, как к стене. */
+function propAt(w: World, x: number, y: number, radius: number): boolean {
+  for (const [prop, propC] of w.propC) {
+    if (propC.phase !== 'idle') continue;
+    const t = w.transform.get(prop);
+    const b = w.body.get(prop);
+    if (t === undefined || b === undefined) continue;
+    const reach = radius + b.radius;
+    if ((t.x - x) ** 2 + (t.y - y) ** 2 <= reach * reach) return true;
+  }
+  return false;
 }
 
 /**

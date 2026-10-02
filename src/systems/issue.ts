@@ -16,7 +16,7 @@ import { grantItem, pickItem } from '../paperwork';
 import { spawnStaff } from '../spawn';
 import { makeRng } from '../rng';
 import { TUNING } from '../tuning';
-import { formStat, infiniteReserve, reserveMax, statAt } from '../weapon';
+import { ammoMax, formStat, infiniteReserve, reserveMax, statAt } from '../weapon';
 
 /** Ближайшая добыча в пределах вытянутой руки. */
 export function stashInReach(w: World): Entity {
@@ -58,6 +58,10 @@ export function issueCost(
   // эвакуации тоже даром: это починка схемы, а не добыча, и платить за
   // то, чтобы интерфейс перестал врать, игрок не должен.
   if (stash.kind === 'case' || stash.kind === 'evac') return 'free';
+
+  // Инструмент выдают по описи — то есть за допуск, как и шкаф, но
+  // бланком его не выпишут: бланк гасит, а не оформляет.
+  if (stash.kind === 'form') return w.passes > 0 ? 'pass' : '';
 
   // Замурованного не оформляют по описи: его правят в расписании, а это
   // стоит допуска и только допуска. Бланком штат не переписывают.
@@ -157,8 +161,10 @@ export function issueOffer(w: World, target: Entity): { text: string; ok: boolea
   if (stash.kind === 'cell' || isService(stash.kind)) {
     return { text: `НУЖНО ${deskPrice(w, stash.kind)} ТАЛОНОВ`, ok: false };
   }
-  // Замурованного бланком не выпустят: штат правят допуском.
-  if (stash.kind === 'walled') return { text: 'НУЖЕН ДОПУСК', ok: false };
+  // Ни замурованного, ни инструмент бланком не выпишут.
+  if (stash.kind === 'walled' || stash.kind === 'form') {
+    return { text: 'НУЖЕН ДОПУСК', ok: false };
+  }
   return { text: 'НЕЧЕМ ОФОРМИТЬ', ok: false };
 }
 
@@ -234,6 +240,23 @@ function freeWalled(w: World, id: string, target: Entity): void {
   w.sounds.push('stamp');
 }
 
+/**
+ * Выдать форму оружия. Обойма и запас у неё уже свои: их набивает
+ * restorePlayer на всякую форму, выписана она или нет, — поэтому
+ * найденная форма сразу рабочая, а не пустая.
+ */
+export function grantForm(w: World, id: string): void {
+  const index = WEAPON_FORMS.findIndex((f) => f.id === id);
+  if (index < 0 || w.forms[index] === true) return;
+  w.forms[index] = true;
+  const p = w.playerC.get(w.player);
+  if (p !== undefined) {
+    p.ammo[index] = ammoMax(w, id);
+    p.reserve[index] = reserveMax(w, id);
+  }
+  w.sounds.push('stamp');
+}
+
 export function issueSystem(w: World): void {
   if (!w.input.useQueued) return;
   w.input.useQueued = false;
@@ -261,6 +284,11 @@ export function issueSystem(w: World): void {
 
   if (stash.kind === 'walled') {
     freeWalled(w, stash.item, target);
+    return;
+  }
+
+  if (stash.kind === 'form') {
+    grantForm(w, stash.item);
     return;
   }
 
@@ -322,7 +350,11 @@ export function issueSystem(w: World): void {
   if (roll < TUNING.stash.safeAmmoShare) {
     // Выбор идёт среди тех форм, которым запас вообще нужен: бросок
     // тратится тот же самый, поэтому поток случайности не съезжает.
-    const pool = WEAPON_FORMS.filter((f) => !infiniteReserve(w, f.id));
+    // Выбор только среди выписанных форм: патроны к ненайденной были бы
+    // выдачей в пустоту.
+    const pool = WEAPON_FORMS.filter(
+      (f, i) => w.forms[i] === true && !infiniteReserve(w, f.id),
+    );
     const picked = pool[rng.int(Math.max(1, pool.length))];
     const index = WEAPON_FORMS.findIndex((f) => f.id === picked?.id);
     const form = WEAPON_FORMS[index];

@@ -358,6 +358,18 @@ function fireSystem(w: World, p: PlayerC, x: number, y: number, dt: number): voi
       p.queued = Math.max(1, Math.round(formStat(w, 'volley', 'count')));
       p.queueTimer = 0;
       break;
+    case 'staple':
+      if (!spend(w, p, 'staple')) return;
+      p.fireCooldown = formStat(w, 'staple', 'interval');
+      w.sounds.push('stamp');
+      launchStaple(w, p, x, y);
+      break;
+    case 'circular':
+      if (!spend(w, p, 'circular')) return;
+      p.fireCooldown = formStat(w, 'circular', 'interval');
+      w.sounds.push('ring');
+      launchCircular(w, p, x, y);
+      break;
   }
 }
 
@@ -459,6 +471,59 @@ function launchLance(w: World, p: PlayerC, x: number, y: number, charge: number)
   flash(w, mx, my);
   spawnBullet(w, 'player', spec, mx, my, p.aimX, p.aimY);
   recoil(w, p.aimX, p.aimY, TUNING.feel.shakeEnemyKill * ratio);
+}
+
+/**
+ * ПОДШИВАЮЩАЯ. Скоба летит прямо и почти не бьёт: её дело — пришить.
+ * Урон в спецификации всё же есть, и не для вида: иначе форма не
+ * считалась бы оружием ни в одной проверке и не ломала бы мебель.
+ */
+function launchStaple(w: World, p: PlayerC, x: number, y: number): void {
+  const angle = Math.atan2(p.aimY, p.aimX) + w.rng.spread(formStat(w, 'staple', 'spreadDeg') * DEG);
+  const dirX = Math.cos(angle);
+  const dirY = Math.sin(angle);
+  const spec: BulletSpec = {
+    speed: formStat(w, 'staple', 'speed'),
+    radius: formStat(w, 'staple', 'radius'),
+    damage: formStat(w, 'staple', 'damage'),
+    life: formStat(w, 'staple', 'life'),
+    pin: formStat(w, 'staple', 'pinTime'),
+    shape: 'bar',
+  };
+  const [mx, my] = muzzleAt(x, y, dirX, dirY);
+  flash(w, mx, my);
+  spawnBullet(w, 'player', spec, mx, my, dirX, dirY);
+  recoil(w, dirX, dirY, TUNING.feel.shakeShoot);
+}
+
+/**
+ * ЦИРКУЛЯРНАЯ. Кольцо во все стороны, каждое следующее провёрнуто на
+ * turnDeg: два кольца подряд не совпадают, и промежутки первого
+ * закрываются вторым. Прицел ей не нужен — отсюда и её смысл: это
+ * единственная форма, которой отвечают на окружение.
+ */
+function launchCircular(w: World, p: PlayerC, x: number, y: number): void {
+  const count = Math.max(1, Math.round(formStat(w, 'circular', 'count')));
+  const turn = formStat(w, 'circular', 'turnDeg') * DEG;
+  p.ring += turn;
+  const spec: BulletSpec = {
+    speed: formStat(w, 'circular', 'speed'),
+    radius: formStat(w, 'circular', 'radius'),
+    damage: formStat(w, 'circular', 'damage'),
+    life: formStat(w, 'circular', 'life'),
+    shape: 'dot',
+  };
+  for (let i = 0; i < count; i++) {
+    const angle = p.ring + (i / count) * Math.PI * 2;
+    const dirX = Math.cos(angle);
+    const dirY = Math.sin(angle);
+    const [mx, my] = muzzleAt(x, y, dirX, dirY);
+    spawnBullet(w, 'player', spec, mx, my, dirX, dirY);
+  }
+  flash(w, x, y);
+  // Отдачи у кольца нет по направлению: толкать некуда, когда бьёшь во
+  // все стороны. Остаётся встряска.
+  addShake(w, TUNING.feel.shakeShoot);
 }
 
 function launchVolleyShot(w: World, p: PlayerC, x: number, y: number): void {
