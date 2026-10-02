@@ -30,6 +30,7 @@ import {
 } from './data/roomTemplates';
 import { WEAPON_FORMS } from './data/weaponForms';
 import { SUBJECT_START, subjectAt, walledAt } from './data/subjects';
+import { ENDINGS } from './data/endings';
 import { ammoMax, reserveMax } from './weapon';
 import { COUNTERS, type CounterSpec } from './data/counters';
 import { FIXTURES_BY_ID } from './data/fixtures';
@@ -93,6 +94,7 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     subject: SUBJECT_START,
     freed: [],
     unlocked: [SUBJECT_START],
+    filed: [],
     precedents: [],
     forms: WEAPON_FORMS.map(() => true),
     tickets: 0,
@@ -103,6 +105,7 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     sections: [],
     commendations: 0,
     runEnded: '',
+    verdict: '',
     note: [],
     noteSlot: -1,
     metronome: TUNING.post.inspector.metronomeInterval,
@@ -195,6 +198,7 @@ export function startRun(w: World): void {
   w.note = [];
   w.noteSlot = -1;
   w.runEnded = '';
+  w.verdict = '';
   w.depth = -1;
   // Печати аннулируются вместе с допуском: подписывать спуск заново.
   w.seals = [];
@@ -321,6 +325,7 @@ export function enterRoom(w: World, index: number, fromDir: Dir | null): void {
   placeEvacPlan(w, room, spot.x, spot.y);
   placeWalled(w, room, spot.x, spot.y);
   placeForm(w, room, spot.x, spot.y);
+  placeVerdict(w, room);
   placeSections(w, room);
   if (!room.cleared) staffRoom(w, room, spot.x, spot.y);
   if (w.staffC.size === 0 && !room.cleared) {
@@ -596,6 +601,23 @@ function placeWalled(w: World, room: RoomNode, entryX: number, entryY: number): 
 }
 
 /**
+ * ФИНАЛ. Три исхода в приёмной центрального архива.
+ *
+ * Боя здесь нет: уровень без ставок, и кончается он не зачисткой, а
+ * решением. Стойки стоят в ряд, подписаны и ничего не стоят — платить
+ * за собственное дело не надо, его надо выбрать.
+ */
+function placeVerdict(w: World, room: RoomNode): void {
+  if (floorAt(w.depth).verdict !== true || room.index !== w.floor.end) return;
+  const centre = roomCenter(w.map);
+  const gap = TUNING.stash.deskGap;
+  ENDINGS.forEach((ending, i) => {
+    const x = centre.x + (i - (ENDINGS.length - 1) / 2) * gap;
+    spawnStash(w, 'verdict', ending.id, `${ending.code} · ${ending.title}`, x, centre.y);
+  });
+}
+
+/**
  * ИНСТРУМЕНТ, ВЫДАННЫЙ ПО ОПИСИ. Форма оружия как находка.
  *
  * Забег начинается с того, что выписано наряду, а прочие формы лежат на
@@ -707,7 +729,10 @@ function placeStash(w: World, room: RoomNode, entryX: number, entryY: number): v
   // Бросок делается всегда, даже когда архив пуст, — иначе поток
   // случайных чисел зависел бы от хранилища, а с ним поехал бы забег.
   const caseRng = makeRng((w.seed + room.index * TUNING.archive.seedStride) >>> 0);
-  const wantCase = caseRng.float() < TUNING.archive.chance;
+  // В центральном архиве комнаты и ЕСТЬ дела: там чужое дело лежит в
+  // каждой, а не с шансом. Бросок всё равно делается — поток случайности
+  // не должен зависеть от уровня.
+  const wantCase = caseRng.float() < TUNING.archive.chance || floorAt(w.depth).verdict === true;
   const slot = caseRng.int(Math.max(1, Math.round(TUNING.archive.keep)));
   if (wantCase && room.kind !== 'start' && !room.corridor) {
     const spot = findSpawnSpot(w.map, caseRng, entryX, entryY, cfg.clearance, cfg.cellRadius);

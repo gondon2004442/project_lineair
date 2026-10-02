@@ -7,6 +7,7 @@
  * тот самый второй рынок бланка: потратить его, чтобы выжить сейчас, или
  * чтобы получить предмет потом.
  */
+import { ENDINGS_BY_ID } from '../data/endings';
 import { POST_INSPECTOR } from '../data/posts';
 import { SUBJECTS_BY_ID } from '../data/subjects';
 import { WEAPON_FORMS } from '../data/weaponForms';
@@ -58,6 +59,15 @@ export function issueCost(
   // эвакуации тоже даром: это починка схемы, а не добыча, и платить за
   // то, чтобы интерфейс перестал врать, игрок не должен.
   if (stash.kind === 'case' || stash.kind === 'evac') return 'free';
+
+  // Исход ничего не стоит: за собственное дело не платят, его решают.
+  // Подшить чужое вместо своего можно только если кого-то освободили.
+  if (stash.kind === 'verdict') {
+    const ending = ENDINGS_BY_ID.get(stash.item);
+    if (ending === undefined) return '';
+    if (ending.needsFreed === true && w.freed.length === 0) return '';
+    return 'free';
+  }
 
   // Инструмент выдают по описи — то есть за допуск, как и шкаф, но
   // бланком его не выпишут: бланк гасит, а не оформляет.
@@ -161,6 +171,7 @@ export function issueOffer(w: World, target: Entity): { text: string; ok: boolea
   if (stash.kind === 'cell' || isService(stash.kind)) {
     return { text: `НУЖНО ${deskPrice(w, stash.kind)} ТАЛОНОВ`, ok: false };
   }
+  if (stash.kind === 'verdict') return { text: 'НЕКОГО ПОДШИТЬ', ok: false };
   // Ни замурованного, ни инструмент бланком не выпишут.
   if (stash.kind === 'walled' || stash.kind === 'form') {
     return { text: 'НУЖЕН ДОПУСК', ok: false };
@@ -257,6 +268,31 @@ export function grantForm(w: World, id: string): void {
   w.sounds.push('stamp');
 }
 
+/**
+ * РЕШЕНИЕ. Забег кончается здесь и только здесь.
+ *
+ * Прецедент подшивается в обоих случаях: и сам исход, и — у третьего —
+ * то, что вместо субъекта вышел освобождённый. Прецеденты ничего не
+ * усиливают, они открывают; поэтому исход и есть единственная награда
+ * за спуск.
+ */
+function decide(w: World, id: string): void {
+  const ending = ENDINGS_BY_ID.get(id);
+  if (ending === undefined || w.verdict !== '') return;
+  if (ending.needsFreed === true && w.freed.length === 0) return;
+  w.verdict = id;
+  w.status = 'cleared';
+  w.runEnded = 'cleared';
+  w.precedents.push(`end:${id}`);
+  // Третий исход: он остаётся, тот выходит. Вышедший с этой минуты
+  // числится субъектом — и уже не потому, что его выпустили, а потому,
+  // что кто-то остался вместо него.
+  if (id === 'swap') {
+    for (const freed of w.freed) w.precedents.push(`instead:${freed}`);
+  }
+  w.sounds.push('stamp');
+}
+
 export function issueSystem(w: World): void {
   if (!w.input.useQueued) return;
   w.input.useQueued = false;
@@ -289,6 +325,11 @@ export function issueSystem(w: World): void {
 
   if (stash.kind === 'form') {
     grantForm(w, stash.item);
+    return;
+  }
+
+  if (stash.kind === 'verdict') {
+    decide(w, stash.item);
     return;
   }
 

@@ -86,11 +86,15 @@ export function statusSystem(w: World): void {
 
   // Приёмная сдана — открывается лифт. Забег на этом больше не кончается:
   // здание глубже, и это единственное место, где видно, насколько.
-  if (w.room === w.floor.end && !liftOpen(w.map)) {
+  // На дне шахты нет: ниже ничего, и дыра в полу обещала бы продолжение.
+  if (deeperExists(w) && w.room === w.floor.end && !liftOpen(w.map)) {
     openLift(w.map);
     // Карта запечена: без отметки шахта не появится до смены участка.
     w.mapToken += 1;
   }
+  // Уровень решения не кончается зачисткой: пока дело не решено, забег
+  // идёт. Кончает его стойка исхода, а не пустая приёмная.
+  if (floorAt(w.depth).verdict === true) return;
   if (!deeperExists(w)) {
     w.status = 'cleared';
     w.runEnded = 'cleared';

@@ -35,6 +35,17 @@ export interface FloorSpec {
    * вниз не подпишут.
    */
   sealHolder: string;
+  /**
+   * Ставок на уровне нет вовсе. Нужно затем, что множитель штата этого
+   * не умеет: квота не опускается ниже одной ставки, и обнулить её
+   * числом нельзя.
+   */
+  staffless?: boolean;
+  /**
+   * Уровень кончается не лифтом и не зачисткой, а решением: что сделать
+   * с делом. Пока оно не принято, забег не кончается.
+   */
+  verdict?: boolean;
 }
 
 export const FLOORS: FloorSpec[] = [
@@ -87,6 +98,21 @@ export const FLOORS: FloorSpec[] = [
     distortion: 'rebuild',
     headStaffing: 'head_commission',
     sealHolder: 'commission',
+  },
+  {
+    depth: -5,
+    code: 'НИВО -5',
+    title: 'ЦЕНТРАЛЬНЫЙ АРХИВ',
+    // Хранение и ничего больше: ряды и проходы между ними.
+    templates: ['cabinets', 'corridor'],
+    staffScale: 1,
+    distortion: '',
+    headStaffing: 'none',
+    sealHolder: '',
+    // Воевать здесь не с кем: дела не занимают ставок.
+    staffless: true,
+    // Здесь спуск кончается. Кончается он решением.
+    verdict: true,
   },
 ];
 

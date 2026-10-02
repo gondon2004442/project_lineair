@@ -86,6 +86,7 @@ async function boot(): Promise<void> {
   function newWorld(): World {
     const next = createWorld(seed, input.snapshot);
     next.unlocked = unlockedSubjects();
+    next.filed = readPrecedents();
     // Кем играли в прошлый раз, тем и выходим, пока он ещё открыт.
     next.subject = next.unlocked.includes(chosen) ? chosen : SUBJECT_START;
     return next;
@@ -251,6 +252,7 @@ async function boot(): Promise<void> {
       for (const id of world.precedents) filePrecedent(id);
       world.precedents.length = 0;
       world.unlocked = unlockedSubjects();
+      world.filed = readPrecedents();
     }
     if (world.noteSlot >= 0) {
       const shelf = readArchive();

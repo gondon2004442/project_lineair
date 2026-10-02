@@ -26,6 +26,13 @@ export interface Staffing {
 
 export const STAFFING: Staffing[] = [
   {
+    // Центральный архив: здесь не работают, здесь хранят. Ставок нет ни
+    // одной, и это не упущение данных, а описание места.
+    id: 'none',
+    label: 'ШТАТ НЕ ПРЕДУСМОТРЕН',
+    posts: [],
+  },
+  {
     id: 'lobby',
     label: 'ВЕСТИБЮЛЬ. ШТАТ НЕ ПРЕДУСМОТРЕН',
     posts: [],
@@ -111,3 +118,6 @@ export const MINI_BOSS_POSTS: StaffPost[] = [
   { post: 'registrar', title: 'РЕГИСТРАТОР', count: 1, priority: 1 },
   { post: 'auditor', title: 'РЕВИЗОР', count: 1, priority: 1 },
 ];
+
+/** Расписание без ставок: уровень, на котором не с кем воевать. */
+export const STAFFING_EMPTY = 'none';

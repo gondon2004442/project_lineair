@@ -2,6 +2,7 @@
 import { TEMPLATES_BY_ID } from './data/roomTemplates';
 import { issuedDirectives, type Directive } from './data/directives';
 import { floorAt } from './data/floors';
+import { ENDINGS, ENDINGS_BY_ID } from './data/endings';
 import { POSTS_BY_ID } from './data/posts';
 import { SUBJECTS, SUBJECTS_BY_ID, subjectAt } from './data/subjects';
 import { ITEMS_BY_ID } from './data/items';
@@ -64,6 +65,7 @@ export function createHud(
       row('ЭТАЖ', `${w.floor.rooms.length} УЧАСТКОВ`),
       row('ПРИЁМНАЯ', `УЧАСТОК ${w.floor.end + 1}`),
       subjectRows(w),
+      precedentRow(w),
       '<div class="call">ШАГНИ В ПРОЁМ, ЧТОБЫ НАЧАТЬ</div>',
     ].join('');
 
@@ -133,7 +135,13 @@ export function createHud(
       banner.innerHTML = '<b>СУБЪЕКТ ЛИКВИДИРОВАН</b><span>[F2] ВЕРНУТЬСЯ В ВЕСТИБЮЛЬ</span>';
     } else if (w.status === 'cleared') {
       banner.hidden = false;
-      banner.innerHTML = '<b>СЕКТОР СДАН</b><span>ЗАВЕДУЮЩИЙ ОТСТРАНЁН · [F2] В ВЕСТИБЮЛЬ</span>';
+      // Исход важнее сдачи сектора: забег кончается решением, и на
+      // баннере должно стоять именно оно.
+      const ending = ENDINGS_BY_ID.get(w.verdict);
+      banner.innerHTML =
+        ending === undefined
+          ? '<b>СЕКТОР СДАН</b><span>ЗАВЕДУЮЩИЙ ОТСТРАНЁН · [F2] В ВЕСТИБЮЛЬ</span>'
+          : `<b>${ending.title}</b><span>${ending.banner} · [F2] В ВЕСТИБЮЛЬ</span>`;
     } else {
       banner.hidden = true;
     }
@@ -175,6 +183,20 @@ function subjectRows(w: World): string {
     row('ОТКРЫТО', `${open} ИЗ ${SUBJECTS.length}`) +
     spec.report.map((line: string) => `<div class="hud-note">${line}</div>`).join('')
   );
+}
+
+/**
+ * Прецеденты прошлых забегов. Они ничего не усиливают, поэтому и стоят
+ * в вестибюле отдельной строкой: это не сила, это то, что контора
+ * готова оформить в следующий раз.
+ */
+function precedentRow(w: World): string {
+  const ends = ENDINGS.filter((e) => w.filed.includes(`end:${e.id}`));
+  const instead = w.filed.filter((id) => id.startsWith('instead:')).length;
+  if (ends.length === 0 && instead === 0) return row('ПРЕЦЕДЕНТЫ', 'НЕ ЗАФИКСИРОВАНО');
+  const parts = ends.map((e) => e.code.replace('ИСХОД ', 'И'));
+  if (instead > 0) parts.push(`ВМЕСТО СУБЪЕКТА ${instead}`);
+  return row('ПРЕЦЕДЕНТЫ', `<span class="ok">${parts.join(' · ')}</span>`);
 }
 
 /**
@@ -296,6 +318,8 @@ function promptRow(w: World): string {
  */
 function liftRow(w: World): string {
   if (w.scene !== 'run' || w.room !== w.floor.end || !liftOpen(w.map)) return '';
+  // На дне лифта нет вовсе: там кончается не этаж, а дело.
+  if (floorAt(w.depth).verdict === true) return '';
   // Без печати лифт стоит: распоряжение о спуске нечем подписать.
   if (!w.seals.includes(w.depth)) {
     const holder = POSTS_BY_ID.get(floorAt(w.depth).sealHolder)?.title ?? 'ДЕРЖАТЕЛЬ ПЕЧАТИ';
@@ -592,7 +616,7 @@ function dossierBody(w: World): string {
           .map((line) => `<div class="dossier-line">${line}</div>`)
           .join('')}</div>`;
   if (w.build.length === 0) {
-    return `${head}${subject}${note}<div class="dossier-item"><div class="dossier-line">ВЫДАЧ НЕ ЗАФИКСИРОВАНО.</div></div>`;
+    return `${head}${subject}${verdictBlock(w)}${note}<div class="dossier-item"><div class="dossier-line">ВЫДАЧ НЕ ЗАФИКСИРОВАНО.</div></div>`;
   }
   const blocks = w.build.map((id) => {
     const item = ITEMS_BY_ID.get(id);
@@ -610,7 +634,15 @@ function dossierBody(w: World): string {
     return `<div class="dossier-item"><div class="dossier-code">${d.number} · ${d.title}</div>${lines}</div>`;
   });
 
-  return head + subject + note + blocks.join('') + orders.join('');
+  return head + subject + verdictBlock(w) + note + blocks.join('') + orders.join('');
+}
+
+/** Принятое решение: что именно сделали с делом. */
+function verdictBlock(w: World): string {
+  const ending = ENDINGS_BY_ID.get(w.verdict);
+  if (ending === undefined) return '';
+  const lines = ending.report.map((line) => `<div class="dossier-line">${line}</div>`).join('');
+  return `<div class="dossier-item"><div class="dossier-code">${ending.code} · ${ending.title}</div>${lines}</div>`;
 }
 
 function gauge(current: number, max: number): string {

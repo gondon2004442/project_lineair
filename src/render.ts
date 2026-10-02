@@ -1432,7 +1432,7 @@ function drawEntities(g: Graphics, w: World, alpha: number): void {
     // Добыча рисуется своим: её не ломают и не таскают, к ней подходят.
     const stash = w.stashC.get(e);
     if (stash !== undefined) {
-      drawStash(g, x, y, draw.size, stash.kind, stash.opened, e === reachStash);
+      drawStash(g, x, y, draw.size, stash.kind, stash.opened, e === reachStash, stash.item);
       continue;
     }
 
@@ -1959,6 +1959,8 @@ function drawStash(
   kind: string,
   opened: boolean,
   near: boolean,
+  /** Что именно в ячейке: по нему различаются знаки исходов. */
+  item: string,
 ): void {
   const safe = kind === 'safe';
   // Замурованный — не мебель: это кладка, в которую его заложили.
@@ -2007,6 +2009,20 @@ function drawStash(
       g.rect(x - m, y - m, m * 2, m * 2).stroke(pen);
       g.rect(x - m * 0.2, y - m * 0.5, m * 1.1, 2).fill(PALETTE.concrete100);
       g.rect(x + m * 0.5, y - m * 0.9, 2, m * 0.8).fill(PALETTE.concrete100);
+    } else if (kind === 'verdict') {
+      // Три исхода различаются знаком: крест — уничтожить, черта
+      // подписи — подписать, две встречные полосы — подшить чужое.
+      const m = half * 0.55;
+      if (item === 'destroy') {
+        g.moveTo(x - m, y - m).lineTo(x + m, y + m).stroke(pen);
+        g.moveTo(x + m, y - m).lineTo(x - m, y + m).stroke(pen);
+      } else if (item === 'sign') {
+        g.rect(x - m, y + m * 0.4, m * 2, 2).fill(PALETTE.concrete100);
+        g.moveTo(x - m * 0.6, y + m * 0.3).lineTo(x + m * 0.2, y - m * 0.6).stroke(pen);
+      } else {
+        g.rect(x - m, y - m * 0.5, m * 1.4, 2).fill(PALETTE.concrete100);
+        g.rect(x - m * 0.4, y + m * 0.4, m * 1.4, 2).fill(PALETTE.concrete100);
+      }
     } else if (kind === 'form') {
       // Ящик с инструментом: уголок с перекладиной. Знак служебный и
       // прямой — это не предмет в дело, это выданное по описи.
