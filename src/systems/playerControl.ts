@@ -110,7 +110,18 @@ export function playerControlSystem(w: World, dt: number): void {
 
   if (w.input.formStep !== 0 && p.switchCooldown <= 0) {
     const count = WEAPON_FORMS.length;
-    p.form = (((p.form + w.input.formStep) % count) + count) % count;
+    // Колесо крутится только по выданным формам: ненайденной в нём нет
+    // вовсе, и пустых позиций оно не проходит.
+    const dir = w.input.formStep > 0 ? 1 : -1;
+    const steps = Math.min(count, Math.abs(w.input.formStep));
+    let next = p.form;
+    for (let s = 0; s < steps; s++) {
+      for (let i = 0; i < count; i++) {
+        next = (((next + dir) % count) + count) % count;
+        if (w.forms[next] === true) break;
+      }
+    }
+    p.form = next;
     p.switchCooldown = TUNING.weapon.switchCooldown;
     // Незавершённые заряд, залп и перезарядка при смене формы сбрасываются.
     p.charge = 0;

@@ -21,6 +21,7 @@ import { roomNumber } from './floor';
 import { currentRoom } from './world';
 import { floorAt } from './data/floors';
 import { litAt } from './systems/postKeeper';
+import { statAt } from './weapon';
 import { DECOR_BY_ID } from './data/decor';
 import { FIXTURES_BY_ID } from './data/fixtures';
 import { TEMPLATES_BY_ID } from './data/roomTemplates';
@@ -873,7 +874,10 @@ function lights(w: World, alpha: number): { x: number; y: number; r: number }[] 
   const out: { x: number; y: number; r: number }[] = [];
   const t = w.transform.get(w.player);
   if (t !== undefined && w.status !== 'dead') {
-    out.push({ x: lerp(t.px, t.x, alpha), y: lerp(t.py, t.y, alpha), r: cfg.player });
+    // Радиус читается через statAt, а не из тюнинга напрямую: лампа
+    // Электрика — такая же правка пути, как приложение, и темнота
+    // обязана считаться по той же величине, что показывает дело.
+    out.push({ x: lerp(t.px, t.x, alpha), y: lerp(t.py, t.y, alpha), r: statAt(w, 'dark.player') });
   }
   // Горят не все: в тепловом узле свет держится через раз. Решение
   // берётся хешем от номера панели — оно не мигает и не зависит от
@@ -1939,8 +1943,11 @@ function drawStash(
   near: boolean,
 ): void {
   const safe = kind === 'safe';
+  // Замурованный — не мебель: это кладка, в которую его заложили.
+  // Поэтому и цвет у него бетонный, а не мебельный.
+  const walled = kind === 'walled';
   contactShadow(g, x, y, half, 1);
-  const body = opened ? PALETTE.concrete700 : PALETTE.furniture;
+  const body = opened ? PALETTE.concrete700 : walled ? PALETTE.concrete500 : PALETTE.furniture;
   block(g, x - half, y - half, half * 2, half * 2, body);
   g.rect(x - half, y - half, half * 2, half * 2).stroke({
     width: TUNING.render.stashEdge,
@@ -1952,7 +1959,7 @@ function drawStash(
     // Пломба: у шкафа поперёк дверцы, у ячейки — ярлык сверху, у особой
     // выдачи крест-накрест: её видно через всю комнату, и не зря.
     const seal = TUNING.render.stashSeal;
-    if (safe) {
+    if (safe || walled) {
       g.rect(x - half, y - seal / 2, half * 2, seal).fill(PALETTE.yellow);
     } else if (kind === 'special') {
       g.rect(x - half, y - seal / 2, half * 2, seal).fill(PALETTE.yellow);
@@ -1982,6 +1989,12 @@ function drawStash(
       g.rect(x - m, y - m, m * 2, m * 2).stroke(pen);
       g.rect(x - m * 0.2, y - m * 0.5, m * 1.1, 2).fill(PALETTE.concrete100);
       g.rect(x + m * 0.5, y - m * 0.9, 2, m * 0.8).fill(PALETTE.concrete100);
+    } else if (walled) {
+      // Фигура в кладке: голова и плечи. Её видно издали, и по ней
+      // сразу понятно, что в стене человек, а не шкаф.
+      const m = half * 0.55;
+      g.rect(x - m * 0.5, y - m * 1.3, m, m * 0.9).fill(PALETTE.concrete300);
+      g.rect(x - m, y - m * 0.2, m * 2, m * 1.2).fill(PALETTE.concrete300);
     } else if (kind === 'heal') {
       // Освидетельствование: крест. Серый, не красный: красное — субъект.
       g.rect(x - mark * 0.25, y - mark, mark * 0.5, mark * 2).fill(PALETTE.concrete100);

@@ -1,8 +1,9 @@
 /** Служебный оверлей: состояние субъекта, схема этажа, отладка, seed. */
 import { TEMPLATES_BY_ID } from './data/roomTemplates';
-import { issuedDirectives } from './data/directives';
+import { issuedDirectives, type Directive } from './data/directives';
 import { floorAt } from './data/floors';
 import { POSTS_BY_ID } from './data/posts';
+import { SUBJECTS, SUBJECTS_BY_ID, subjectAt } from './data/subjects';
 import { ITEMS_BY_ID } from './data/items';
 import { toolCooldown } from './systems/tool';
 import { WEAPON_FORMS } from './data/weaponForms';
@@ -24,6 +25,7 @@ import type { Profiler } from './profiler';
 import {
   ammoMax,
   cursedItems,
+  hasTrait,
   currentForm,
   formStat,
   infiniteReserve,
@@ -61,12 +63,14 @@ export function createHud(
       '<div class="subtitle">ВЕСТИБЮЛЬ. ДОПУСК ОФОРМЛЕН</div>',
       row('ЭТАЖ', `${w.floor.rooms.length} УЧАСТКОВ`),
       row('ПРИЁМНАЯ', `УЧАСТОК ${w.floor.end + 1}`),
+      subjectRows(w),
       '<div class="call">ШАГНИ В ПРОЁМ, ЧТОБЫ НАЧАТЬ</div>',
     ].join('');
 
     right.innerHTML = [
       row('SEED', formatSeed(w.seed)),
       row('E', 'ДРУГОЙ SEED'),
+      row('TAB', w.unlocked.length > 1 ? 'ДРУГОЙ СУБЪЕКТ' : 'СУБЪЕКТ ОДИН'),
       row('FPS', String(Math.round(fps))),
       row('F1 ХИТБОКСЫ', hitboxes ? '<span class="ok">ВКЛ</span>' : 'ВЫКЛ'),
       row('` ', 'КРУТИЛКИ'),
@@ -160,6 +164,20 @@ export function createHud(
 }
 
 /**
+ * Наряд, по которому выходят. В вестибюле это единственное решение
+ * до начала забега, поэтому справка стоит целиком: по ней и выбирают.
+ */
+function subjectRows(w: World): string {
+  const spec = subjectAt(w.subject);
+  const open = w.unlocked.length;
+  return (
+    row('НАРЯД', `<span class="ok">${spec.code} · ${spec.title}</span>`) +
+    row('ОТКРЫТО', `${open} ИЗ ${SUBJECTS.length}`) +
+    spec.report.map((line: string) => `<div class="hud-note">${line}</div>`).join('')
+  );
+}
+
+/**
  * Форма и обойма — две строки из четырёх. Запас патронов и заряд пики
  * стоят внутри них, а не отдельными строками: сами по себе обе цифры
  * ничего не решают, а место держали всю игру.
@@ -176,6 +194,10 @@ function weaponRows(w: World): string {
   const reserve = reserveOf(w, index);
 
   let head = `${form.code} · ${form.title}`;
+  // Сколько форм на руках вообще. Строка нужна только тем, у кого
+  // колесо неполное: иначе она сообщала бы «четыре из четырёх».
+  const carried = w.forms.filter((f) => f).length;
+  if (carried < WEAPON_FORMS.length) head += ` · ФОРМ ${carried}/${WEAPON_FORMS.length}`;
   if (form.id === 'lance' && !player.reloading) {
     const full = formStat(w, 'lance', 'chargeTime');
     const ratio = full <= 0 ? 1 : Math.min(1, player.charge / full);
@@ -526,9 +548,20 @@ function energyRow(w: World): string {
   );
 }
 
+/**
+ * Распоряжения, действующие прямо сейчас. Состав дела — не единственное
+ * условие: распоряжение может быть выписано только на определённое
+ * свойство субъекта, и тогда с чужим нарядом оно не выпускается.
+ */
+function inForce(w: World): Directive[] {
+  return issuedDirectives(w.build).filter(
+    (d) => d.requiresTrait === undefined || hasTrait(w, d.requiresTrait),
+  );
+}
+
 /** Коротко о деле: приложений и выпущенных по ним распоряжений. */
 function dossierLine(w: World): string {
-  const orders = issuedDirectives(w.build).length;
+  const orders = inForce(w).length;
   if (orders === 0) return `${w.build.length} ПРИЛОЖЕНИЙ`;
   return `${w.build.length} ПРИЛОЖЕНИЙ · <span class="ok">${orders} РАСПОРЯЖЕНИЙ</span>`;
 }
@@ -536,6 +569,20 @@ function dossierLine(w: World): string {
 /** Личное дело: служебные отчёты по выданным предметам. */
 function dossierBody(w: World): string {
   const head = '<b>ЛИЧНОЕ ДЕЛО СУБЪЕКТА</b><span class="dossier-hint">[I] ЗАКРЫТЬ</span>';
+  // Наряд идёт первым: всё остальное в деле читается от того, на кого
+  // оно выписано. Освобождённые — следом: их свойства теперь тоже свои.
+  const spec = subjectAt(w.subject);
+  const subject =
+    `<div class="dossier-item"><div class="dossier-code">${spec.code} · ${spec.title}</div>` +
+    spec.report.map((line: string) => `<div class="dossier-line">${line}</div>`).join('') +
+    w.freed
+      .map((id) => {
+        const freed = SUBJECTS_BY_ID.get(id);
+        if (freed === undefined) return '';
+        return `<div class="dossier-line">ОСВОБОЖДЁН: ${freed.title}. ОТДАЛ СВОЁ ДО КОНЦА ЗАБЕГА.</div>`;
+      })
+      .join('') +
+    '</div>';
   // Найденное дело прошлого экземпляра идёт первым: это записка от того,
   // кто не дошёл, и читать её надо раньше собственных приложений.
   const note =
@@ -545,7 +592,7 @@ function dossierBody(w: World): string {
           .map((line) => `<div class="dossier-line">${line}</div>`)
           .join('')}</div>`;
   if (w.build.length === 0) {
-    return `${head}${note}<div class="dossier-item"><div class="dossier-line">ВЫДАЧ НЕ ЗАФИКСИРОВАНО.</div></div>`;
+    return `${head}${subject}${note}<div class="dossier-item"><div class="dossier-line">ВЫДАЧ НЕ ЗАФИКСИРОВАНО.</div></div>`;
   }
   const blocks = w.build.map((id) => {
     const item = ITEMS_BY_ID.get(id);
@@ -556,12 +603,14 @@ function dossierBody(w: World): string {
 
   // Распоряжения идут после приложений: сначала что нашли, потом что
   // контора из этого вывела.
-  const orders = issuedDirectives(w.build).map((d) => {
+  // Распоряжение, выписанное на чужое свойство, в деле не лежит: его
+  // просто не выпустили на этого субъекта.
+  const orders = inForce(w).map((d) => {
     const lines = d.text.map((line) => `<div class="dossier-line">${line}</div>`).join('');
     return `<div class="dossier-item"><div class="dossier-code">${d.number} · ${d.title}</div>${lines}</div>`;
   });
 
-  return head + note + blocks.join('') + orders.join('');
+  return head + subject + note + blocks.join('') + orders.join('');
 }
 
 function gauge(current: number, max: number): string {
@@ -600,6 +649,9 @@ function schematic(w: World): string {
   const width = w.floor.width * step;
   const height = w.floor.height * step;
   const parts: string[] = [];
+  // Картограф видит этаж целиком: он эти схемы и составлял. Непосещённый
+  // участок читается у него как посещённый, а опечатанные шкафы помечены.
+  const mapped = hasTrait(w, 'mapper');
 
   for (const room of w.floor.rooms) {
     const cx = room.gx * step + half;
@@ -629,14 +681,22 @@ function schematic(w: World): string {
     } else if (room.cleared) {
       fill = hex(PALETTE.concrete700);
       stroke = hex(PALETTE.concrete500);
-    } else if (room.visited) {
+    } else if (room.visited || mapped) {
       stroke = hex(PALETTE.concrete300);
     }
     parts.push(
       `<rect x="${x}" y="${y}" width="${cell}" height="${cell}" fill="${fill}" stroke="${stroke}" stroke-width="${TUNING.hud.mapStroke}"/>`,
     );
+    // Опечатанный шкаф у Картографа помечен точкой в углу: это не
+    // состояние участка, а то, что на нём лежит.
+    if (mapped && room.safe && !room.cleared) {
+      const dot = TUNING.hud.mapSafeDot;
+      parts.push(
+        `<rect x="${x + cell - dot - 1}" y="${y + 1}" width="${dot}" height="${dot}" fill="${hex(PALETTE.yellow)}"/>`,
+      );
+    }
     // Посещённый, но не зачищенный участок со старшей ставкой — серая метка.
-    if (room.visited && !room.cleared && !current && room.miniBoss !== '') {
+    if ((room.visited || mapped) && !room.cleared && !current && room.miniBoss !== '') {
       const inset = TUNING.hud.mapEndInset;
       parts.push(
         `<rect x="${x + inset}" y="${y + inset}" width="${cell - inset * 2}" height="${cell - inset * 2}" fill="${hex(PALETTE.concrete500)}"/>`,

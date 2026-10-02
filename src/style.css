@@ -372,6 +372,12 @@ body.panel-open #hud-right {
   color: var(--concrete-mid);
 }
 
+.hud-note {
+  color: var(--concrete-mid);
+  text-transform: none;
+  letter-spacing: 0.04em;
+}
+
 .call {
   margin-top: 10px;
   padding-top: 8px;

@@ -37,6 +37,16 @@ export interface Directive {
   againstPost?: 'intern' | 'inspector' | 'registrar' | 'auditor' | 'courier' | 'chief';
   /** Множитель урона по должности из againstPost. Без неё не читается. */
   damageMul?: number;
+  /**
+   * Распоряжение выписывается только на это свойство субъекта. Отсюда
+   * главное: один и тот же набор приложений у Электрика и у Картографа
+   * собирается в РАЗНЫЕ распоряжения, потому что контора смотрит не
+   * только на дело, но и на того, кто его носит.
+   *
+   * Свойство считается своим и у освобождённого: замурованный отдаёт
+   * своё тому, кто его выпустил.
+   */
+  requiresTrait?: 'courier' | 'mapper' | 'utility' | 'staff' | 'intern';
 }
 
 export const DIRECTIVES: Directive[] = [
@@ -188,6 +198,42 @@ export const DIRECTIVES: Directive[] = [
       'ДЕЙСТВИЕ: урон по Курьеру много выше. По прочим — как был.',
     ],
     mods: [],
+  },
+  {
+    id: 'survey',
+    number: 'РАСПОРЯЖЕНИЕ 72-С',
+    title: 'О ПРАВЕ НА ОБМЕР ПОМЕЩЕНИЙ',
+    requires: [['tape', 'index'], ['regulation', 'movement']],
+    requiresTrait: 'mapper',
+    text: [
+      'В связи с наличием в деле мерного приложения и регламента',
+      'лицу, составлявшему схемы помещений, разрешается обмер',
+      'на ходу, без остановки и без уведомления отдела.',
+      'ДЕЙСТВИЕ: субъект быстрее, перекат чаще, захват достаёт дальше.',
+    ],
+    mods: [
+      { path: 'player.speed', mul: 1.12 },
+      { path: 'player.rollCooldown', mul: 0.85 },
+      { path: 'telekinesis.grabRange', mul: 1.25 },
+    ],
+  },
+  {
+    id: 'wiring',
+    number: 'РАСПОРЯЖЕНИЕ 84-Э',
+    title: 'О ДОСТУПЕ К ЩИТОВОЙ',
+    requires: [['lifting', 'breaks'], ['service', 'property']],
+    requiresTrait: 'utility',
+    text: [
+      'В связи с наличием в деле регламентов обращения с тяжёлым',
+      'лицу, обслуживавшему узел, разрешён доступ к щитовой',
+      'без сопровождения и со своим освещением.',
+      'ДЕЙСТВИЕ: лампа светит дальше, удержание дешевле, энергии больше.',
+    ],
+    mods: [
+      { path: 'dark.player', mul: 1.5 },
+      { path: 'telekinesis.holdDrain', mul: 0.7 },
+      { path: 'telekinesis.energyMax', add: 25 },
+    ],
   },
 ];
 

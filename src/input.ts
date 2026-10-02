@@ -50,6 +50,8 @@ export interface InputDevice {
   onToggleHitboxes(handler: () => void): void;
   onToggleDossier(handler: () => void): void;
   onReroll(handler: () => void): void;
+  /** Tab в вестибюле: следующий открытый субъект. */
+  onCycleSubject(handler: () => void): void;
   onToggleProfiler(handler: () => void): void;
 }
 
@@ -85,6 +87,7 @@ export function createInput(target: HTMLElement): InputDevice {
   let toggleHitboxes = (): void => {};
   let toggleDossier = (): void => {};
   let reroll = (): void => {};
+  let cycleSubject = (): void => {};
   let toggleProfiler = (): void => {};
 
   const recomputeMove = (): void => {
@@ -130,6 +133,13 @@ export function createInput(target: HTMLElement): InputDevice {
     }
     if (ev.code === 'KeyF') {
       snapshot.useQueued = true;
+      return;
+    }
+    if (ev.code === 'Tab') {
+      // Вестибюль решает, кем выходить. Проверку сцены делает сам
+      // обработчик: ввод про сцены не знает.
+      ev.preventDefault();
+      cycleSubject();
       return;
     }
     if (ev.code === 'KeyI') {
@@ -225,6 +235,9 @@ export function createInput(target: HTMLElement): InputDevice {
     },
     onReroll(handler) {
       reroll = handler;
+    },
+    onCycleSubject(handler) {
+      cycleSubject = handler;
     },
     onToggleProfiler(handler) {
       toggleProfiler = handler;

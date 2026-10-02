@@ -28,7 +28,12 @@ export function roomSystem(w: World): void {
     w.map.doorsLocked = false;
     w.mapToken += 1;
     w.sounds.push('door.unlock');
-    rollReward(w, room.index);
+    // Второй раз за тот же участок не выдают: освобождение замурованного
+    // запирает двери заново, и это наказание, а не повод для выдачи.
+    if (!room.rewarded) {
+      room.rewarded = true;
+      rollReward(w, room.index);
+    }
   }
 
   if (w.map.doorsLocked || w.status === 'dead') return;

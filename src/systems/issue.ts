@@ -7,10 +7,13 @@
  * тот самый второй рынок бланка: потратить его, чтобы выжить сейчас, или
  * чтобы получить предмет потом.
  */
+import { POST_INSPECTOR } from '../data/posts';
+import { SUBJECTS_BY_ID } from '../data/subjects';
 import { WEAPON_FORMS } from '../data/weaponForms';
 import type { Entity, World } from '../ecs';
 import { ITEMS_BY_ID } from '../data/items';
 import { grantItem, pickItem } from '../paperwork';
+import { spawnStaff } from '../spawn';
 import { makeRng } from '../rng';
 import { TUNING } from '../tuning';
 import { formStat, infiniteReserve, reserveMax, statAt } from '../weapon';
@@ -55,6 +58,10 @@ export function issueCost(
   // эвакуации тоже даром: это починка схемы, а не добыча, и платить за
   // то, чтобы интерфейс перестал врать, игрок не должен.
   if (stash.kind === 'case' || stash.kind === 'evac') return 'free';
+
+  // Замурованного не оформляют по описи: его правят в расписании, а это
+  // стоит допуска и только допуска. Бланком штат не переписывают.
+  if (stash.kind === 'walled') return w.passes > 0 ? 'pass' : '';
 
   // Стол выдачи: платят талонами, и только пока кладовщик обслуживает.
   if (stash.kind === 'cell' || stash.kind === 'special' || isService(stash.kind)) {
@@ -150,6 +157,8 @@ export function issueOffer(w: World, target: Entity): { text: string; ok: boolea
   if (stash.kind === 'cell' || isService(stash.kind)) {
     return { text: `НУЖНО ${deskPrice(w, stash.kind)} ТАЛОНОВ`, ok: false };
   }
+  // Замурованного бланком не выпустят: штат правят допуском.
+  if (stash.kind === 'walled') return { text: 'НУЖЕН ДОПУСК', ok: false };
   return { text: 'НЕЧЕМ ОФОРМИТЬ', ok: false };
 }
 
@@ -187,6 +196,44 @@ export function safeContents(w: World, target: Entity): string {
   return 'ПРИЛОЖЕНИЕ';
 }
 
+/**
+ * ОСВОБОЖДЕНИЕ. Правка штатного расписания снаружи.
+ *
+ * Здание этого не прощает: двери запираются заново, и в помещение
+ * выставляется волна. Поэтому замурованный — это решение, а не подарок:
+ * допуск потрачен, бой начался сначала, а взамен освобождённый отдаёт
+ * своё до конца забега и открывается для будущих.
+ */
+function freeWalled(w: World, id: string, target: Entity): void {
+  const spec = SUBJECTS_BY_ID.get(id);
+  if (spec === undefined || w.freed.includes(id)) return;
+  const cfg = TUNING.walled;
+  w.freed.push(id);
+  // Прецедент: он открывается для будущих забегов. Симуляция про
+  // хранилище не знает — помечает, а подшивает точка входа.
+  w.precedents.push(id);
+  w.record.penalty = Math.min(TUNING.record.penaltyMax, w.record.penalty + cfg.penalty);
+
+  const t = w.transform.get(target);
+  const room = w.floor.rooms[w.room];
+  if (room !== undefined) {
+    room.cleared = false;
+    w.map.doorsLocked = true;
+    w.mapToken += 1;
+  }
+
+  // Волна встаёт вокруг проёма: здание не пускает подкрепление в дверь,
+  // оно ставит его там, где расписание правили.
+  const count = Math.max(0, Math.round(cfg.wave));
+  for (let i = 0; i < count; i++) {
+    const angle = (i / Math.max(1, count)) * Math.PI * 2;
+    const x = (t?.x ?? 0) + Math.cos(angle) * cfg.waveSpread;
+    const y = (t?.y ?? 0) + Math.sin(angle) * cfg.waveSpread;
+    spawnStaff(w, POST_INSPECTOR, TUNING.post.registrar.hirePriority, x, y);
+  }
+  w.sounds.push('stamp');
+}
+
 export function issueSystem(w: World): void {
   if (!w.input.useQueued) return;
   w.input.useQueued = false;
@@ -209,6 +256,11 @@ export function issueSystem(w: World): void {
 
   if (stash.kind === 'evac') {
     w.evacPlan = true;
+    return;
+  }
+
+  if (stash.kind === 'walled') {
+    freeWalled(w, stash.item, target);
     return;
   }
 

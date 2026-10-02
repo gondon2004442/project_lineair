@@ -29,6 +29,7 @@ import {
   type Scene,
 } from './data/roomTemplates';
 import { WEAPON_FORMS } from './data/weaponForms';
+import { SUBJECT_START, subjectAt, walledAt } from './data/subjects';
 import { ammoMax, reserveMax } from './weapon';
 import { COUNTERS, type CounterSpec } from './data/counters';
 import { FIXTURES_BY_ID } from './data/fixtures';
@@ -89,6 +90,11 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     record: { penalty: 0, service: 0, broken: 0, roomClean: true, controlHere: 0 },
     depth: -1,
     seals: [],
+    subject: SUBJECT_START,
+    freed: [],
+    unlocked: [SUBJECT_START],
+    precedents: [],
+    forms: WEAPON_FORMS.map(() => true),
     tickets: 0,
     listed: false,
     evacPlan: false,
@@ -163,6 +169,14 @@ export function startRun(w: World): void {
   w.scene = 'run';
   w.status = 'playing';
   w.build = [];
+  // Кем играют — решается в вестибюле, а здесь только раскладывается:
+  // освобождённые прошлого забега не переезжают, формы выдаются по
+  // наряду. Колесо Картографа короче не из-за числа, а из-за того, что
+  // остальные формы ему ещё не выписаны.
+  w.freed = [];
+  const subject = subjectAt(w.subject);
+  const forms = Math.max(1, Math.min(WEAPON_FORMS.length, Math.round(subject.forms)));
+  w.forms = WEAPON_FORMS.map((_, i) => i < forms);
   // Бланки пополняются на входе на этаж, но только до потолка: сэкономил
   // прошлый этаж — запас не копится, потратил весь — получишь полный.
   w.blanks = Math.max(w.blanks, TUNING.blank.refillTo);
@@ -301,6 +315,7 @@ export function enterRoom(w: World, index: number, fromDir: Dir | null): void {
   placeFixtures(w, room, spot.x, spot.y);
   placeRails(w, room);
   placeEvacPlan(w, room, spot.x, spot.y);
+  placeWalled(w, room, spot.x, spot.y);
   placeSections(w, room);
   if (!room.cleared) staffRoom(w, room, spot.x, spot.y);
   if (w.staffC.size === 0 && !room.cleared) {
@@ -548,6 +563,31 @@ function evacRoom(w: World): number {
     .map((r) => r.index);
   if (pool.length === 0) return -1;
   return pool[rng.int(pool.length)] ?? -1;
+}
+
+/**
+ * ЗАМУРОВАННЫЙ. Сотрудник, которого здание не оформило ни на одну
+ * должность и потому не выпускает.
+ *
+ * Лежит он на своём уровне и только там: Картограф в архиве, Электрик в
+ * узле. Попадается с шансом — то есть не каждый забег, — и ровно на
+ * одном участке, который считается от посевной, а не хранится.
+ */
+function placeWalled(w: World, room: RoomNode, entryX: number, entryY: number): void {
+  const spec = walledAt(w.depth);
+  if (spec === undefined || w.freed.includes(spec.id)) return;
+  const cfg = TUNING.walled;
+  const rng = makeRng((w.seed + Math.abs(w.depth) * cfg.seedStride) >>> 0);
+  // Бросок делается всегда и до выбора участка: иначе шанс зависел бы
+  // от того, в каком порядке обходят этаж.
+  const wanted = rng.float() < cfg.chance;
+  const pool = w.floor.rooms
+    .filter((r) => r.kind !== 'start' && r.index !== w.floor.end && !r.corridor)
+    .map((r) => r.index);
+  const where = pool.length === 0 ? -1 : (pool[rng.int(pool.length)] ?? -1);
+  if (!wanted || where !== room.index) return;
+  const spot = findSpawnSpot(w.map, rng, entryX, entryY, TUNING.stash.clearance, cfg.radius);
+  spawnStash(w, 'walled', spec.id, `ЗАМУРОВАННЫЙ · ${spec.title}`, spot.x, spot.y);
 }
 
 /**

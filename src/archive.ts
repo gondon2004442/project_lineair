@@ -24,6 +24,7 @@ export interface CaseFile {
 }
 
 const KEY = 'lineair.archive';
+const PRECEDENTS = 'lineair.precedents';
 
 /** Прочитать архив. Недоступное хранилище — просто пустой архив. */
 export function readArchive(): CaseFile[] {
@@ -74,4 +75,32 @@ function isCase(value: unknown): value is CaseFile {
 
 function formatSeedNumber(seed: number): string {
   return (seed >>> 0).toString(16).toUpperCase().padStart(8, '0');
+}
+
+/**
+ * ПРЕЦЕДЕНТЫ. Они ничего не усиливают, они ОТКРЫВАЮТ: субъекта, форму,
+ * вид стойки. Прогресс в разнообразии, а не в числах, — иначе архив
+ * превратился бы в прокачку и отнял бы смысл у забега.
+ */
+export function readPrecedents(): string[] {
+  try {
+    const raw = window.localStorage.getItem(PRECEDENTS);
+    if (raw === null) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((v): v is string => typeof v === 'string');
+  } catch {
+    return [];
+  }
+}
+
+/** Подшить прецедент. Уже подшитый не удваивается. */
+export function filePrecedent(id: string): void {
+  try {
+    const all = readPrecedents();
+    if (all.includes(id)) return;
+    window.localStorage.setItem(PRECEDENTS, JSON.stringify([...all, id]));
+  } catch {
+    // Хранилище недоступно — прецедент просто не переживёт сеанс.
+  }
 }

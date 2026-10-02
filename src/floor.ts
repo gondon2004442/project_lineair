@@ -46,6 +46,12 @@ export interface RoomNode {
   corridor: boolean;
   cleared: boolean;
   visited: boolean;
+  /**
+   * Выдача за этот участок уже брошена. Нужна оттого, что участок можно
+   * зачистить дважды: освобождение замурованного запирает двери заново и
+   * выставляет волну, а второй выдачи за ту же комнату быть не должно.
+   */
+  rewarded: boolean;
 }
 
 export interface Floor {
@@ -364,6 +370,7 @@ function finish(drafts: Draft[], rng: Rng, scheme: FloorScheme): Floor {
       rng.float() < TUNING.stash.safeChance,
     desk: false,
     cleared: d.kind === 'start',
+    rewarded: false,
     visited: false,
     };
   });

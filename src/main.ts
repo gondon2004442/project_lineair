@@ -3,7 +3,7 @@
  * рендер идёт своим темпом и интерполирует между шагами.
  */
 import './style.css';
-import { caseNote, fileCase, readArchive } from './archive';
+import { caseNote, fileCase, filePrecedent, readArchive, readPrecedents } from './archive';
 import { createAudio } from './audio';
 import { createHud } from './hud';
 import { createInput } from './input';
@@ -17,7 +17,7 @@ import { STEP, TUNING } from './tuning';
 import { DIRECTIVES, issuedDirectives } from './data/directives';
 import { ITEMS, ITEM_ID_CLASHES } from './data/items';
 import { spawnStaff } from './spawn';
-import { damageFactorAgainst, penaltyOf, statAt } from './weapon';
+import { damageFactorAgainst, hasTrait, penaltyOf, statAt } from './weapon';
 import { applyDamage } from './systems/damage';
 import { ticketValue } from './systems/tickets';
 import { counterInReach, counterOffer } from './systems/counter';
@@ -26,8 +26,10 @@ import { DECOR, DECOR_BY_ID, DECOR_TOO_LIGHT } from './data/decor';
 import { TEMPLATES_BY_ID } from './data/roomTemplates';
 import { liftOpen } from './room';
 import { floorAt } from './data/floors';
+import { SUBJECTS, SUBJECT_START, subjectAt } from './data/subjects';
 import { shownRoom } from './hud';
 import { createWorld, descend, enterLobby, enterRoom, startRun } from './world';
+import type { World } from './ecs';
 
 /** Приоритеты тикера Pixi: наш проход до отрисовки и замер сразу после неё. */
 const TICKER_BEFORE_RENDER = 0;
@@ -71,8 +73,37 @@ async function boot(): Promise<void> {
     resize: () => renderer.layout(),
   });
 
+  /**
+   * Открытые субъекты: стартовый плюс те, кого открыли прецеденты
+   * прошлых забегов. Симуляция хранилища не знает, поэтому список
+   * выкладывается ей снаружи — как архив и как звук.
+   */
+  function unlockedSubjects(): string[] {
+    const filed = readPrecedents();
+    return SUBJECTS.filter((s) => s.id === SUBJECT_START || filed.includes(s.id)).map((s) => s.id);
+  }
+
+  function newWorld(): World {
+    const next = createWorld(seed, input.snapshot);
+    next.unlocked = unlockedSubjects();
+    // Кем играли в прошлый раз, тем и выходим, пока он ещё открыт.
+    next.subject = next.unlocked.includes(chosen) ? chosen : SUBJECT_START;
+    return next;
+  }
+
   let seed = resolveSeed();
-  let world = createWorld(seed, input.snapshot);
+  let chosen = SUBJECT_START;
+  let world = newWorld();
+
+  /** Tab в вестибюле: следующий открытый субъект. */
+  function cycleSubject(): void {
+    if (world.scene !== 'lobby') return;
+    const pool = world.unlocked;
+    if (pool.length <= 1) return;
+    const at = pool.indexOf(world.subject);
+    chosen = pool[(at + 1) % pool.length] ?? SUBJECT_START;
+    world.subject = chosen;
+  }
 
   /** F2 — выход из забега обратно в вестибюль. Этаж остаётся тем же. */
   function toLobby(): void {
@@ -84,19 +115,20 @@ async function boot(): Promise<void> {
   function rerollSeed(): void {
     if (world.scene !== 'lobby' || seedPinned()) return;
     seed = resolveSeed();
-    world = createWorld(seed, input.snapshot);
+    world = newWorld();
     panel.clearRestartFlag();
   }
 
   /** Смена крутилок, читаемых при рождении: пересобираем этаж заново. */
   function rebuild(): void {
-    world = createWorld(seed, input.snapshot);
+    world = newWorld();
     panel.clearRestartFlag();
   }
 
   input.setProjection((sx, sy) => renderer.screenToWorld(sx, sy));
   input.onRestart(toLobby);
   input.onReroll(rerollSeed);
+  input.onCycleSubject(cycleSubject);
   input.onToggleHitboxes(() => {
     renderer.showHitboxes = !renderer.showHitboxes;
   });
@@ -121,6 +153,12 @@ async function boot(): Promise<void> {
       liftOpen,
       // Описание уровня нужно стенду печатей: кто держит печать.
       floorAt,
+      // Субъекты нужны стенду: иначе не проверить, что свойство доходит
+      // до распоряжений, а освобождение — до путей тюнинга.
+      subjectAt,
+      subjects: SUBJECTS,
+      // Свойство: стенд сверяет, что освобождённый отдаёт своё.
+      hasTrait,
       // Искажение схемы проверяется только так: на экране это метка,
       // а числом — номер участка, который она показывает.
       shownRoom,
@@ -201,6 +239,14 @@ async function boot(): Promise<void> {
         commendations: world.commendations,
       });
       world.runEnded = '';
+    }
+    // Прецеденты: освобождённый открывается для будущих забегов. Список
+    // открытых пересобирается тут же — иначе он обновился бы только со
+    // следующим миром, и игрок не увидел бы, что открыл.
+    if (world.precedents.length > 0) {
+      for (const id of world.precedents) filePrecedent(id);
+      world.precedents.length = 0;
+      world.unlocked = unlockedSubjects();
     }
     if (world.noteSlot >= 0) {
       const shelf = readArchive();
