@@ -77,6 +77,7 @@ export function createWorld(seed: number, input: InputSnapshot): World {
       shotTime: 0,
       shotX: 0,
       shotY: 0,
+      hiss: 0,
     },
     sounds: [],
     status: 'playing',

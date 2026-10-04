@@ -475,6 +475,13 @@ export interface Feedback {
   shotTime: number;
   shotX: number;
   shotY: number;
+  /**
+   * Красное состояние: куда ведём пересчёт, 0..1. Это ЦЕЛЬ, а не текущее
+   * значение — текущее держит рендер и ведёт к цели за hiss.fadeIn.
+   * Симуляция только объявляет, что допуск приостановлен; как это
+   * выглядит, её не касается.
+   */
+  hiss: number;
 }
 
 export interface World {

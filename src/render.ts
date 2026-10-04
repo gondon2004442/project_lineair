@@ -5,7 +5,7 @@
  */
 import { Application, BlurFilter, Container, Graphics } from 'pixi.js';
 import type { World } from './ecs';
-import { createAberration, createDust, drawSmoke, type WarpSource } from './fx';
+import { createAberration, createDust, createHiss, drawSmoke, type WarpSource } from './fx';
 import { PALETTE } from './palette';
 import { makeRng } from './rng';
 import { countDrawCalls, profiler } from './profiler';
@@ -60,6 +60,15 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
   const dustLayer = new Graphics();
   const smokeLayer = new Graphics();
   const entityLayer = new Graphics();
+  // Служебная разметка помещения: рамка проёма, запорная полоса, пороги.
+  // Запекается вместе с бетоном, но живёт ОТДЕЛЬНЫМ слоем — он идёт
+  // поверх красного пересчёта, и жёлтый в нём остаётся жёлтым.
+  const markLayer = new Graphics();
+  // Служебный слой: таблички, телеграфы, счётчики, печати и снаряды.
+  const serviceLayer = new Graphics();
+  // Субъект. Отдельно от всего: в красном состоянии он не пересчитан, а
+  // подменён — самое светлое пятно в кадре.
+  const subjectLayer = new Graphics();
   const darkLayer = new Graphics();
   const debugLayer = new Graphics();
 
@@ -77,7 +86,11 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
   // переставал принадлежать субъекту. Снизу ореол остаётся ореолом.
   // Антураж идёт сразу за помещением и до всего живого: он часть места,
   // а не участник сцены. Отдельным слоем — чтобы гаситься одной ручкой.
-  shakeLayer.addChild(
+  // Мир — всё, что красное состояние имеет право пересчитать: бетон,
+  // антураж, мебель, штат. Отдельным контейнером, потому что фильтр
+  // вешается на контейнер, а не на отдельные слои.
+  const worldLayer = new Container();
+  worldLayer.addChild(
     roomLayer,
     decorLayer,
     flickerLayer,
@@ -86,7 +99,14 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
     smokeLayer,
     glowLayer,
     entityLayer,
+  );
+  shakeLayer.addChild(
+    worldLayer,
+    markLayer,
+    serviceLayer,
+    subjectLayer,
     // Темнота идёт ПОВЕРХ всего живого: она и есть то, чего не видно.
+    // И вне пересчёта: чернота обязана оставаться чернотой.
     darkLayer,
     debugLayer,
   );
@@ -102,6 +122,10 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
   app.stage.filterArea = app.screen;
 
   const aberration = createAberration();
+  // Красное состояние: своя глубина, которая ведётся к цели из w.fx.hiss.
+  const hiss = createHiss();
+  let hissNow = 0;
+  let hissOn = false;
   let aberrationOn = TUNING.fx.aberration > 0;
   let shakeTick = -1;
   let shakeX = 0;
@@ -142,7 +166,8 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
       profiler.begin('КАДР: ТАЙЛМАП');
       if (w.mapToken !== drawnToken) {
         drawnToken = w.mapToken;
-        drawRoom(roomLayer, w.map, warmSector(w));
+        markLayer.clear();
+        drawRoom(roomLayer, markLayer, w.map, warmSector(w));
         drawDoorSigns(roomLayer, w);
         drawLift(roomLayer, w);
         drawDecor(decorLayer, w);
@@ -155,6 +180,28 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
 
       const frame = app.ticker.deltaMS / 1000;
       fxTime += frame;
+
+      // Красное состояние считается ДО отрисовки: от него зависит и
+      // проход, и цвет субъекта на этом же кадре. Ведётся к цели ровно,
+      // а не скачком: вход за hiss.fadeIn, выход — тоже не мгновенный,
+      // его волной задаёт тот, кто ставит цель.
+      profiler.begin('КАДР: КРАСНОЕ');
+      const want = Math.max(0, Math.min(1, w.fx.hiss)) * TUNING.hiss.amount;
+      const rate = TUNING.hiss.fadeIn <= 0 ? 1 : frame / TUNING.hiss.fadeIn;
+      hissNow += Math.max(-rate, Math.min(rate, want - hissNow));
+      if (Math.abs(want - hissNow) < 0.001) hissNow = want;
+      const wantHiss = hissNow > 0;
+      if (wantHiss !== hissOn) {
+        hissOn = wantHiss;
+        // На нуле проход снимается целиком: выключенный эффект не должен
+        // стоить ни кадра, как уже сделано со свечением и аберрацией.
+        worldLayer.filters = wantHiss ? [hiss.filter] : [];
+      }
+      if (hissOn) hiss.set(hissNow, TUNING.hiss.gamma, TUNING.hiss.deep, TUNING.hiss.hot);
+      // Субъекту в заседании возвращают не красный, а почти белый: он
+      // больше не сотрудник, он посторонний в помещении.
+      const skin = hissOn ? TUNING.hiss.subject : PALETTE.red;
+      profiler.end('КАДР: КРАСНОЕ');
 
       // Тряска переставляется раз в шаг симуляции, а не раз в кадр. На
       // быстром мониторе кадров втрое больше шагов, и случайный сдвиг
@@ -187,13 +234,16 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
       profiler.end('КАДР: ДЫМ');
 
       entityLayer.clear();
+      serviceLayer.clear();
+      subjectLayer.clear();
       drawSections(entityLayer, w);
-      drawEntities(entityLayer, w, alpha);
+      drawEntities(entityLayer, serviceLayer, subjectLayer, w, alpha, skin);
 
       profiler.begin('КАДР: ТЕМНОТА');
       darkLayer.clear();
       drawDark(darkLayer, w, alpha);
       profiler.end('КАДР: ТЕМНОТА');
+
 
       // Свечение и аберрация на нуле снимаются целиком: слабой машине
       // важно, чтобы выключенный эффект ничего не стоил.
@@ -299,7 +349,7 @@ function warmSector(w: World): boolean {
   return TEMPLATES_BY_ID.get(room.template)?.sector === 'office';
 }
 
-function drawRoom(g: Graphics, map: TileMap, warm: boolean): void {
+function drawRoom(g: Graphics, svc: Graphics, map: TileMap, warm: boolean): void {
   g.clear();
   const size = map.size;
   for (let cy = 0; cy < map.rows; cy++) {
@@ -317,10 +367,12 @@ function drawRoom(g: Graphics, map: TileMap, warm: boolean): void {
         continue;
       }
       if (tile === TILE_GATE) {
-        // Проём: в полу нет пола. Провал в служебной рамке.
+        // Проём: в полу нет пола. Провал в служебной рамке. Сама рамка
+        // служебная, поэтому уходит в слой разметки, а провал остаётся
+        // в мире: он часть помещения.
         const inset = TUNING.render.gateInset;
         g.rect(x, y, size, size).fill(PALETTE.black);
-        g.rect(x + inset, y + inset, size - inset * 2, size - inset * 2).stroke({
+        svc.rect(x + inset, y + inset, size - inset * 2, size - inset * 2).stroke({
           width: TUNING.render.gateWidth,
           color: PALETTE.yellow,
           alpha: 0.6,
@@ -336,7 +388,7 @@ function drawRoom(g: Graphics, map: TileMap, warm: boolean): void {
         .fill(PALETTE.floorSeam);
 
       if (tile !== TILE_DOOR) continue;
-      drawDoorway(g, map, cx, cy, x, y, size);
+      drawDoorway(g, svc, map, cx, cy, x, y, size);
     }
   }
 }
@@ -1070,7 +1122,13 @@ function drawDoorSigns(g: Graphics, w: World): void {
  * Субъект. Единственное красное на экране и потому верхний слой:
  * что бы ни творилось на участке, себя видно всегда.
  */
-function drawPlayer(g: Graphics, w: World, alpha: number): void {
+/**
+ * Субъект. Цвет приходит снаружи, а не берётся из палитры: в красном
+ * состоянии он не пересчитан проходом, а ПОДМЕНЁН — служебный красный у
+ * него отобрали вместе с допуском, и он становится самым светлым пятном
+ * в кадре. Это и есть опознание субъекта, когда цвета в кадре нет.
+ */
+function drawPlayer(g: Graphics, w: World, alpha: number, skin: number): void {
   const player = w.playerC.get(w.player);
   const t = w.transform.get(w.player);
   const health = w.health.get(w.player);
@@ -1095,7 +1153,7 @@ function drawPlayer(g: Graphics, w: World, alpha: number): void {
         pose.hx * 2,
         pose.hy * 2,
       ).fill({
-        color: PALETTE.red,
+        color: skin,
         alpha: (1 - i / (TUNING.render.dashTrail + 1)) * TUNING.render.dashGhostAlpha,
       });
     }
@@ -1115,7 +1173,7 @@ function drawPlayer(g: Graphics, w: World, alpha: number): void {
     health.iframes > dashIFrameWindow(w) &&
     Math.floor(w.tick * STEP * TUNING.feel.blinkRate) % 2 === 0;
   if (!blink) {
-    const color = health !== undefined && health.flash > 0 ? PALETTE.concrete100 : PALETTE.red;
+    const color = health !== undefined && health.flash > 0 ? PALETTE.concrete100 : skin;
     block(g, cx - pose.hx, cy - pose.hy, pose.hx * 2, pose.hy * 2, color);
     // Кант: красный тёмный, и без канта субъект на полу пропадает,
     // стоит убрать цвет. Контур — единственный в кадре, силуэт читается
@@ -1131,7 +1189,7 @@ function drawPlayer(g: Graphics, w: World, alpha: number): void {
   const ay = player.aimY;
   g.moveTo(cx + ax * half, cy + ay * half)
     .lineTo(cx + ax * TUNING.render.aimLength, cy + ay * TUNING.render.aimLength)
-    .stroke({ width: TUNING.render.aimWidth, color: PALETTE.red });
+    .stroke({ width: TUNING.render.aimWidth, color: skin });
 }
 
 /**
@@ -1273,6 +1331,7 @@ function drawGlassPartition(
 /** Проём: тёмный зев, деревянный наличник, жёлтая разметка на полу. */
 function drawDoorway(
   g: Graphics,
+  svc: Graphics,
   map: TileMap,
   cx: number,
   cy: number,
@@ -1289,7 +1348,7 @@ function drawDoorway(
     const bar = horizontal
       ? { x, y: y + inset, w: size, h: size - inset * 2 }
       : { x: x + inset, y, w: size - inset * 2, h: size };
-    g.rect(bar.x, bar.y, bar.w, bar.h).fill(PALETTE.yellow);
+    svc.rect(bar.x, bar.y, bar.w, bar.h).fill(PALETTE.yellow);
     return;
   }
 
@@ -1306,7 +1365,7 @@ function drawDoorway(
     const strip = horizontal
       ? { x, y: cy === 0 ? y + shift : y + size - shift - t, w: size, h: t }
       : { x: cx === 0 ? x + shift : x + size - shift - t, y, w: t, h: size };
-    g.rect(strip.x, strip.y, strip.w, strip.h).fill({ color: PALETTE.yellow, alpha: 0.75 });
+    svc.rect(strip.x, strip.y, strip.w, strip.h).fill({ color: PALETTE.yellow, alpha: 0.75 });
   }
 }
 
@@ -1342,7 +1401,25 @@ function fxLeft(left: number, alpha: number): number {
   return Math.max(0, left - alpha * STEP);
 }
 
-function drawEntities(g: Graphics, w: World, alpha: number): void {
+/**
+ * Всё живое за кадр. Три цели вместо одной, и это не прихоть рендера:
+ *
+ *   g    — мир. Его красное состояние имеет право пересчитать.
+ *   svc  — служебное: таблички, телеграфы, счётчики, печати, снаряды.
+ *          Оно идёт поверх пересчёта и остаётся жёлтым.
+ *   subj — субъект. В заседании он не пересчитан, а подменён.
+ *
+ * Маски по оттенку нет и не будет: жёлтый отделяется порядком
+ * отрисовки, а не разбором цвета в шейдере.
+ */
+function drawEntities(
+  g: Graphics,
+  svc: Graphics,
+  subj: Graphics,
+  w: World,
+  alpha: number,
+  skin: number,
+): void {
   const time = w.tick * STEP;
   profiler.begin('КАДР: ТЕЛЕГРАФЫ');
 
@@ -1361,7 +1438,7 @@ function drawEntities(g: Graphics, w: World, alpha: number): void {
       inspector.shotsLeft > 0
         ? { x: inspector.aimX, y: inspector.aimY }
         : { x: dx / len, y: dy / len };
-    g.moveTo(x, y)
+    svc.moveTo(x, y)
       .lineTo(x + aim.x * TUNING.render.telegraphRay, y + aim.y * TUNING.render.telegraphRay)
       .stroke(telegraphPen(w, staff.plateFlash));
   }
@@ -1372,7 +1449,7 @@ function drawEntities(g: Graphics, w: World, alpha: number): void {
     const t = w.transform.get(e);
     const tt = w.transform.get(auditor.target);
     if (t === undefined || tt === undefined) continue;
-    g.moveTo(lerp(t.px, t.x, alpha), lerp(t.py, t.y, alpha))
+    svc.moveTo(lerp(t.px, t.x, alpha), lerp(t.py, t.y, alpha))
       .lineTo(lerp(tt.px, tt.x, alpha), lerp(tt.py, tt.y, alpha))
       .stroke({
         width: TUNING.render.telegraphWidth,
@@ -1406,7 +1483,7 @@ function drawEntities(g: Graphics, w: World, alpha: number): void {
     const t = w.transform.get(heldEntity);
     const pt = w.transform.get(w.player);
     if (t !== undefined && pt !== undefined) {
-      g.moveTo(lerp(pt.px, pt.x, alpha), lerp(pt.py, pt.y, alpha))
+      svc.moveTo(lerp(pt.px, pt.x, alpha), lerp(pt.py, pt.y, alpha))
         .lineTo(lerp(t.px, t.x, alpha), lerp(t.py, t.y, alpha))
         .stroke({
           width: TUNING.render.telegraphWidth,
@@ -1555,46 +1632,49 @@ function drawEntities(g: Graphics, w: World, alpha: number): void {
       const gap = TUNING.render.controlOutlineGap;
       const width = TUNING.render.controlOutline;
       for (const pad of [gap, gap * 2]) {
-        g.rect(x - draw.size - pad, y - draw.size - pad, (draw.size + pad) * 2, (draw.size + pad) * 2)
+        svc.rect(x - draw.size - pad, y - draw.size - pad, (draw.size + pad) * 2, (draw.size + pad) * 2)
           .stroke({ width, color: PALETTE.concrete100 });
       }
     }
 
-    drawPlates(g, x, y, draw.size, staff);
+    drawPlates(svc, x, y, draw.size, staff);
     // Приостановлен: печать над головой. Знак неподвижный и глухой —
     // ровно чтобы отличаться от телеграфа, который означает угрозу.
     // Пришитый скобой читается иначе, чем приостановленный: печать
     // означает предписание, а скоба — что он прибит к опоре и сейчас
     // выдернется. Два знака на одном отсчёте путали бы оба.
-    if (staff.pinned > 0) drawStaple(g, x, y, draw.size);
-    else if (staff.frozen > 0) drawStamp(g, x, y - draw.size - TUNING.render.suspendLift);
+    if (staff.pinned > 0) drawStaple(svc, x, y, draw.size);
+    else if (staff.frozen > 0) drawStamp(svc, x, y - draw.size - TUNING.render.suspendLift);
     if (staff.plateFlash > 0) {
       const inset = TUNING.render.telegraphInset;
-      g.rect(x - draw.size - inset, y - draw.size - inset, (draw.size + inset) * 2, (draw.size + inset) * 2)
+      svc.rect(x - draw.size - inset, y - draw.size - inset, (draw.size + inset) * 2, (draw.size + inset) * 2)
         .stroke(telegraphPen(w, staff.plateFlash));
     }
-    if (w.registrarC.has(e)) drawVacancyCount(g, x, y, draw.size, vacancyCount(w));
+    if (w.registrarC.has(e)) drawVacancyCount(svc, x, y, draw.size, vacancyCount(w));
 
     // Ревизор: счётчик невнесённых строк над головой, а пока идёт опись —
     // ещё и глухая рамка. Она же и есть «по нему не проходит».
     const auditor = w.auditorC.get(e);
     if (auditor !== undefined) {
       if (auditor.phase === 'open') {
-        drawVacancyCount(g, x, y, draw.size, 0);
+        drawVacancyCount(svc, x, y, draw.size, 0);
       } else {
-        drawVacancyCount(g, x, y, draw.size, pendingItems(w));
+        drawVacancyCount(svc, x, y, draw.size, pendingItems(w));
         const inset = TUNING.render.auditShieldInset;
-        g.rect(x - draw.size - inset, y - draw.size - inset, (draw.size + inset) * 2, (draw.size + inset) * 2)
+        svc.rect(x - draw.size - inset, y - draw.size - inset, (draw.size + inset) * 2, (draw.size + inset) * 2)
           .stroke({ width: TUNING.render.auditShieldWidth, color: PALETTE.concrete300 });
       }
     }
   }
 
-  drawPlayer(g, w, alpha);
+  drawPlayer(subj, w, alpha, skin);
   profiler.end('КАДР: СУЩНОСТИ');
 
+  // Снаряды — тоже служебный слой, и это сознательно. По ним принимают
+  // решение за доли секунды; пересчитанные вместе с бетоном, они слились
+  // бы с ним ровно там, где это стоит здоровья.
   profiler.begin('КАДР: ПУЛИ');
-  drawBullets(g, w, alpha);
+  drawBullets(svc, w, alpha);
   profiler.end('КАДР: ПУЛИ');
 }
 

@@ -178,6 +178,88 @@ void main(void) {
 }
 `;
 
+/**
+ * КРАСНОЕ СОСТОЯНИЕ. Монохромный пересчёт кадра.
+ *
+ * Берётся яркость пикселя и по ней выбирается точка на красной рампе: от
+ * почти чёрного к почти белому розовому. Никакого оттенка на выходе нет
+ * — только светлота, и это и есть смысл приёма. Цветной светофильтр
+ * поверх сцены выглядел бы дёшево и оставил бы цвета читаемыми; здесь
+ * цвет уничтожается.
+ *
+ * Жёлтый и субъект сюда не попадают вовсе: они рисуются слоями ПОВЕРХ
+ * фильтрованного контейнера. Маски по оттенку нет — есть порядок.
+ */
+const HISS_FRAGMENT = `#version 300 es
+precision highp float;
+
+in vec2 vTextureCoord;
+out vec4 finalColor;
+
+uniform sampler2D uTexture;
+uniform float uAmount;
+uniform float uGamma;
+uniform vec3 uDeep;
+uniform vec3 uHot;
+
+void main(void) {
+    vec4 color = texture(uTexture, vTextureCoord);
+    // Яркость по Rec.709 — той же формулой меряются кадры на стенде.
+    float L = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+    // Прозрачные места не красим: за кадром помещения ничего нет, и
+    // чернота вокруг него должна остаться чернотой, а не стать красной.
+    vec3 hiss = mix(uDeep, uHot, pow(clamp(L, 0.0, 1.0), uGamma));
+    finalColor = vec4(mix(color.rgb, hiss * color.a, uAmount), color.a);
+}
+`;
+
+export interface Hiss {
+  filter: Filter;
+  /** Глубина пересчёта на этом кадре и форма рампы. */
+  set(amount: number, gamma: number, deep: number, hot: number): void;
+}
+
+export function createHiss(): Hiss {
+  const filter = new Filter({
+    glProgram: GlProgram.from({
+      vertex: ABERRATION_VERTEX,
+      fragment: HISS_FRAGMENT,
+      name: 'hiss',
+    }),
+    resources: {
+      hissUniforms: {
+        uAmount: { value: 0, type: 'f32' },
+        uGamma: { value: TUNING.hiss.gamma, type: 'f32' },
+        uDeep: { value: new Float32Array(rgb(TUNING.hiss.deep)), type: 'vec3<f32>' },
+        uHot: { value: new Float32Array(rgb(TUNING.hiss.hot)), type: 'vec3<f32>' },
+      },
+    },
+  });
+
+  const uniforms = (): Record<string, unknown> | null => {
+    const group = filter.resources['hissUniforms'];
+    if (group === undefined || !('uniforms' in group)) return null;
+    return group.uniforms as Record<string, unknown>;
+  };
+
+  return {
+    filter,
+    set(amount, gamma, deep, hot) {
+      const u = uniforms();
+      if (u === null) return;
+      u['uAmount'] = amount;
+      u['uGamma'] = gamma;
+      (u['uDeep'] as Float32Array).set(rgb(deep));
+      (u['uHot'] as Float32Array).set(rgb(hot));
+    },
+  };
+}
+
+/** Цвет палитры в три доли единицы: шейдер считает в них. */
+function rgb(color: number): [number, number, number] {
+  return [((color >> 16) & 255) / 255, ((color >> 8) & 255) / 255, (color & 255) / 255];
+}
+
 export interface WarpSource {
   /** Центр в координатах экрана, 0..1. */
   x: number;
