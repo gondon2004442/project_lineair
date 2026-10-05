@@ -274,6 +274,10 @@ async function boot(): Promise<void> {
     profiler.begin('СБОРКА КАДРА');
     renderer.draw(world, accumulator / STEP);
     profiler.end('СБОРКА КАДРА');
+    if (renderer.events !== undefined) {
+      for (const id of renderer.events) audio.play(id);
+      renderer.events.length = 0;
+    }
 
     profiler.begin('ОВЕРЛЕЙ');
     hud.update(world, ticker.FPS, renderer.showHitboxes, frame);

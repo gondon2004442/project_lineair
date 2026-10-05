@@ -155,6 +155,7 @@ export class Rig {
       shoe.castShadow = true;
       knee.add(shoe);
     }
+    shadeAll(this.root);
   }
 
   /** Поза на кадр: шаг, руки, дыхание. */
@@ -250,4 +251,16 @@ function limb(parent: Group, mat: Material, sx: number, sy: number, sz: number, 
   mesh.receiveShadow = true;
   parent.add(mesh);
   return mesh;
+}
+
+/**
+ * Всё, что в помещении, обязано принимать тень. Солнце держит потолок, а
+ * не стены: деталь без приёма тени получает солнце насквозь и светится,
+ * как лампа, — так и светились кисти и газеты.
+ */
+export function shadeAll(root: { traverse(cb: (o: unknown) => void): void }): void {
+  root.traverse((o) => {
+    const mesh = o as Mesh;
+    if (mesh.isMesh === true) mesh.receiveShadow = true;
+  });
 }

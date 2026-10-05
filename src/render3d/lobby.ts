@@ -38,6 +38,7 @@ import { TUNING } from '../tuning';
 import { beamMaterial } from './beam';
 import { GeoBuilder } from './geo';
 import { Kit } from './kit';
+import { shadeAll } from './rig';
 import type { Materials } from './materials';
 import type { RoomView } from './room';
 import { archive, board, buildClock, lockers, planter, propMats, reception, snake, vitrine, waiting, type Ctx } from './furnish';
@@ -445,6 +446,7 @@ export function buildLobby(w: World, m: Materials): RoomView {
   });
 
   meshes.push(...kit.build(group));
+  shadeAll(group);
   for (const mesh of meshes) owned.push(mesh.geometry);
   // Стены отбрасывают тень обеими сторонами: солнце светит им в спину.
   L.plaster.shadowSide = DoubleSide;

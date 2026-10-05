@@ -176,18 +176,26 @@ export async function createRenderer3D(host: HTMLElement): Promise<Renderer> {
     toneMapped: false,
     side: 2,
   });
+  const puffMat = new MeshBasicMaterial({
+    vertexColors: true,
+    transparent: true,
+    depthWrite: false,
+    map: m.glow,
+  });
+  const puff = new QuadBatch(512, puffMat);
+  puff.mesh.renderOrder = 7;
   const decal = new QuadBatch(4096, decalMat);
   const glow = new QuadBatch(4096, glowMat);
   const svc = new QuadBatch(8192, svcMat);
   decal.mesh.renderOrder = 2;
   glow.mesh.renderOrder = 6;
-  scene.add(decal.mesh, glow.mesh);
+  scene.add(decal.mesh, glow.mesh, puff.mesh);
   overlay.add(svc.mesh);
 
   const actors = new Actors(m);
   scene.add(actors.group);
 
-  const aoHidden: Object3D[] = [keyBeam, dust, decal.mesh, glow.mesh];
+  const aoHidden: Object3D[] = [keyBeam, dust, decal.mesh, glow.mesh, puff.mesh];
   const aoBase = aoHidden.length;
   const post = createPost(gl, scene, camera, aoHidden);
   const reflection = new Reflection(gl, m);
@@ -300,6 +308,7 @@ export async function createRenderer3D(host: HTMLElement): Promise<Renderer> {
 
   const renderer: Renderer = {
     app: { canvas: gl.domElement, ticker },
+    events: actors.events,
     showHitboxes: TUNING.debug.hitboxes,
 
     screenToWorld(sx, sy) {
@@ -493,10 +502,12 @@ export async function createRenderer3D(host: HTMLElement): Promise<Renderer> {
       decal.begin();
       glow.begin();
       svc.begin();
+      puff.begin();
       glow.right.copy(camRight);
       glow.up.copy(camUp);
       actors.sync(w, {
         alpha,
+        soft: room?.warm === true && w.scene === 'run',
         time: w.tick * STEP,
         skin,
         hiss: hissOn,
@@ -504,10 +515,11 @@ export async function createRenderer3D(host: HTMLElement): Promise<Renderer> {
         showHitboxes: renderer.showHitboxes,
         camRight,
         camUp,
-      }, { decal, glow, svc });
+      }, { decal, glow, svc, puff });
       decal.end();
       glow.end();
       svc.end();
+      puff.end();
       if (actors.playerRoot !== null) actors.playerRoot.traverse((o) => o.layers.enable(SUBJECT_LAYER));
       profiler.end('КАДР: СУЩНОСТИ');
 
@@ -570,7 +582,7 @@ export async function createRenderer3D(host: HTMLElement): Promise<Renderer> {
       post.composer.render(frame);
       // Отражение пола снимается после кадра, на готовых тенях, и идёт в
       // следующий: запаздывание на кадр глазу не видно, а тени не считаются дважды.
-      reflection.render(scene, camera, reflectNow, [decal.mesh, glow.mesh, dust, keyBeam, ...(room?.fx.children ?? [])]);
+      reflection.render(scene, camera, reflectNow, [decal.mesh, glow.mesh, puff.mesh, dust, keyBeam, ...(room?.fx.children ?? [])]);
       // Поверх пересчёта: субъект и служебный слой. Субъект в заседании не
       // пересчитан, а подменён; жёлтое остаётся жёлтым.
       gl.autoClear = false;

@@ -19,12 +19,14 @@ import {
   MeshStandardMaterial,
   PlaneGeometry,
   PointLight,
+  SphereGeometry,
   Vector3,
   type CanvasTexture,
 } from 'three';
 import { PALETTE } from '../palette';
 import type { Rng } from '../rng';
 import { Kit } from './kit';
+import { Rig, shadeAll } from './rig';
 import type { Materials } from './materials';
 import {
   clockFace,
@@ -310,8 +312,8 @@ export function reception(ctx: Ctx, x0: number, z0: number, x1: number, z1: numb
   kit.box(L.brass, cx - 0.45, 0.72, z1 + 0.015, cx + 0.45, 0.9, z1 + 0.03);
   kit.box(m.void, cx - 0.36, 0.79, z1 + 0.03, cx + 0.36, 0.83, z1 + 0.034);
   // Рабочий стол за стойкой.
-  kit.box(m.wood, x0 + 0.35, 0.72, z0 + 0.12, x1 - 0.08, 0.77, front - 0.04);
-  kit.box(m.darkMetal, x1 - 0.55, 0, z0 + 0.15, x1 - 0.1, 0.72, front - 0.08);
+  kit.box(m.wood, x0 + 0.35, 0.72, z0 + 0.12, x1 - 0.08, 0.77, z0 + 0.8);
+  kit.box(m.darkMetal, x1 - 0.55, 0, z0 + 0.15, x1 - 0.1, 0.72, z0 + 0.76);
   kit.box(m.darkMetal, x0 + 0.4, 0, z0 + 0.14, x0 + 0.44, 0.72, z0 + 0.18);
   // Терминал очереди на стойке, экраном к посетителям.
   const tx = x1 - 0.55;
@@ -350,8 +352,9 @@ export function reception(ctx: Ctx, x0: number, z0: number, x1: number, z1: numb
   const warm = new PointLight(0xffc68a, 2.2, 4, 2);
   warm.position.set(lx + 0.1, 0.98, lz + 0.26);
   group.add(warm);
-  // Кресло дежурного.
-  chair(ctx, cx + 0.2, z0 + 0.62, Math.PI);
+  // Кресло дежурного и сама дежурная: лицом к столу, печатает.
+  chair(ctx, cx + 0.2, z0 + 1.2, Math.PI);
+  person(ctx, cx + 0.2, z0 + 1.16, Math.PI, 0, 'type');
 }
 
 /** Кадка с фикусами и скамья вдоль неё. */
@@ -458,6 +461,15 @@ export function waiting(ctx: Ctx, x0: number, z0: number, x1: number, z1: number
       kit.box(m.metal, sx - 0.02, 0.58, zr - 0.2, sx + 0.03, 0.61, zr + 0.18);
     }
   }
+  // Посетители: двое ждут, один читает.
+  const sit = (row: number, i: number, kind: number, act: 'idle' | 'read'): void => {
+    if (i >= seats) return;
+    const zr = row > 0 ? zc + 0.42 : zc - 0.42;
+    person(ctx, x0 + 0.43 + i * 0.62, zr - 0.04 * row, row > 0 ? 0 : Math.PI, kind, act);
+  };
+  sit(1, 1, 1, 'read');
+  sit(1, 3, 2, 'idle');
+  sit(-1, 2, 3, 'idle');
   // Забытое: газета, плащ, портфель, стакан.
   kit.add(new BoxGeometry(1, 1, 1), L.docs[1] ?? m.paper, x0 + 0.45, 0.48, zc + 0.45, 0.34, 0.01, 0.46, 0, 0.4);
   kit.add(new BoxGeometry(1, 1, 1), m.fabric, x0 + 1.7, 0.6, zc - 0.42, 0.5, 0.25, 0.4, 0.3, 0.2);
@@ -542,4 +554,73 @@ export function board(ctx: Ctx, x: number, y: number, wd: number, ht: number): v
     kit.add(new BoxGeometry(1, 1, 1), mat, px, py, 1.065 + i * 0.002, 0.26, 0.36, 0.004, 0, 0, (rng.float() - 0.5) * 0.15);
     kit.sphere(i % 3 === 0 ? m.signLit : m.metal, px, py + 0.15, 1.075 + i * 0.002, 0.025, 0.025, 0.02);
   }
+}
+
+// --- Люди --------------------------------------------------------------------
+
+/** Гражданская одежда: плащ, костюм, кардиган, форма дежурной. */
+const CLOTHES = [0x3d4450, 0x6b5a46, 0x4b5a4e, 0x7a6e5c];
+const SKINS = [0xc9a98f, 0xb88f74, 0xd8bca6, 0xa77d63];
+let peopleMats: { suit: MeshStandardMaterial[]; skin: MeshStandardMaterial[]; shoe: MeshStandardMaterial } | null = null;
+
+/**
+ * Сидящий человек: ещё не заражён, просто ждёт. Ставится только на
+ * сплошные клетки — в кресло зала ожидания или за стойку, — чтобы сквозь
+ * него нельзя было пройти. Живёт: дышит, поворачивает голову, печатает
+ * или листает.
+ */
+export function person(ctx: Ctx, x: number, z: number, ry: number, kind: number, act: 'idle' | 'read' | 'type'): void {
+  if (peopleMats === null) {
+    peopleMats = {
+      suit: CLOTHES.map((c) => new MeshStandardMaterial({ color: c, roughness: 0.85 })),
+      skin: SKINS.map((c) => new MeshStandardMaterial({ color: new Color(c).multiplyScalar(0.85), roughness: 0.88 })),
+      shoe: new MeshStandardMaterial({ color: 0x17161a, roughness: 0.6 }),
+    };
+  }
+  const pm = peopleMats;
+  const suit = pm.suit[kind % pm.suit.length] ?? pm.shoe;
+  const skin = pm.skin[(kind * 3 + 1) % pm.skin.length] ?? pm.shoe;
+  const rig = new Rig({ height: 1.8, shoulder: 0.27, hunch: 0.12, headSink: 0, head: 1, bulk: 1.05, arm: 1, seated: true }, { suit, skin, shoe: pm.shoe });
+  rig.root.position.set(x, 0, z);
+  rig.root.rotation.y = ry;
+  ctx.group.add(rig.root);
+  // Волосы: тёмная шапка, у второго — седые.
+  const hair = new Mesh(new SphereGeometry(0.5, 14, 10), new MeshStandardMaterial({ color: kind % 2 === 0 ? 0x2a211b : 0x8f8a84, roughness: 0.8 }));
+  hair.scale.set(0.23, 0.17, 0.25);
+  hair.position.set(0, 0.04, -0.02);
+  rig.head.add(hair);
+  ctx.owned.push(hair.geometry, hair.material as MeshStandardMaterial);
+  if (act === 'read') {
+    const paper = new Mesh(new BoxGeometry(0.5, 0.36, 0.01), ctx.L.docs[1] ?? ctx.m.paper);
+    paper.position.set(0, -0.06, 0.05);
+    paper.rotation.x = -0.3;
+    rig.handR.add(paper);
+    ctx.owned.push(paper.geometry);
+  }
+  shadeAll(rig.root);
+  const phase = kind * 1.7;
+  ctx.ticks.push((t) => {
+    rig.pose({ phase: 0, amp: 0, time: t + phase, aim: false });
+    // Голова: изредка поворачивается, у читающего опущена в газету.
+    const look = Math.sin(t * 0.23 + phase) > 0.6 ? Math.sin(t * 0.9 + phase) * 0.6 : 0;
+    rig.head.rotation.y = act === 'read' ? 0 : look;
+    rig.head.rotation.x = act === 'read' ? 0.35 : act === 'type' ? 0.2 : 0;
+    if (act === 'type') {
+      // Печатает: руки на столе, кисти мелко ходят.
+      rig.shoulderL.rotation.x = -1.1;
+      rig.shoulderR.rotation.x = -1.1;
+      rig.elbowL.rotation.x = -0.7 + Math.sin(t * 14 + phase) * 0.05;
+      rig.elbowR.rotation.x = -0.7 + Math.sin(t * 13 + phase + 1) * 0.05;
+    } else if (act === 'read') {
+      rig.shoulderL.rotation.x = -0.9;
+      rig.shoulderR.rotation.x = -0.9;
+      rig.elbowL.rotation.x = -1.0;
+      rig.elbowR.rotation.x = -1.0;
+    } else {
+      rig.shoulderL.rotation.x = -0.5;
+      rig.shoulderR.rotation.x = -0.5;
+      rig.elbowL.rotation.x = -1.1;
+      rig.elbowR.rotation.x = -1.1;
+    }
+  });
 }

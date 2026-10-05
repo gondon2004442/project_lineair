@@ -17,4 +17,9 @@ export interface Renderer {
   screenToWorld(sx: number, sy: number): { x: number; y: number };
   layout(): void;
   draw(w: World, alpha: number): void;
+  /**
+   * Звуки, которые родились в кадре, а не в симуляции: шаги. Точка входа
+   * забирает их после отрисовки, как забирает w.sounds после шага.
+   */
+  events?: string[];
 }

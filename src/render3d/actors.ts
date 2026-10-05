@@ -49,7 +49,7 @@ import { counterInReach } from '../systems/counter';
 import { grabCandidate } from '../systems/telekinesis';
 import { dashIFrameWindow, dashSpec } from '../systems/playerControl';
 import type { QuadBatch } from './batch';
-import { Rig, type RigSpec } from './rig';
+import { Rig, shadeAll, type RigSpec } from './rig';
 import type { Materials } from './materials';
 
 /** Пиксели мира → клетки. */
@@ -90,6 +90,8 @@ interface View {
 }
 
 export interface Batches {
+  /** Пыль из-под ног: мягкие пятна, растут и тают. */
+  puff: QuadBatch;
   /** Пятна на полу: лужи, щитки, кольца. Под пересчётом красного. */
   decal: QuadBatch;
   /** Аддитивные ореолы: заражение, субъект, снаряды. */
@@ -100,6 +102,8 @@ export interface Batches {
 
 export interface FrameInfo {
   alpha: number;
+  /** Пол мягкий: ковролин глушит шаг. */
+  soft: boolean;
   time: number;
   /** Цвет кожи субъекта: красный, а в заседании — почти белый. */
   skin: number;
@@ -126,6 +130,11 @@ export class Actors {
   private readonly up = new Vector3(0, 1, 0);
   /** Узел субъекта — его же рисуют второй раз поверх пересчёта. */
   playerRoot: Object3D | null = null;
+  /** Звуки кадра: шаги. Забирает рендер. */
+  readonly events: string[] = [];
+  private readonly puffs: { x: number; z: number; t: number; size: number; life: number }[] = [];
+  private lastStep = 0;
+  private lastPuff = 0;
 
   constructor(private readonly m: Materials) {
     const glowMat = new MeshBasicMaterial({ color: 0xffffff });
@@ -178,6 +187,7 @@ export class Actors {
       if (view === undefined || view.key !== key) {
         if (view !== undefined) this.drop(e);
         view = this.build(w, e, key, draw.size * U, draw.color);
+        shadeAll(view.root);
         this.views.set(e, view);
         this.group.add(view.root);
       }
@@ -191,6 +201,7 @@ export class Actors {
 
     this.service(w, f, b, candidate, held);
     this.bullets(w, f, b);
+    this.dust(f, b);
   }
 
   // --- Ключ и сборка ---------------------------------------------------------
@@ -838,6 +849,18 @@ export class Actors {
     }
     view.legYaw = (view.legYaw ?? 0) + (legYaw - (view.legYaw ?? 0)) * 0.25;
     view.rig?.pose({ phase: phase * dir, amp, time: f.time, aim: true, dash, legYaw: view.legYaw });
+    // Шаг: каждая половина цикла — нога на полу. Звук и пылинка из-под неё.
+    const stepIdx = Math.floor(view.walk / stride);
+    if (!dash && amp > 0.35 && stepIdx !== this.lastStep) {
+      this.events.push(f.soft ? 'step_soft' : 'step');
+      if (!f.soft) this.puffs.push({ x, z, t: f.time, size: 0.25, life: 0.5 });
+    }
+    this.lastStep = stepIdx;
+    // Рывок поднимает пыль полосой за собой.
+    if (dash && f.time - this.lastPuff > 0.03) {
+      this.lastPuff = f.time;
+      this.puffs.push({ x: x + (Math.random() - 0.5) * 0.2, z: z + (Math.random() - 0.5) * 0.2, t: f.time, size: 0.5, life: 0.9 });
+    }
     if (view.rimMat !== undefined) view.rimMat.visible = !f.hiss;
 
     // Призраки рывка.
@@ -1133,6 +1156,20 @@ export class Actors {
       default:
         break;
     }
+  }
+
+  /** Пыль: растёт и тает. Старое выбрасывается. */
+  private dust(f: FrameInfo, b: Batches): void {
+    let keep = 0;
+    for (const p of this.puffs) {
+      const age = f.time - p.t;
+      if (age < 0 || age > p.life) continue;
+      this.puffs[keep++] = p;
+      const k = age / p.life;
+      const r = p.size * (0.6 + k * 1.6);
+      b.puff.flat(p.x, p.z, r, r, 0.04 + k * 0.2, PALETTE.concrete300, 0.55 * (1 - k) * (1 - k));
+    }
+    this.puffs.length = keep;
   }
 
   // --- Снаряды ---------------------------------------------------------------

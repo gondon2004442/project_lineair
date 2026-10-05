@@ -1392,7 +1392,7 @@ export const TUNING = {
     /** Свечение: сила, радиус, порог. */
     bloomStrength: 0.45,
     bloomRadius: 0.4,
-    bloomThreshold: 1.05,
+    bloomThreshold: 1.3,
     /** Затенение в углах: 1 — включено. */
     ao: 1,
     aoRadius: 0.5,

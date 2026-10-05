@@ -41,6 +41,7 @@ import { TUNING } from '../tuning';
 import { beamMaterial } from './beam';
 import { GeoBuilder } from './geo';
 import { Kit } from './kit';
+import { shadeAll } from './rig';
 import { additive, type Materials } from './materials';
 import {
   archive,
@@ -846,6 +847,7 @@ export function buildDressed(w: World, m: Materials): RoomView {
   floorMesh.receiveShadow = true;
   group.add(floorMesh);
   for (const mesh of kit.build(group)) owned.push(mesh.geometry);
+  shadeAll(group);
   if ('shadowSide' in t.wall) (t.wall as Material).shadowSide = DoubleSide;
 
   return {
