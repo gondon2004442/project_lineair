@@ -35,8 +35,11 @@ import {
   Vector2,
   Vector3,
   WebGLRenderer,
+  type Object3D,
 } from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
+import { Reflection } from './reflect';
 import type { World } from '../ecs';
 import type { Renderer } from '../renderer';
 import { PALETTE } from '../palette';
@@ -58,7 +61,8 @@ const LIGHTS = 8;
 const SUBJECT_LAYER = 1;
 
 export async function createRenderer3D(host: HTMLElement): Promise<Renderer> {
-  const gl = new WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+  const gl = new WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  RectAreaLightUniformsLib.init();
   gl.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
   gl.outputColorSpace = SRGBColorSpace;
   gl.toneMapping = ACESFilmicToneMapping;
@@ -91,14 +95,15 @@ export async function createRenderer3D(host: HTMLElement): Promise<Renderer> {
   const hemi = new HemisphereLight(0x9aa4ae, 0x17191c, TUNING.view3d.ambient);
   const key = new DirectionalLight(TUNING.view3d.keyColor, TUNING.view3d.key);
   key.castShadow = true;
-  key.shadow.mapSize.set(2048, 2048);
+  key.shadow.mapSize.set(4096, 4096);
+  key.shadow.radius = 3;
   key.shadow.bias = -0.0004;
   key.shadow.normalBias = 0.025;
   const sc = key.shadow.camera;
-  sc.left = -24;
-  sc.right = 24;
-  sc.top = 24;
-  sc.bottom = -24;
+  sc.left = -21;
+  sc.right = 21;
+  sc.top = 21;
+  sc.bottom = -21;
   sc.near = 1;
   sc.far = 120;
   scene.add(hemi, key, key.target);
@@ -182,7 +187,10 @@ export async function createRenderer3D(host: HTMLElement): Promise<Renderer> {
   const actors = new Actors(m);
   scene.add(actors.group);
 
-  const post = createPost(gl, scene, camera, [keyBeam, dust, decal.mesh, glow.mesh]);
+  const aoHidden: Object3D[] = [keyBeam, dust, decal.mesh, glow.mesh];
+  const aoBase = aoHidden.length;
+  const post = createPost(gl, scene, camera, aoHidden);
+  const reflection = new Reflection(gl, m);
 
   // --- Состояние кадра ----------------------------------------------------------
   let room: RoomView | null = null;
@@ -281,6 +289,9 @@ export async function createRenderer3D(host: HTMLElement): Promise<Renderer> {
     }
     room = buildRoom(w, m);
     scene.add(room.group, room.fx);
+    aoHidden.length = aoBase;
+    aoHidden.push(room.fx, ...room.aoHidden);
+    reflection.setFloors(room.floors);
     for (const lamp of room.lamps) lamp.beam.renderOrder = 5;
   }
 
@@ -362,6 +373,20 @@ export async function createRenderer3D(host: HTMLElement): Promise<Renderer> {
       hemi.intensity = v.ambient * (dark ? 0.08 : 1);
       scene.environmentIntensity = v.env * (dark ? 0.15 : 1);
       gl.toneMappingExposure = v.exposure;
+      // Помещение со своим светом: солнце в окна вместо общего ключевого.
+      const own = room?.look?.();
+      if (own !== undefined) {
+        const saz = (own.sun.az * Math.PI) / 180;
+        const sel = (own.sun.el * Math.PI) / 180;
+        toLight.set(Math.sin(saz) * Math.cos(sel), Math.sin(sel), -Math.cos(saz) * Math.cos(sel));
+        key.position.copy(key.target.position).addScaledVector(toLight, 60);
+        key.intensity = own.sun.intensity;
+        key.color.setHex(own.sun.color);
+        hemi.intensity = own.sky;
+        scene.environmentIntensity = own.env;
+        gl.toneMappingExposure = own.exposure;
+      }
+      room?.tick?.(time);
       (scene.fog as FogExp2).density = v.fog;
 
       // Косой луч ключевого света: столб из-за левого верхнего угла на пол.
@@ -371,7 +396,7 @@ export async function createRenderer3D(host: HTMLElement): Promise<Renderer> {
       keyBeam.quaternion.copy(quat);
       keyBeamMat.uniforms['uIntensity']!.value = v.keyBeam * dim;
       keyBeamMat.uniforms['uTime']!.value = time;
-      keyBeam.visible = v.keyBeam > 0 && !dark;
+      keyBeam.visible = v.keyBeam > 0 && !dark && own === undefined;
 
       // Пул точечного света.
       let slot = 0;
@@ -508,6 +533,9 @@ export async function createRenderer3D(host: HTMLElement): Promise<Renderer> {
       profiler.begin('КАДР: СЦЕНА');
       gl.shadowMap.needsUpdate = true;
       post.composer.render(frame);
+      // Отражение пола снимается после кадра, на готовых тенях, и идёт в
+      // следующий: запаздывание на кадр глазу не видно, а тени не считаются дважды.
+      reflection.render(scene, camera, v.reflect, [decal.mesh, glow.mesh, dust, keyBeam, ...(room?.fx.children ?? [])]);
       // Поверх пересчёта: субъект и служебный слой. Субъект в заседании не
       // пересчитан, а подменён; жёлтое остаётся жёлтым.
       gl.autoClear = false;

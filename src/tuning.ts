@@ -1401,6 +1401,33 @@ export const TUNING = {
     grain: 0.045,
     /** Плотность воздуха: дальняя часть помещения тонет в дымке. */
     fog: 0.01,
+    /** Отражения в полу: сила зеркала поверх шероховатости. */
+    reflect: 0.5,
+  },
+
+  /**
+   * ВЕСТИБЮЛЬ В ОБЪЁМЕ. Показательное помещение: дневной свет из окон
+   * дальней стены, светильники под потолком, натёртый пол.
+   */
+  lobby3d: {
+    /** Солнце за окнами: сила, азимут, высота над горизонтом. */
+    sun: 16,
+    sunAzimuth: 14,
+    sunElevation: 31,
+    sunColor: 0xffeedb,
+    /** Рассеянный свет помещения. */
+    sky: 0.16,
+    /** Потолочные светильники. */
+    area: 1.7,
+    /** Отражения окружения. */
+    env: 0.3,
+    exposure: 0.95,
+    /** Плотность лучей из окон. */
+    shafts: 0.13,
+    /** Свечение стекла окон. */
+    window: 0.85,
+    /** Мягкий верхний свет с тенью: от него под мебелью ложатся пятна. */
+    fill: 13,
   },
 
   render: {
@@ -1764,6 +1791,22 @@ export interface TuningGroup {
 }
 
 export const PANEL: TuningGroup[] = [
+  {
+    title: 'ВИД 3D: ВЕСТИБЮЛЬ',
+    fields: [
+      { path: 'lobby3d.sun', label: 'СОЛНЦЕ', min: 0, max: 30, step: 0.5 },
+      { path: 'lobby3d.sunAzimuth', label: 'СОЛНЦЕ: АЗИМУТ', min: -60, max: 60, step: 1 },
+      { path: 'lobby3d.sunElevation', label: 'СОЛНЦЕ: ВЫСОТА', min: 10, max: 70, step: 1 },
+      { path: 'lobby3d.sky', label: 'РАССЕЯННЫЙ', min: 0, max: 2, step: 0.01 },
+      { path: 'lobby3d.area', label: 'СВЕТИЛЬНИКИ', min: 0, max: 20, step: 0.1 },
+      { path: 'lobby3d.env', label: 'ОТРАЖЕНИЯ', min: 0, max: 2, step: 0.01 },
+      { path: 'lobby3d.exposure', label: 'ЭКСПОЗИЦИЯ', min: 0.2, max: 3, step: 0.01 },
+      { path: 'lobby3d.shafts', label: 'ЛУЧИ ИЗ ОКОН', min: 0, max: 0.6, step: 0.005 },
+      { path: 'lobby3d.window', label: 'СВЕЧЕНИЕ ОКОН', min: 0, max: 8, step: 0.1 },
+      { path: 'lobby3d.fill', label: 'ВЕРХНИЙ СВЕТ С ТЕНЬЮ', min: 0, max: 120, step: 1 },
+      { path: 'view3d.reflect', label: 'ЗЕРКАЛО ПОЛА', min: 0, max: 1.5, step: 0.01 },
+    ],
+  },
   {
     title: 'ВИД 3D',
     fields: [

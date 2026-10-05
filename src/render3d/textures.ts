@@ -371,3 +371,182 @@ export function hazard(yellow: number, black: number): Texture {
   ctx.putImageData(img, 0, 0);
   return wrap(new CanvasTexture(c), true);
 }
+
+// --- Вестибюль -------------------------------------------------------------
+
+/**
+ * Терраццо: светлый камень с крошкой, крупные плиты 2×2 клетки. Пол
+ * вестибюля натёрт до блеска — в нём отражаются окна и люди.
+ */
+export function terrazzo(): PbrSet {
+  const size = 512;
+  const slab = size / 2;
+  return build(size, 1.2, (x, y) => {
+    const cloud = fbm(x, y, size, 3, 4, 201);
+    const chip = hash(Math.floor(x / 3), Math.floor(y / 3), 203);
+    const chip2 = hash(Math.floor(x / 5), Math.floor(y / 5), 207);
+    const wear = fbm(x, y, size, 5, 3, 209);
+    const gx = x % slab;
+    const gy = y % slab;
+    const seam = Math.max(groove(gx, 1.3), groove(gx - slab, 1.3), groove(gy, 1.3), groove(gy - slab, 1.3));
+    const tone = (hash(Math.floor(x / slab), Math.floor(y / slab), 211) - 0.5) * 0.04;
+    let r = 168;
+    let g = 171;
+    let b = 172;
+    // Крошка: тёмная, светлая и редкая тёплая.
+    if (chip > 0.93) {
+      r = 92; g = 96; b = 101;
+    } else if (chip > 0.86) {
+      r = 228; g = 229; b = 228;
+    } else if (chip2 > 0.965) {
+      r = 168; g = 150; b = 128;
+    }
+    const k = (0.94 + (cloud - 0.5) * 0.08 + tone) * (1 - seam * 0.55);
+    return {
+      h: 0.6 - seam * 0.5 + (chip > 0.93 ? 0.03 : 0),
+      r: r * k,
+      g: g * k,
+      b: b * k,
+      rough: 0.16 + wear * 0.16 + seam * 0.5,
+    };
+  });
+}
+
+/** Штукатурка: тёплая белая с едва заметной неровностью валика. */
+export function plaster(): PbrSet {
+  const size = 512;
+  return build(size, 1.6, (x, y) => {
+    const roll = fbm(x, y * 0.4, size, 8, 3, 221);
+    const fine = fbm(x, y, size, 64, 2, 223);
+    const stain = fbm(x, y, size, 3, 3, 227);
+    const k = 0.95 + (roll - 0.5) * 0.06 + (fine - 0.5) * 0.04 - (stain > 0.68 ? (stain - 0.68) * 0.25 : 0);
+    return { h: 0.5 + roll * 0.1 + fine * 0.15, r: 214 * k, g: 211 * k, b: 204 * k, rough: 0.88 };
+  });
+}
+
+/** Полированный гранит: цоколь, столешницы, ступени. */
+export function granite(): PbrSet {
+  const size = 256;
+  return build(size, 0.6, (x, y) => {
+    const grain = hash(Math.floor(x / 2), Math.floor(y / 2), 231);
+    const cloud = fbm(x, y, size, 4, 4, 233);
+    let v = 40 + cloud * 18;
+    if (grain > 0.9) v += 45;
+    else if (grain < 0.08) v -= 14;
+    return { h: 0.5, r: v, g: v * 1.02, b: v * 1.06, rough: 0.14 + cloud * 0.08 };
+  });
+}
+
+/** Крашеный металл: шкафчики и батареи. Краска с потёртостями. */
+export function paintedMetal(base: number): PbrSet {
+  const size = 256;
+  const [br, bg, bb] = rgbOf(base);
+  return build(size, 0.9, (x, y) => {
+    const orange = fbm(x, y, size, 32, 2, 241);
+    const scratch = fbm(x * 0.2, y * 6, size, 8, 3, 243);
+    const chip = fbm(x, y, size, 12, 3, 247);
+    const bare = chip > 0.74 ? 1 : 0;
+    const k = 0.93 + orange * 0.08 + (scratch > 0.7 ? 0.06 : 0);
+    return {
+      h: 0.5 + orange * 0.06 - bare * 0.2,
+      r: bare ? 120 : br * k,
+      g: bare ? 124 : bg * k,
+      b: bare ? 128 : bb * k,
+      rough: bare ? 0.35 : 0.48 + orange * 0.12,
+    };
+  });
+}
+
+/** Рисованная текстура: canvas со своим рисунком. */
+export function painted(width: number, height: number, draw: (ctx: CanvasRenderingContext2D) => void): CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = width;
+  c.height = height;
+  const ctx = c.getContext('2d');
+  if (ctx === null) throw new Error('2D-контекст недоступен');
+  draw(ctx);
+  const t = new CanvasTexture(c);
+  t.colorSpace = SRGBColorSpace;
+  t.anisotropy = 8;
+  return t;
+}
+
+/** Циферблат служебных часов: белый, чёрные риски, без цифр. */
+export function clockFace(): CanvasTexture {
+  return painted(256, 256, (ctx) => {
+    ctx.fillStyle = '#e9e7e1';
+    ctx.beginPath();
+    ctx.arc(128, 128, 126, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#1c1d1f';
+    for (let i = 0; i < 60; i++) {
+      const a = (i / 60) * Math.PI * 2;
+      const long = i % 5 === 0;
+      ctx.lineWidth = long ? 7 : 2;
+      const r0 = long ? 92 : 104;
+      ctx.beginPath();
+      ctx.moveTo(128 + Math.cos(a) * r0, 128 + Math.sin(a) * r0);
+      ctx.lineTo(128 + Math.cos(a) * 114, 128 + Math.sin(a) * 114);
+      ctx.stroke();
+    }
+  });
+}
+
+/** Лист служебной бумаги: шапка, строки машинописи, печать. */
+export function documentSheet(seed: number): CanvasTexture {
+  return painted(128, 176, (ctx) => {
+    ctx.fillStyle = '#dcdcd6';
+    ctx.fillRect(0, 0, 128, 176);
+    ctx.fillStyle = '#2a2c2f';
+    ctx.fillRect(12, 12, 70 + (seed % 3) * 10, 8);
+    for (let i = 0; i < 14; i++) {
+      const w = 60 + hash(i, seed, 251) * 44;
+      ctx.globalAlpha = 0.55;
+      ctx.fillRect(12, 34 + i * 9, w, 3);
+    }
+    ctx.globalAlpha = 0.5;
+    ctx.strokeStyle = '#3d4552';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(92, 150, 14, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  });
+}
+
+/** Экран терминала: тёмное стекло, зелёные строки, рамка развёртки. */
+export function terminalScreen(): CanvasTexture {
+  const t = painted(256, 192, (ctx) => {
+    ctx.fillStyle = '#071008';
+    ctx.fillRect(0, 0, 256, 192);
+    ctx.fillStyle = '#7dff9a';
+    for (let i = 0; i < 16; i++) {
+      const w = 40 + hash(i, 3, 261) * 170;
+      ctx.globalAlpha = 0.75;
+      ctx.fillRect(14, 12 + i * 10, w, 5);
+    }
+    ctx.globalAlpha = 0.18;
+    ctx.fillStyle = '#000000';
+    for (let y = 0; y < 192; y += 3) ctx.fillRect(0, y, 256, 1);
+    ctx.globalAlpha = 1;
+  });
+  t.wrapS = RepeatWrapping;
+  t.wrapT = RepeatWrapping;
+  return t;
+}
+
+/** Плакат: служебная графика без слов — плашки, полосы, круг. */
+export function poster(seed: number): CanvasTexture {
+  return painted(128, 180, (ctx) => {
+    ctx.fillStyle = '#c9c7bf';
+    ctx.fillRect(0, 0, 128, 180);
+    ctx.fillStyle = '#25272a';
+    ctx.fillRect(10, 10, 108, 54);
+    ctx.fillStyle = seed % 2 === 0 ? '#e8b923' : '#8a8f96';
+    ctx.beginPath();
+    ctx.arc(64, 108, 26, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#25272a';
+    for (let i = 0; i < 4; i++) ctx.fillRect(14, 146 + i * 7, 60 + hash(i, seed, 271) * 40, 3);
+  });
+}

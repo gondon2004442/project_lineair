@@ -15,6 +15,7 @@ import {
   MeshStandardMaterial,
   PlaneGeometry,
   type Material,
+  type Object3D,
 } from 'three';
 import type { World } from '../ecs';
 import { PALETTE } from '../palette';
@@ -28,6 +29,7 @@ import { TUNING } from '../tuning';
 import { beamMaterial } from './beam';
 import { FACE, GeoBuilder } from './geo';
 import { additive, type Materials } from './materials';
+import { buildLobby } from './lobby';
 
 export interface Lamp {
   x: number;
@@ -41,12 +43,32 @@ export interface Lamp {
   panel: Mesh;
 }
 
+/**
+ * Свет, который помещение задаёт само. Пусто — общий ключевой свет из
+ * крутилок «ВИД 3D».
+ */
+export interface RoomLook {
+  /** Солнце за окнами вместо общего ключевого света. */
+  sun: { az: number; el: number; intensity: number; color: number };
+  sky: number;
+  env: number;
+  exposure: number;
+}
+
 export interface RoomView {
   group: Group;
   /** Лучи и пятна света: рисуются отдельным проходом, мимо затенения углов. */
   fx: Group;
   lamps: Lamp[];
   warm: boolean;
+  /** Полы: их прячут, когда снимают отражение. */
+  floors: Mesh[];
+  /** То, чего не должно быть в буфере затенения углов. */
+  aoHidden: Object3D[];
+  /** Читается каждый кадр: крутилки меняют свет на живую. */
+  look?: () => RoomLook;
+  /** Живое помещения: часы, мерцание экрана, ветер в листьях. */
+  tick?(time: number): void;
   dispose(): void;
 }
 
@@ -59,6 +81,7 @@ const WALL_MOUNT_HEIGHT: Record<string, number> = {
 };
 
 export function buildRoom(w: World, m: Materials): RoomView {
+  if (w.scene === 'lobby') return buildLobby(w, m);
   const v = TUNING.view3d;
   const map = w.map;
   const group = new Group();
@@ -544,16 +567,19 @@ export function buildRoom(w: World, m: Materials): RoomView {
   }
 
   // --- Сборка мешей ---------------------------------------------------------------
-  const add = (b: GeoBuilder, mat: Material, cast = true): void => {
-    if (b.empty) return;
+  const floors: Mesh[] = [];
+  const add = (b: GeoBuilder, mat: Material, cast = true): Mesh | null => {
+    if (b.empty) return null;
     const geo = b.build();
     owned.push(geo);
     const mesh = new Mesh(geo, mat);
     mesh.castShadow = cast;
     mesh.receiveShadow = true;
     group.add(mesh);
+    return mesh;
   };
-  add(floor, warm ? m.carpet : m.floor, false);
+  const floorMesh = add(floor, warm ? m.carpet : m.floor, false);
+  if (floorMesh !== null) floors.push(floorMesh);
   add(concrete, warm ? m.wallWarm : m.wall);
   add(tops, m.wallTop);
   add(wood, m.wood);
@@ -574,6 +600,8 @@ export function buildRoom(w: World, m: Materials): RoomView {
     fx,
     lamps,
     warm,
+    floors,
+    aoHidden: [],
     dispose() {
       for (const o of owned) o.dispose();
     },
