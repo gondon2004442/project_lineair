@@ -10,6 +10,7 @@ import { createInput } from './input';
 import { createPanel } from './panel';
 import { profiler } from './profiler';
 import { createRenderer } from './render';
+import { createRenderer3D } from './render3d';
 import { grantItem, pickItem, synergyFactor } from './paperwork';
 import { makeRng, resolveSeed, seedPinned } from './rng';
 import { step } from './step';
@@ -57,7 +58,9 @@ async function boot(): Promise<void> {
     throw new Error('Разметка оверлея не найдена');
   }
 
-  const renderer = await createRenderer(host);
+  // Тестовая ветка визуала: по умолчанию объём, плоский вид — по ?view=2d.
+  const flat = new URLSearchParams(window.location.search).get('view') === '2d';
+  const renderer = flat ? await createRenderer(host) : await createRenderer3D(host);
   const input = createInput(renderer.app.canvas);
   const hud = createHud(hudLeft, hudRight, hudMap, hudDossier, hudProfile, hudBanner);
   const audio = createAudio();

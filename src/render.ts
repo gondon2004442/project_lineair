@@ -5,6 +5,7 @@
  */
 import { Application, BlurFilter, Container, Graphics } from 'pixi.js';
 import type { World } from './ecs';
+import type { Renderer } from './renderer';
 import { createAberration, createDust, createHiss, drawSmoke, type WarpSource } from './fx';
 import { PALETTE } from './palette';
 import { makeRng } from './rng';
@@ -27,13 +28,7 @@ import { FIXTURES_BY_ID } from './data/fixtures';
 import { TEMPLATES_BY_ID } from './data/roomTemplates';
 import { ROOM_HEIGHT, ROOM_WIDTH, STEP, TUNING } from './tuning';
 
-export interface Renderer {
-  app: Application;
-  showHitboxes: boolean;
-  screenToWorld(sx: number, sy: number): { x: number; y: number };
-  layout(): void;
-  draw(w: World, alpha: number): void;
-}
+export type { Renderer };
 
 export async function createRenderer(host: HTMLElement): Promise<Renderer> {
   const app = new Application();

@@ -1340,6 +1340,69 @@ export const TUNING = {
     hitstopFlash: 0.14,
   },
 
+  /**
+   * ТРЁХМЕРНЫЙ ВИД (тестовая ветка визуала). Единицы здесь — клетки
+   * помещения, а не пиксели: высоты стен и тел меряются в тайлах.
+   * Логика мира про эти числа не знает — это только кадр.
+   */
+  view3d: {
+    /** Наклон камеры от горизонта, градусы. 90 — строго сверху. */
+    pitch: 58,
+    /** Угол обзора, градусы. Меньше — ближе к ортографии. */
+    fov: 24,
+    /** Запас кадра вокруг помещения. */
+    margin: 1.03,
+    /** Камера чуть ведётся за прицелом: доля расстояния до курсора. */
+    lookahead: 0.035,
+    /** Высота внешних стен, клеток. */
+    wallHeight: 3.4,
+    /** Высота внутренних стен планировки. */
+    innerWallHeight: 2.1,
+    /** Ближняя к камере стена срезана, иначе она закрывает помещение. */
+    southWallHeight: 0.32,
+    /** Высота проёма до перемычки. */
+    doorHeight: 2.4,
+    /** Высота обшивки и цоколя. */
+    wainscot: 1.15,
+    /** Рост сотрудника и субъекта, клеток. */
+    bodyHeight: 1.9,
+    /** Высота полёта снарядов. */
+    shotHeight: 0.95,
+    /** Ключевой свет: один жёсткий луч сверху-слева. */
+    key: 2.3,
+    keyColor: 0xe6edf5,
+    /** Азимут и высота ключевого света, градусы. */
+    keyAzimuth: -38,
+    keyElevation: 52,
+    /** Заполняющий свет неба и пола. */
+    ambient: 0.28,
+    /** Сила отражений окружения. */
+    env: 0.22,
+    /** Экспозиция тональной кривой. */
+    exposure: 0.9,
+    /** Потолочная лампа: сила точечного света и плотность луча. */
+    lampIntensity: 18,
+    lampBeam: 0.045,
+    /** Косой луч ключевого света в воздухе. */
+    keyBeam: 0.035,
+    /** Красный ореол субъекта на полу и телах вокруг. */
+    playerGlow: 2.2,
+    /** Фонарь субъекта в тёмном уровне. */
+    darkLight: 30,
+    /** Свечение: сила, радиус, порог. */
+    bloomStrength: 0.45,
+    bloomRadius: 0.4,
+    bloomThreshold: 0.9,
+    /** Затенение в углах: 1 — включено. */
+    ao: 1,
+    aoRadius: 0.5,
+    /** Виньетка и плёночное зерно. */
+    vignette: 0.5,
+    grain: 0.045,
+    /** Плотность воздуха: дальняя часть помещения тонет в дымке. */
+    fog: 0.01,
+  },
+
   render: {
     /**
      * Стена — не кладка из блоков, а одна залитая масса. Швов между
@@ -1701,6 +1764,34 @@ export interface TuningGroup {
 }
 
 export const PANEL: TuningGroup[] = [
+  {
+    title: 'ВИД 3D',
+    fields: [
+      { path: 'view3d.pitch', label: 'НАКЛОН КАМЕРЫ', min: 35, max: 90, step: 1 },
+      { path: 'view3d.fov', label: 'УГОЛ ОБЗОРА', min: 8, max: 60, step: 1 },
+      { path: 'view3d.lookahead', label: 'ВЕДЕНИЕ ЗА ПРИЦЕЛОМ', min: 0, max: 0.2, step: 0.005 },
+      { path: 'view3d.wallHeight', label: 'ВЫСОТА СТЕН', min: 0.5, max: 6, step: 0.1 },
+      { path: 'view3d.innerWallHeight', label: 'ВЫСОТА ПЕРЕГОРОДОК', min: 0.3, max: 5, step: 0.1 },
+      { path: 'view3d.southWallHeight', label: 'БЛИЖНЯЯ СТЕНА', min: 0.05, max: 3, step: 0.05 },
+      { path: 'view3d.bodyHeight', label: 'РОСТ', min: 0.6, max: 3.5, step: 0.05 },
+      { path: 'view3d.key', label: 'КЛЮЧЕВОЙ СВЕТ', min: 0, max: 8, step: 0.1 },
+      { path: 'view3d.keyAzimuth', label: 'АЗИМУТ СВЕТА', min: -180, max: 180, step: 1 },
+      { path: 'view3d.keyElevation', label: 'ВЫСОТА СВЕТА', min: 10, max: 89, step: 1 },
+      { path: 'view3d.ambient', label: 'ЗАПОЛНЕНИЕ', min: 0, max: 2, step: 0.01 },
+      { path: 'view3d.env', label: 'ОТРАЖЕНИЯ', min: 0, max: 1.5, step: 0.01 },
+      { path: 'view3d.exposure', label: 'ЭКСПОЗИЦИЯ', min: 0.2, max: 3, step: 0.01 },
+      { path: 'view3d.lampIntensity', label: 'ЛАМПЫ', min: 0, max: 100, step: 1 },
+      { path: 'view3d.lampBeam', label: 'ЛУЧИ ЛАМП', min: 0, max: 0.5, step: 0.005 },
+      { path: 'view3d.keyBeam', label: 'КОСОЙ ЛУЧ', min: 0, max: 0.4, step: 0.005 },
+      { path: 'view3d.playerGlow', label: 'ОРЕОЛ СУБЪЕКТА', min: 0, max: 10, step: 0.1 },
+      { path: 'view3d.bloomStrength', label: 'СВЕЧЕНИЕ', min: 0, max: 3, step: 0.05 },
+      { path: 'view3d.bloomThreshold', label: 'ПОРОГ СВЕЧЕНИЯ', min: 0, max: 1.5, step: 0.01 },
+      { path: 'view3d.ao', label: 'ЗАТЕНЕНИЕ УГЛОВ 0/1', min: 0, max: 1, step: 1 },
+      { path: 'view3d.vignette', label: 'ВИНЬЕТКА', min: 0, max: 1.5, step: 0.01 },
+      { path: 'view3d.grain', label: 'ЗЕРНО', min: 0, max: 0.3, step: 0.005 },
+      { path: 'view3d.fog', label: 'ДЫМКА', min: 0, max: 0.06, step: 0.001 },
+    ],
+  },
   {
     title: 'СУБЪЕКТ',
     fields: [
