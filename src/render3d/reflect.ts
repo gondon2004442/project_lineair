@@ -50,12 +50,22 @@ export class Reflection {
     this.patch(m.floor);
   }
 
-  setFloors(floors: Mesh[]): void {
-    this.floors = floors;
+  /**
+   * Полы помещения. Прятать при съёмке надо все меши с отражающим
+   * материалом, а не только главный пол: иначе пол кабинета за стеной
+   * читает тот снимок, в который его же и пишут.
+   */
+  setFloors(floors: Mesh[], root: Object3D): void {
     for (const f of floors) {
       const mat = f.material as Material;
       if ('roughness' in mat) this.patch(mat as MeshStandardMaterial);
     }
+    const all: Mesh[] = [];
+    root.traverse((o) => {
+      const mesh = o as Mesh;
+      if (mesh.isMesh === true && this.patched.has(mesh.material as Material)) all.push(mesh);
+    });
+    this.floors = all;
   }
 
   render(scene: Scene, camera: Camera, strength: number, hide: Object3D[]): void {

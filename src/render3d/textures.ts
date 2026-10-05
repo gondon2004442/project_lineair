@@ -550,3 +550,117 @@ export function poster(seed: number): CanvasTexture {
     for (let i = 0; i < 4; i++) ctx.fillRect(14, 146 + i * 7, 60 + hash(i, seed, 271) * 40, 3);
   });
 }
+
+// --- Уровни ------------------------------------------------------------------
+
+/** Линолеум картотеки: тёмный, с мелким крапом и рулонными швами. */
+export function linoleum(base: number): PbrSet {
+  const size = 512;
+  const [br, bg, bb] = rgbOf(base);
+  const strip = size / 2;
+  return build(size, 0.8, (x, y) => {
+    const speck = hash(Math.floor(x / 2), Math.floor(y / 2), 301);
+    const cloud = fbm(x, y, size, 4, 4, 303);
+    const scuff = fbm(x * 3, y * 0.5, size, 16, 2, 307);
+    const seam = Math.max(groove(x % strip, 1), groove((x % strip) - strip, 1));
+    let k = 0.92 + (cloud - 0.5) * 0.12 + (speck > 0.93 ? 0.1 : speck < 0.05 ? -0.08 : 0);
+    k *= 1 - seam * 0.4;
+    return { h: 0.5 - seam * 0.4, r: br * k, g: bg * k, b: bb * k, rough: 0.28 + scuff * 0.25 + seam * 0.3 };
+  });
+}
+
+/** Белый бетон натурной части: почти без фактуры, крупные плиты. */
+export function whiteConcrete(): PbrSet {
+  const size = 512;
+  const slab = size / 2;
+  return build(size, 0.8, (x, y) => {
+    const cloud = fbm(x, y, size, 3, 4, 311);
+    const pores = fbm(x, y, size, 48, 2, 313);
+    const seam = Math.max(groove(x % slab, 1), groove((x % slab) - slab, 1), groove(y % slab, 1), groove((y % slab) - slab, 1));
+    const k = (0.97 + (cloud - 0.5) * 0.05 - (pores > 0.8 ? 0.04 : 0)) * (1 - seam * 0.25);
+    return { h: 0.5 + pores * 0.05 - seam * 0.3, r: 236 * k, g: 236 * k, b: 233 * k, rough: 0.7 + pores * 0.1 };
+  });
+}
+
+/** Бетон бойлерной: тёмный, в масляных пятнах и ржавых потёках. */
+export function oilyConcrete(): PbrSet {
+  const size = 512;
+  const slab = size / 2;
+  return build(size, 2.4, (x, y) => {
+    const cloud = fbm(x, y, size, 4, 5, 321);
+    const oil = fbm(x, y, size, 3, 4, 323);
+    const grit = hash(x, y, 327);
+    const rust = fbm(x, y, size, 6, 3, 329);
+    const seam = Math.max(groove(x % slab, 2), groove((x % slab) - slab, 2), groove(y % slab, 2), groove((y % slab) - slab, 2));
+    let r = 92;
+    let g = 92;
+    let b = 90;
+    const k = 0.82 + cloud * 0.3 + (grit - 0.5) * 0.08 - seam * 0.3;
+    r *= k;
+    g *= k;
+    b *= k;
+    const wet = oil > 0.62 ? Math.min(1, (oil - 0.62) * 4) : 0;
+    r *= 1 - wet * 0.55;
+    g *= 1 - wet * 0.55;
+    b *= 1 - wet * 0.5;
+    if (rust > 0.72) {
+      r += 30 * (rust - 0.72) * 4;
+      g += 10 * (rust - 0.72) * 4;
+    }
+    return { h: 0.55 + cloud * 0.2 - seam * 0.5 + grit * 0.05, r, g, b, rough: 0.85 - wet * 0.6 };
+  });
+}
+
+/** Портрет: масляный парадный бюст на тёмном фоне. Лица нет — только форма. */
+export function portraitTex(seed: number): CanvasTexture {
+  return painted(128, 160, (ctx) => {
+    const bg = ['#2c2a24', '#24292b', '#2e2620'][seed % 3] ?? '#2c2a24';
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, 128, 160);
+    const g = ctx.createRadialGradient(64, 60, 4, 64, 70, 90);
+    g.addColorStop(0, 'rgba(255,240,210,0.18)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 128, 160);
+    ctx.fillStyle = '#17181a';
+    ctx.beginPath();
+    ctx.ellipse(64, 150, 52, 46, 0, Math.PI, 0);
+    ctx.fill();
+    ctx.fillStyle = ['#a88f78', '#9c8a7c', '#b09a86'][seed % 3] ?? '#a88f78';
+    ctx.beginPath();
+    ctx.ellipse(64, 64, 20, 26, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#2a2420';
+    ctx.beginPath();
+    ctx.ellipse(64, 46, 21, 12, 0, Math.PI, 0);
+    ctx.fill();
+    ctx.fillStyle = '#d8d3c8';
+    ctx.beginPath();
+    ctx.moveTo(52, 104);
+    ctx.lineTo(64, 122);
+    ctx.lineTo(76, 104);
+    ctx.fill();
+  });
+}
+
+/** Сетка-рабица: прозрачная текстура для клеток бойлерной. */
+export function meshTex(): CanvasTexture {
+  const t = painted(64, 64, (ctx) => {
+    ctx.clearRect(0, 0, 64, 64);
+    ctx.strokeStyle = 'rgba(190,195,200,1)';
+    ctx.lineWidth = 2;
+    for (let i = -64; i < 128; i += 12) {
+      ctx.beginPath();
+      ctx.moveTo(i, 0);
+      ctx.lineTo(i + 64, 64);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(i + 64, 0);
+      ctx.lineTo(i, 64);
+      ctx.stroke();
+    }
+  });
+  t.wrapS = RepeatWrapping;
+  t.wrapT = RepeatWrapping;
+  return t;
+}

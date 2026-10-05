@@ -291,7 +291,7 @@ export async function createRenderer3D(host: HTMLElement): Promise<Renderer> {
     scene.add(room.group, room.fx);
     aoHidden.length = aoBase;
     aoHidden.push(room.fx, ...room.aoHidden);
-    reflection.setFloors(room.floors);
+    reflection.setFloors(room.floors, room.group);
     for (const lamp of room.lamps) lamp.beam.renderOrder = 5;
   }
 
@@ -380,14 +380,25 @@ export async function createRenderer3D(host: HTMLElement): Promise<Renderer> {
         const sel = (own.sun.el * Math.PI) / 180;
         toLight.set(Math.sin(saz) * Math.cos(sel), Math.sin(sel), -Math.cos(saz) * Math.cos(sel));
         key.position.copy(key.target.position).addScaledVector(toLight, 60);
-        key.intensity = own.sun.intensity;
+        key.intensity = own.sun.intensity * dim;
         key.color.setHex(own.sun.color);
-        hemi.intensity = own.sky;
-        scene.environmentIntensity = own.env;
+        hemi.intensity = own.sky * (dark ? 0.3 : 1);
+        hemi.color.setHex(own.skyColor ?? 0x9aa4ae);
+        hemi.groundColor.setHex(own.groundColor ?? 0x17191c);
+        scene.environmentIntensity = own.env * (dark ? 0.3 : 1);
         gl.toneMappingExposure = own.exposure;
+      } else {
+        hemi.color.setHex(0x9aa4ae);
+        hemi.groundColor.setHex(0x17191c);
       }
       room?.tick?.(time);
-      (scene.fog as FogExp2).density = v.fog;
+      const fog = scene.fog as FogExp2;
+      fog.density = own?.fog ?? v.fog;
+      // Пустота вокруг помещения: чёрная везде, кроме натурной части.
+      const voidColor = own?.voidColor ?? 0;
+      fog.color.setHex(voidColor === 0 ? 0x030405 : voidColor);
+      gl.setClearColor(voidColor, 1);
+      const reflectNow = (own?.reflect ?? 0.5) * (v.reflect / 0.5);
 
       // Косой луч ключевого света: столб из-за левого верхнего угла на пол.
       const floorHit = new Vector3(roomW * 0.32, 0, roomD * 0.58);
@@ -526,7 +537,7 @@ export async function createRenderer3D(host: HTMLElement): Promise<Renderer> {
 
       post.ao.enabled = v.ao > 0;
       post.ao.updateGtaoMaterial({ radius: v.aoRadius, scale: 1, thickness: 1 });
-      post.bloom.strength = v.bloomStrength;
+      post.bloom.strength = v.bloomStrength * (room?.look?.().bloom ?? 1);
       post.bloom.radius = v.bloomRadius;
       post.bloom.threshold = v.bloomThreshold;
 
@@ -535,7 +546,7 @@ export async function createRenderer3D(host: HTMLElement): Promise<Renderer> {
       post.composer.render(frame);
       // Отражение пола снимается после кадра, на готовых тенях, и идёт в
       // следующий: запаздывание на кадр глазу не видно, а тени не считаются дважды.
-      reflection.render(scene, camera, v.reflect, [decal.mesh, glow.mesh, dust, keyBeam, ...(room?.fx.children ?? [])]);
+      reflection.render(scene, camera, reflectNow, [decal.mesh, glow.mesh, dust, keyBeam, ...(room?.fx.children ?? [])]);
       // Поверх пересчёта: субъект и служебный слой. Субъект в заседании не
       // пересчитан, а подменён; жёлтое остаётся жёлтым.
       gl.autoClear = false;
