@@ -194,6 +194,9 @@ export async function createRenderer3D(host: HTMLElement): Promise<Renderer> {
 
   // --- Состояние кадра ----------------------------------------------------------
   let room: RoomView | null = null;
+  /** Отладка: крупный план вместо общего кадра. Ставится из консоли. */
+  const debugView: { close: { x: number; z: number; dist: number; y?: number; pitch?: number; fov?: number } | null } = { close: null };
+  let closeWas = false;
   let roomKey = '';
   let lastWorld: World | null = null;
   let hissNow = 0;
@@ -358,6 +361,27 @@ export async function createRenderer3D(host: HTMLElement): Promise<Renderer> {
       subjectCam.projectionMatrix.copy(camera.projectionMatrix);
       subjectCam.projectionMatrixInverse.copy(camera.projectionMatrixInverse);
       subjectCam.updateMatrixWorld();
+      if (debugView.close !== null) {
+        // Отладочный крупный план: камера смотрит на точку под своим углом.
+        const c = debugView.close;
+        const pitch = ((c.pitch ?? v.pitch) * Math.PI) / 180;
+        camera.position.set(c.x, Math.sin(pitch) * c.dist, c.z + Math.cos(pitch) * c.dist);
+        camera.lookAt(c.x, c.y ?? 0.8, c.z);
+        camera.fov = c.fov ?? 30;
+        camera.near = 0.1;
+        camera.far = 200;
+        camera.updateProjectionMatrix();
+        camera.updateMatrixWorld();
+        subjectCam.position.copy(camera.position);
+        subjectCam.quaternion.copy(camera.quaternion);
+        subjectCam.projectionMatrix.copy(camera.projectionMatrix);
+        subjectCam.projectionMatrixInverse.copy(camera.projectionMatrixInverse);
+        subjectCam.updateMatrixWorld();
+        closeWas = true;
+      } else if (closeWas) {
+        closeWas = false;
+        fit();
+      }
       camRight.setFromMatrixColumn(camera.matrixWorld, 0).normalize();
       camUp.setFromMatrixColumn(camera.matrixWorld, 1).normalize();
 
@@ -565,7 +589,7 @@ export async function createRenderer3D(host: HTMLElement): Promise<Renderer> {
   };
 
   // Отладочная ручка: стенд и консоль добираются до сцены и проходов.
-  Object.defineProperty(window, 'lineair3d', { value: { gl, scene, camera, post }, configurable: true });
+  Object.defineProperty(window, 'lineair3d', { value: { gl, scene, camera, post, debugView }, configurable: true });
 
   return renderer;
 }

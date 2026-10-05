@@ -49,6 +49,7 @@ import { counterInReach } from '../systems/counter';
 import { grabCandidate } from '../systems/telekinesis';
 import { dashIFrameWindow, dashSpec } from '../systems/playerControl';
 import type { QuadBatch } from './batch';
+import { Rig, type RigSpec } from './rig';
 import type { Materials } from './materials';
 
 /** Пиксели мира → клетки. */
@@ -75,7 +76,10 @@ interface View {
   retinue?: Group;
   lamp?: MeshStandardMaterial;
   ghosts?: Mesh[];
-  rim?: Mesh;
+  rimMat?: MeshBasicMaterial;
+  rig?: Rig;
+  /** Сглаженный поворот ног относительно корпуса. */
+  legYaw?: number;
   /** Обломок: своя геометрия, её надо освободить. */
   own?: BufferGeometry[];
   seen: boolean;
@@ -287,32 +291,36 @@ export class Actors {
     view.mats.push(suit);
     const skin = this.tint(0xc8b2a6, view, 0.55);
     const hair = this.tint(0x1b1612, view, 0.8);
-    const r = s * 0.95;
-    const torso = part(view.body, CAPSULE, suit, r * 2, (H * 0.62 - r * 2) * 0.8, r * 1.5, 0, H * 0.42, 0);
-    // Ноги: два столбика под корпусом, шаг читается по ним.
-    part(view.body, CAPSULE, suit, r * 0.7, H * 0.18, r * 0.7, -r * 0.42, H * 0.17, 0);
-    part(view.body, CAPSULE, suit, r * 0.7, H * 0.18, r * 0.7, r * 0.42, H * 0.17, 0);
-    part(view.body, SPHERE, skin, r * 0.95, r * 1.05, r * 0.95, 0, H * 0.82, 0.02);
-    part(view.body, SPHERE, hair, r * 1.0, r * 0.8, r * 1.0, 0, H * 0.86, -0.04);
-    // Табельное: рука с оружием, смотрит туда же, куда прицел.
-    part(view.body, CAPSULE, suit, r * 0.45, r * 0.9, r * 0.45, r * 0.75, H * 0.55, r * 0.6, true, Math.PI / 2);
-    part(view.body, BOX, this.m.darkMetal, r * 0.32, r * 0.42, r * 1.3, r * 0.75, H * 0.57, r * 1.45);
-    // Кант: светлая обводка корпуса со спины, чтобы субъект не тонул на
-    // тёмном полу, когда цвет у него отобран.
-    const rimMat = new MeshBasicMaterial({ color: PALETTE.concrete100, side: BackSide, transparent: true, opacity: 0.85 });
-    const rim = new Mesh(CAPSULE, rimMat);
-    rim.scale.copy(torso.scale).multiplyScalar(1.09);
-    rim.position.copy(torso.position);
-    view.body.add(rim);
-    view.rim = rim;
+    const shoe = this.tint(0x141416, view, 0.5);
+    const rig = new Rig({ height: H, shoulder: s * 0.82, hunch: 0.04, headSink: 0, head: 1, bulk: 1, arm: 1 }, { suit, skin, shoe });
+    view.body.add(rig.root);
+    view.rig = rig;
+    // Волосы: тёмная шапка на затылке, собранные назад.
+    const hairCap = new Mesh(SPHERE, hair);
+    hairCap.scale.set(H * 0.13, H * 0.12, H * 0.14);
+    hairCap.position.set(0, H * 0.025, -H * 0.012);
+    hairCap.castShadow = true;
+    rig.head.add(hairCap);
+    // Табельное в правой руке: ствол вдоль кисти, смотрит туда же, куда рука.
+    part(rig.handR, BOX, this.m.darkMetal, 0.06, 0.24, 0.09, 0, -0.1, 0.02);
+    part(rig.handR, BOX, this.m.darkMetal, 0.05, 0.08, 0.14, 0, 0.0, -0.05);
+    // Кант: светлая обводка, чтобы субъект не тонул на тёмном полу.
+    const rimMat = new MeshBasicMaterial({ color: PALETTE.concrete100, side: BackSide, transparent: true, opacity: 0.7 });
+    view.rimMat = rimMat;
+    rig.root.traverse((o) => {
+      const mesh = o as Mesh;
+      if (mesh.isMesh !== true || mesh.material === rimMat) return;
+      const hull = new Mesh(mesh.geometry, rimMat);
+      hull.scale.setScalar(1.12);
+      mesh.add(hull);
+    });
     // Призраки рывка.
     view.ghosts = [];
     for (let i = 0; i < Math.max(0, TUNING.render.dashTrail); i++) {
       const gm = new MeshBasicMaterial({ color: PALETTE.red, transparent: true, opacity: 0, depthWrite: false });
       const ghost = new Mesh(CAPSULE, gm);
-      ghost.scale.set(r * 2, H * 0.55, r * 1.5);
+      ghost.scale.set(s * 1.6, H * 0.5, s * 1.2);
       ghost.visible = false;
-      view.root.parent?.add(ghost);
       view.ghosts.push(ghost);
     }
   }
@@ -321,58 +329,77 @@ export class Actors {
     const H = TUNING.view3d.bodyHeight;
     const R = TUNING.render;
     const skin = this.flesh(color, view);
+    // Форма: тёмная шерсть. Светлее у младших — у них ещё остался цвет.
+    const light = Math.min(1, ((color >> 16) & 255) / 255);
+    const suit = this.tint(new Color(0x4a515b).lerp(new Color(0x7d848c), light).getHex(), view, 0.85);
+    const shoe = this.tint(0x15161a, view, 0.9, 0);
+    const mats = { suit, skin, shoe };
     const b = view.body;
     if (desk) {
       const extra = R.deskExtra * U;
-      part(b, BOX, this.m.wood, (s + extra) * 2.2, 0.06, (s + extra) * 1.2, 0, 0.78, s + extra * 0.6);
-      part(b, BOX, this.m.darkMetal, (s + extra) * 2.0, 0.72, 0.06, 0, 0.38, s + extra * 1.1);
+      part(b, BOX, this.m.wood, (s + extra) * 2.4, 0.06, (s + extra) * 1.3, 0, 0.78, s + extra * 0.8);
+      part(b, BOX, this.m.darkMetal, (s + extra) * 2.2, 0.72, 0.06, 0, 0.38, s + extra * 1.4);
     }
+    let spec: RigSpec = { height: H * 0.95, shoulder: s * 0.85, hunch: 0.08, headSink: 0.1, head: 1, bulk: 1, arm: 1 };
+    switch (sil) {
+      case 'armed':
+        spec = { height: H, shoulder: s * 0.78, hunch: 0, headSink: 0, head: 0.95, bulk: 0.9, arm: 1.08 };
+        break;
+      case 'wide':
+        spec = { height: H * 0.92, shoulder: s * 1.55, hunch: 0.12, headSink: 0.35, head: 0.9, bulk: 1.45, arm: 0.92 };
+        break;
+      case 'bulk':
+        spec = { height: H * 1.08, shoulder: s * 1.2, hunch: 0.28, headSink: 0, head: 0, bulk: 1.7, arm: 0.85 };
+        break;
+      case 'desk':
+        spec = { height: H * 1.1, shoulder: s * 1.1, hunch: 0.04, headSink: 0.05, head: 1.1, bulk: 1.3, arm: 1 };
+        break;
+      case 'counter':
+        spec = { height: H * 0.95, shoulder: s * 1.0, hunch: 0.2, headSink: 0.2, head: 1, bulk: 1.1, arm: 1, seated: true };
+        break;
+      case 'lamp':
+        spec = { height: H * 1.15, shoulder: s * 0.55, hunch: 0, headSink: 0, head: 0, bulk: 0.75, arm: 1.2 };
+        break;
+      case 'seat':
+        spec = { height: H * 0.95, shoulder: s * 0.9, hunch: 0.1, headSink: 0.1, head: 1, bulk: 1, arm: 1, seated: true };
+        break;
+      case 'slim':
+        spec = { height: H, shoulder: s * 0.62, hunch: 0.22, headSink: 0, head: 0.88, bulk: 0.72, arm: 1.05 };
+        break;
+      default:
+        // Стажёр: сутулый, голова ушла в плечи.
+        spec = { height: H * 0.9, shoulder: s * 0.92, hunch: 0.38, headSink: 0.6, head: 1, bulk: 1.1, arm: 0.95 };
+    }
+    const rig = new Rig(spec, mats);
+    b.add(rig.root);
+    view.rig = rig;
+    const T = rig.torsoLen;
     switch (sil) {
       case 'armed': {
-        const bw = s * R.inspectorWidth;
-        part(b, CAPSULE, skin, bw * 2, H * 0.55, bw * 1.6, 0, H * 0.45, 0);
-        part(b, SPHERE, skin, s * 0.85, s * 0.95, s * 0.85, 0, H * 0.9, 0);
-        // Воротник шире плеч — его видно и в чёрном пятне.
-        const cw = s * R.collarWidth * 1.7;
-        const collar = part(b, TORUS, skin, cw, cw, cw, 0, H * 0.78, 0);
+        // Воротник шире плеч — его видно и в чёрном пятне. Штамп в руке.
+        const cw = spec.shoulder * 2.1;
+        const collar = part(rig.torso, TORUS, skin, cw, cw, cw * 0.7, 0, T * 0.98, 0);
         collar.rotation.x = Math.PI / 2;
-        const arm = new Group();
-        arm.position.set(0, H * 0.62, 0);
-        const reach = s * R.armReach;
-        const thick = s * R.armThickness;
-        part(arm, CAPSULE, skin, thick * 2, reach, thick * 2, 0, 0, reach * 0.55, true, Math.PI / 2);
-        part(arm, BOX, this.m.darkMetal, thick * 1.6, thick * 1.8, thick * 3.2, 0, 0, reach * 1.15);
-        view.root.add(arm);
-        view.arm = arm;
+        part(rig.handR, BOX, this.m.darkMetal, 0.08, 0.22, 0.1, 0, -0.1, 0);
         break;
       }
       case 'wide': {
-        const bw = s * 2;
-        part(b, BOX, skin, bw * 2, H * 0.55, s * 1.6, 0, H * 0.3, 0);
-        part(b, SPHERE, skin, s * 0.9, s * 0.9, s * 0.9, 0, H * 0.62, 0);
-        const out = s * R.registrarArmOut;
-        const arm = s * R.armThickness;
-        // По бокам картотеки выше корпуса: силуэт стола с двумя тумбами.
+        // По бокам — картотечные ящики, вросшие в руки.
         const cab = this.tint(PALETTE.furniture, view, 0.45, 0.4);
-        part(b, BOX, cab, arm * 2.4, H * 0.72, s * 1.4, -bw - out, H * 0.36, 0);
-        part(b, BOX, cab, arm * 2.4, H * 0.72, s * 1.4, bw + out, H * 0.36, 0);
+        const arm = s * R.armThickness;
+        part(rig.handL, BOX, cab, arm * 2.6, H * 0.3, s * 1.2, 0, -H * 0.12, 0);
+        part(rig.handR, BOX, cab, arm * 2.6, H * 0.3, s * 1.2, 0, -H * 0.12, 0);
         break;
       }
       case 'bulk': {
-        const shift = s * R.bulkShift;
-        const tall = s * R.bulkTall;
-        const leftW = s * R.bulkLeft;
         // Масса смещена влево, головы нет вовсе: она поглощена.
-        part(b, SPHERE, skin, leftW * 2.2, H * 1.15, leftW * 2, -shift * 0.6, H * 0.5, 0);
-        part(b, SPHERE, skin, leftW * 1.4, H * 0.6, leftW * 1.4, -shift * 0.4, H * 0.95, -s * 0.2);
-        const rw = s * R.bulkRightWidth;
-        const rh = s * R.bulkRightHeight;
-        part(b, BOX, skin, rw * 2, Math.max(tall, rh) * 1.4, rw * 2, leftW * 0.9, rh * 0.7, 0);
+        const leftW = s * R.bulkLeft;
+        part(rig.torso, SPHERE, skin, leftW * 2.3, T * 1.6, leftW * 2, -spec.shoulder * 0.7, T * 0.75, 0);
+        part(rig.torso, SPHERE, skin, leftW * 1.3, T * 1.0, leftW * 1.3, -spec.shoulder * 0.2, T * 1.15, -0.05);
+        part(rig.torso, SPHERE, skin, leftW * 0.8, T * 0.6, leftW * 0.9, spec.shoulder * 0.5, T * 1.05, 0.05);
         break;
       }
       case 'desk': {
-        part(b, BOX, skin, s * 2.1, H * 0.8, s * 1.6, 0, H * 0.42, 0);
-        part(b, SPHERE, skin, s * R.bulkHead * 2.2, s * R.bulkHead * 2.2, s * R.bulkHead * 2.2, 0, H * 0.93, 0);
         const retinue = new Group();
         const count = Math.max(0, R.chiefRetinue);
         const ring = s * R.chiefRetinueRadius;
@@ -382,59 +409,51 @@ export class Actors {
           const plate = part(retinue, BOX, this.m.signLit, mark * 2, mark, 0.04, Math.cos(a) * ring, 0, Math.sin(a) * ring, false);
           plate.rotation.y = -a + Math.PI / 2;
         }
-        retinue.position.y = H * 0.75;
+        retinue.position.y = H * 0.8;
         view.root.add(retinue);
         view.retinue = retinue;
+        // Наросты на плечах: у заведующего кожи почти не осталось.
+        part(rig.torso, SPHERE, skin, s * 0.9, s * 0.7, s * 0.9, -spec.shoulder * 0.8, T * 0.95, 0);
+        part(rig.torso, SPHERE, skin, s * 0.7, s * 0.6, s * 0.7, spec.shoulder * 0.9, T * 0.9, 0.05);
         break;
       }
       case 'counter': {
         const wide = s * R.counterDeskWide;
         const tall = s * R.counterDeskTall;
-        part(b, BOX, this.m.wood, wide * 2, 0.08, tall * 2.2, 0, 0.92, tall * 0.4);
-        part(b, BOX, this.tint(PALETTE.furniture, view, 0.5, 0.3), wide * 2, 0.88, tall * 2, 0, 0.44, tall * 0.4);
-        part(b, CAPSULE, skin, s * 1.3, H * 0.45, s * 1.1, 0, H * 0.55, -tall * 0.9);
-        part(b, SPHERE, skin, s * 0.8, s * 0.85, s * 0.8, 0, H * 0.88, -tall * 0.9);
+        part(b, BOX, this.m.wood, wide * 2, 0.08, tall * 1.4, 0, 0.92, tall * 0.9);
+        part(b, BOX, this.tint(PALETTE.furniture, view, 0.5, 0.3), wide * 2, 0.88, 0.1, 0, 0.44, tall * 1.5);
+        part(b, BOX, this.m.darkMetal, s * 1.6, 0.06, s * 1.4, 0, 0.47, 0);
         break;
       }
       case 'lamp': {
-        const wide = s * R.keeperWidth;
-        const tall = H * 1.05;
-        part(b, CYL, skin, wide * 2, tall, wide * 2, 0, tall / 2, 0);
+        // Вместо головы — фонарь: под лампой светлый, в темноте глухой.
         const lamp = new MeshStandardMaterial({ color: PALETTE.concrete700, emissive: PALETTE.yellow, emissiveIntensity: 0, roughness: 0.4 });
         view.mats.push(lamp);
         const lampSize = s * R.keeperLamp * 2.2;
-        part(b, BOX, lamp, lampSize, lampSize, lampSize, 0, tall + lampSize / 2, 0);
-        part(b, BOX, this.m.darkMetal, lampSize * 1.2, 0.05, lampSize * 1.2, 0, tall + lampSize, 0);
+        part(rig.torso, BOX, lamp, lampSize, lampSize, lampSize, 0, T + lampSize * 0.7, 0);
+        part(rig.torso, BOX, this.m.darkMetal, lampSize * 1.25, 0.05, lampSize * 1.25, 0, T + lampSize * 1.25, 0);
+        part(rig.torso, BOX, this.m.darkMetal, lampSize * 1.25, 0.05, lampSize * 1.25, 0, T + lampSize * 0.15, 0);
         view.lamp = lamp;
         break;
       }
       case 'seat': {
-        part(b, BOX, this.m.darkMetal, s * 2.2, 0.08, s * 2, 0, 0.5, 0);
-        part(b, BOX, this.m.darkMetal, s * 2.2, 0.9, 0.08, 0, 0.9, -s * 0.95);
-        part(b, CAPSULE, skin, s * 1.8, H * 0.35, s * 1.4, 0, H * 0.5, -s * 0.2);
-        part(b, SPHERE, skin, s * R.bulkHead * 2.2, s * R.bulkHead * 2.3, s * R.bulkHead * 2.2, 0, H * 0.82, -s * 0.2);
+        part(b, BOX, this.m.darkMetal, s * 2.0, 0.06, s * 1.7, 0, 0.47, -0.05);
+        part(b, BOX, this.m.darkMetal, s * 2.0, 0.85, 0.07, 0, 0.88, -s * 0.9);
+        for (const [px, pz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) part(b, BOX, this.m.darkMetal, 0.04, 0.45, 0.04, px * s * 0.9, 0.22, pz * s * 0.75);
         break;
       }
       case 'slim': {
-        const across = s * R.slimWidth;
-        const along = s * R.courierStretch;
-        part(b, CAPSULE, skin, across * 2, H * 0.6, along * 1.2, 0, H * 0.48, 0);
-        part(b, SPHERE, skin, across * 1.6, across * 1.7, across * 1.6, 0, H * 0.86, along * 0.2);
+        // Сумка через плечо: по ней видно, куда бежит.
         const bag = s * R.courierBag;
-        const out = s * R.courierBagOut;
-        part(b, BOX, this.m.fabric, bag * 2, bag * 2.4, bag * 1.4, -out, H * 0.42, 0);
+        part(rig.torso, BOX, this.m.fabric, bag * 2.2, bag * 2.2, bag * 1.1, -spec.shoulder * 1.15, T * 0.3, 0);
+        part(rig.torso, BOX, this.m.fabric, 0.03, T * 1.1, 0.03, 0, T * 0.6, spec.shoulder * 0.5);
         break;
       }
       default: {
-        // Стажёр: голова утоплена в плечи, вспухшее плечо торчит наружу.
-        const bh = s * R.sunkenSquat;
-        const bw = s * R.internWide;
-        part(b, CAPSULE, skin, bw * 2, H * 0.4, bw * 1.6, 0, H * 0.36, 0);
-        part(b, SPHERE, skin, s * 1.0, s * 0.9, s * 1.0, 0, H * 0.62, 0.05);
+        // Вспухшее плечо: заражение начинается отсюда.
         const lump = s * R.internShoulder;
-        part(b, SPHERE, skin, lump * 2.4, lump * 2.2, lump * 2.4, -bw * 0.95, H * 0.55 + bh * 0.1, 0);
-        part(b, CAPSULE, skin, s * 0.6, H * 0.15, s * 0.6, -s * 0.4, H * 0.12, 0);
-        part(b, CAPSULE, skin, s * 0.6, H * 0.15, s * 0.6, s * 0.4, H * 0.12, 0);
+        part(rig.torso, SPHERE, skin, lump * 2.6, lump * 2.3, lump * 2.4, -spec.shoulder * 1.05, T * 0.85, 0);
+        part(rig.torso, SPHERE, skin, lump * 1.4, lump * 1.2, lump * 1.4, -spec.shoulder * 0.6, T * 1.05, -0.05);
       }
     }
     void w;
@@ -643,7 +662,7 @@ export class Actors {
     }
     for (const mat of view.mats) mat.dispose();
     for (const geo of view.own ?? []) geo.dispose();
-    if (view.rim !== undefined) (view.rim.material as Material).dispose();
+    view.rimMat?.dispose();
     if (this.playerRoot === view.root) this.playerRoot = null;
     this.views.delete(e);
   }
@@ -704,16 +723,20 @@ export class Actors {
       // Шаг: подпрыгивание и наклон по ходу. Приостановленный и
       // пришитый стоят столбом.
       const still = staff.frozen > 0 || staff.pinned > 0;
-      const amp = still ? 0 : Math.min(1, speed / 60);
-      view.body.position.y = Math.abs(Math.sin(view.walk * 5.5)) * 0.06 * amp;
-      view.body.rotation.z = Math.sin(view.walk * 5.5) * 0.06 * amp;
-      view.body.rotation.x = 0.08 * amp;
-      if (view.arm !== undefined) {
-        const insp = w.inspectorC.get(e);
-        const ax = insp?.aimX ?? 1;
-        const ay = insp?.aimY ?? 0;
-        view.arm.rotation.y = Math.atan2(ax, ay) - root.rotation.y;
-      }
+      const amp = still ? 0 : Math.min(1, speed / 55);
+      // Инспектор целится: корпус и рука к линии огня, пока горит табличка.
+      const insp = w.inspectorC.get(e);
+      const aiming = insp !== undefined && (staff.plateFlash > 0 || insp.shotsLeft > 0);
+      if (aiming && insp !== undefined) root.rotation.y = Math.atan2(insp.aimX, insp.aimY);
+      const stride = Math.max(1e-6, TUNING.render.walkStride * U);
+      view.rig?.pose({
+        phase: (view.walk / stride) * Math.PI,
+        amp,
+        time: f.time + e * 0.37,
+        aim: aiming,
+        reach: staff.silhouette === 'wide',
+        still,
+      });
       if (view.retinue !== undefined) view.retinue.rotation.y = f.time * TUNING.render.chiefRetinueSpin;
       // Ореол заражения на полу.
       if (TUNING.render.staffGlowAlpha > 0) {
@@ -799,26 +822,23 @@ export class Actors {
     const amp = Math.min(1, Math.max(0, (speed - cfg.walkMinSpeed) / Math.max(1e-6, cfg.walkEase)));
     const stride = Math.max(1e-6, cfg.walkStride * U);
     const phase = (view.walk / stride) * Math.PI;
-    const body = view.body;
-    if (dash) {
-      body.scale.set(1 / cfg.dashStretch, 1 / Math.sqrt(cfg.dashStretch), cfg.dashStretch);
-      body.position.y = 0;
-      body.rotation.set(0.25, 0, 0);
-    } else {
-      // Шаг: подъём на проходном, оседание на опорном и наклон по ходу.
-      const bob = Math.abs(Math.sin(phase)) * 0.07 * amp;
-      body.scale.set(1, 1 - 0.04 * amp * Math.cos(phase * 2), 1);
-      body.position.y = bob;
-      // Наклон считается в своих осях: тело повёрнуто к прицелу, а идти
-      // может куда угодно.
-      const lx = Math.cos(yaw) * vx - Math.sin(yaw) * vz;
-      const lz = Math.sin(yaw) * vx + Math.cos(yaw) * vz;
-      const lean = 0.0006;
-      body.rotation.set(lz * lean * amp, 0, -lx * lean * amp + Math.sin(phase) * 0.04 * amp);
-      // Дыхание на месте.
-      if (speed < cfg.walkMinSpeed) body.scale.y = 1 + Math.sin(f.time * Math.PI * 2 / Math.max(0.1, cfg.idleBreathTime)) * cfg.idleBreath * 0.5;
+    // Ноги идут по ходу, плечи держат прицел. Назад — шагом назад, а не
+    // разворотом: таз поворачивается не больше чем на прямой угол.
+    let legYaw = 0;
+    let dir = 1;
+    if (speed > cfg.walkMinSpeed && !dash) {
+      let rel = Math.atan2(vx, vz) - yaw;
+      while (rel > Math.PI) rel -= Math.PI * 2;
+      while (rel < -Math.PI) rel += Math.PI * 2;
+      if (Math.abs(rel) > Math.PI / 2) {
+        rel += rel > 0 ? -Math.PI : Math.PI;
+        dir = -1;
+      }
+      legYaw = rel;
     }
-    if (view.rim !== undefined) view.rim.visible = !f.hiss;
+    view.legYaw = (view.legYaw ?? 0) + (legYaw - (view.legYaw ?? 0)) * 0.25;
+    view.rig?.pose({ phase: phase * dir, amp, time: f.time, aim: true, dash, legYaw: view.legYaw });
+    if (view.rimMat !== undefined) view.rimMat.visible = !f.hiss;
 
     // Призраки рывка.
     const ghosts = view.ghosts ?? [];
