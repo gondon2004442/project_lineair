@@ -9,13 +9,15 @@ import { makeRng, type Rng } from '../rng';
 import { DIRS, opposite, standingInDoor } from '../room';
 import { TUNING } from '../tuning';
 import { enterRoom } from '../world';
+import { onDuty } from './cleanse';
 import { formStat, infiniteReserve, penaltyOf, reserveMax, statAt } from '../weapon';
 
 export function roomSystem(w: World): void {
   const room = w.floor.rooms[w.room];
   if (room === undefined) return;
 
-  if (!room.cleared && w.staffC.size === 0) {
+  // Снятые с должности ставок не занимают: двери держит штат, а не люди.
+  if (!room.cleared && onDuty(w) === 0) {
     room.cleared = true;
     // Участок, пройденный без единого попадания, идёт в выслугу.
     if (w.record.roomClean) {

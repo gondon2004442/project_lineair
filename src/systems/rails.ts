@@ -13,12 +13,14 @@
  * написана.
  */
 import { floorAt } from '../data/floors';
+import { distortionNow } from './cleanse';
 import type { World } from '../ecs';
 import { TUNING } from '../tuning';
 
 /** Едут ли на этом уровне стеллажи. */
 export function shuffling(w: World): boolean {
-  return floorAt(w.depth).distortion === 'shuffle';
+  // Сданный этаж стеллажи не двигает: перестановка была работами.
+  return distortionNow(w, floorAt(w.depth)) === 'shuffle';
 }
 
 export function railSystem(w: World, dt: number): void {

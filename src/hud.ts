@@ -1,5 +1,6 @@
 /** Служебный оверлей: состояние субъекта, схема этажа, отладка, seed. */
 import { TEMPLATES_BY_ID } from './data/roomTemplates';
+import { cleansed, cleansedRoom, distortionNow } from './systems/cleanse';
 import { issuedDirectives, type Directive } from './data/directives';
 import { floorAt } from './data/floors';
 import { ENDINGS, ENDINGS_BY_ID } from './data/endings';
@@ -114,6 +115,7 @@ export function createHud(
       weaponRows(w),
       energyRow(w),
       row('ВАКАНСИЙ', vacancyLine(w)),
+      staffCountRow(w),
       row('Q БЛАНК · ДОПУСК · ТАЛОН', suppliesLine(w)),
       toolRow(w),
       promptRow(w),
@@ -128,7 +130,9 @@ export function createHud(
     // Под схемой остаётся только номер участка: планировку и расписание
     // видно в самой комнате, а не в списке.
     map.innerHTML =
-      row('УЧАСТОК', `${w.room + 1} / ${w.floor.rooms.length}`) + schematic(w);
+      row('УЧАСТОК', `${w.room + 1} / ${w.floor.rooms.length}`) +
+      (cleansed(w) ? row('ЭТАЖ', '<span class="ok">СДАН ПО АКТУ</span>') : '') +
+      schematic(w);
 
     // Титр заседания перебивает всё: допуск приостановлен, и это первое,
     // что субъект должен прочитать в комнате.
@@ -589,6 +593,21 @@ function inForce(w: World): Directive[] {
   );
 }
 
+/**
+ * Два счёта рядом и без единого слова оценки: снятых с должности и
+ * ликвидированных. Убил ставку — получил талоны сейчас; оставил —
+ * получил человека после очищения. Никакой морали в тексте: числа
+ * говорят сами.
+ */
+function staffCountRow(w: World): string {
+  const { retired, killed } = w.record;
+  if (retired === 0 && killed === 0) return '';
+  return row(
+    'СНЯТО С ДОЛЖНОСТИ · ЛИКВИДИРОВАНО',
+    `<span class="ok">${retired}</span> · ${killed}`,
+  );
+}
+
 /** Коротко о деле: приложений и выпущенных по ним распоряжений. */
 function dossierLine(w: World): string {
   const orders = inForce(w).length;
@@ -670,7 +689,7 @@ function gauge(current: number, max: number): string {
  * помеха, а не как неверная схема.
  */
 export function shownRoom(w: World): number {
-  if (w.evacPlan || floorAt(w.depth).distortion !== 'shuffle') return w.room;
+  if (w.evacPlan || distortionNow(w, floorAt(w.depth)) !== 'shuffle') return w.room;
   const room = w.floor.rooms[w.room];
   if (room === undefined) return w.room;
   for (const dir of DIRS) {
@@ -721,6 +740,12 @@ function schematic(w: World): string {
       stroke = hex(PALETTE.concrete500);
     } else if (room.visited || mapped) {
       stroke = hex(PALETTE.concrete300);
+    }
+    // Волна очищения идёт по схеме: сданное помещение светлеет само,
+    // и видно, как этаж сдаётся по частям, а не разом.
+    if (cleansedRoom(w, room.index) && !current) {
+      fill = hex(PALETTE.concrete500);
+      stroke = hex(PALETTE.concrete100);
     }
     parts.push(
       `<rect x="${x}" y="${y}" width="${cell}" height="${cell}" fill="${fill}" stroke="${stroke}" stroke-width="${TUNING.hud.mapStroke}"/>`,

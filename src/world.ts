@@ -1,5 +1,6 @@
 /** Сборка этажа и вход в помещение. Всё случайное — из seeded PRNG. */
 import { destroyEntity, type World, componentStores } from './ecs';
+import { cleansedRoom, distortionNow, retire } from './systems/cleanse';
 import { POST_COURIER, POST_ARCHIVIST, POST_KEEPER } from './data/posts';
 import { MINI_BOSS_POSTS, STAFFING_BY_ID, type StaffPost } from './data/staffing';
 import { DEEPEST, floorAt } from './data/floors';
@@ -90,9 +91,18 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     blanks: TUNING.blank.refillTo,
     passes: TUNING.stash.passesStart,
     reward: { chance: TUNING.reward.base, dry: 0, lastItem: '', lastOrder: '', lastWeight: 1 },
-    record: { penalty: 0, service: 0, broken: 0, roomClean: true, controlHere: 0 },
+    record: {
+      penalty: 0,
+      service: 0,
+      broken: 0,
+      roomClean: true,
+      controlHere: 0,
+      retired: 0,
+      killed: 0,
+    },
     depth: -1,
     seals: [],
+    cleanse: -1,
     subject: SUBJECT_START,
     freed: [],
     unlocked: [SUBJECT_START],
@@ -163,6 +173,9 @@ export function enterLobby(w: World): void {
   w.record.controlHere = 0;
   w.metronome = TUNING.post.inspector.metronomeInterval;
   w.beat = 0;
+  // Титр заседания принадлежит помещению, а не забегу: вышел — и он
+  // гаснет вместе с дверью за спиной.
+  w.fx.seatTitle = 0;
 
   const center = roomCenter(w.map);
   // Ставим субъекта ниже проёма, чтобы забег не начался сам собой.
@@ -208,10 +221,13 @@ export function startRun(w: World): void {
   w.depth = -1;
   // Печати аннулируются вместе с допуском: подписывать спуск заново.
   w.seals = [];
+  w.cleanse = -1;
   w.record.penalty = 0;
   w.record.service = 0;
   w.record.broken = 0;
   w.record.roomClean = true;
+  w.record.retired = 0;
+  w.record.killed = 0;
   restorePlayer(w);
   enterRoom(w, w.floor.start, null);
 }
@@ -233,6 +249,8 @@ export function descend(w: World): void {
   w.floor = generateFloor(rng, w.depth);
   w.listed = false;
   w.evacPlan = false;
+  // Новый уровень — новые работы: акт приёмки на него ещё не подписан.
+  w.cleanse = -1;
   w.note = [];
   w.noteSlot = -1;
   w.blanks = Math.max(w.blanks, TUNING.blank.refillTo);
@@ -316,6 +334,9 @@ export function enterRoom(w: World, index: number, fromDir: Dir | null): void {
 
   w.metronome = TUNING.post.inspector.metronomeInterval;
   w.beat = 0;
+  // Титр заседания принадлежит помещению, а не забегу: вышел — и он
+  // гаснет вместе с дверью за спиной.
+  w.fx.seatTitle = 0;
   // Отсчёт перестройки начинается заново в каждом помещении.
   w.rebuildIn = 0;
   w.rebuilds = 0;
@@ -334,6 +355,12 @@ export function enterRoom(w: World, index: number, fromDir: Dir | null): void {
   placeVerdict(w, room);
   placeSections(w, room);
   if (!room.cleared) staffRoom(w, room, spot.x, spot.y);
+  // Помещение, до которого волна уже дошла: штат в нём набирается, как
+  // обычно, и тут же снимается с должности. Иначе очищённый этаж стоял
+  // бы пустым, а он не пустой — в нём сидят люди.
+  if (cleansedRoom(w, index)) {
+    for (const [e] of [...w.staffC]) retire(w, e);
+  }
   if (w.staffC.size === 0 && !room.cleared) {
     room.cleared = true;
     w.map.doorsLocked = false;
@@ -537,7 +564,7 @@ function toAnyFreeCell(w: World, t: { x: number; y: number }, radius: number): b
  * от порядка обхода: вернувшись, застанешь ту же перестановку.
  */
 function placeRails(w: World, room: RoomNode): void {
-  if (floorAt(w.depth).distortion !== 'shuffle') return;
+  if (distortionNow(w, floorAt(w.depth)) !== 'shuffle') return;
   const cfg = TUNING.rail;
   const rng = makeRng((w.seed + room.index * cfg.seedStride) >>> 0);
 
@@ -563,7 +590,7 @@ function placeRails(w: World, room: RoomNode): void {
  * интерфейс перестал врать, игрок не должен.
  */
 function placeEvacPlan(w: World, room: RoomNode, entryX: number, entryY: number): void {
-  if (floorAt(w.depth).distortion !== 'shuffle') return;
+  if (distortionNow(w, floorAt(w.depth)) !== 'shuffle') return;
   if (w.evacPlan || room.index !== evacRoom(w)) return;
   const cfg = TUNING.stash;
   const rng = makeRng((w.seed + room.index * cfg.seedStride + 7) >>> 0);

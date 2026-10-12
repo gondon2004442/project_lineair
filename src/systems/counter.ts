@@ -10,6 +10,7 @@
  * стойка рядом: иначе она съедала бы F у шкафов.
  */
 import { COUNTERS_BY_KIND } from '../data/counters';
+import { cleansed } from './cleanse';
 import type { Entity, World } from '../ecs';
 import { grantItem, pickItem } from '../paperwork';
 import { makeRng } from '../rng';
@@ -37,6 +38,16 @@ export function counterInReach(w: World): Entity {
 }
 
 /** Чем платят этой стойке и хватает ли. Пустая цена — стойка отработала. */
+/**
+ * Цена у стойки с учётом приёмки. На сданном этаже окошки работают
+ * дешевле: не из доброты, а потому что назад по очищенному этажу надо
+ * давать повод возвращаться, а не только пустой бэктрекинг.
+ */
+export function counterPrice(w: World, value: number): number {
+  const off = cleansed(w) ? Math.max(0, Math.min(1, TUNING.cleanse.counterDiscount)) : 0;
+  return Math.max(0, Math.round(value * (1 - off)));
+}
+
 export function counterOffer(
   w: World,
   target: Entity,
@@ -54,14 +65,14 @@ export function counterOffer(
     // за проступок, и вернётся на следующем же шаге.
     const cursed = cursedItems(w)[0];
     if (cursed !== undefined) {
-      const seize = Math.max(0, Math.round(cfg.seizePrice));
+      const seize = counterPrice(w, cfg.seizePrice);
       return {
         offer: `ИЗЪЯТЬ ${cursed.code}`,
         price: `${seize} ТАЛОНОВ`,
         ok: w.tickets >= seize,
       };
     }
-    const price = Math.max(0, Math.round(cfg.registryPrice));
+    const price = counterPrice(w, cfg.registryPrice);
     // Снимать нечего — окошко всё равно не примет: пустая подача это
     // потраченные талоны ни за что.
     if (w.record.penalty <= 0) return { offer, price: 'ВЗЫСКАНИЙ НЕТ', ok: false };
@@ -77,7 +88,7 @@ export function counterOffer(
   }
 
   if (counter.kind === 'listing') {
-    const price = Math.max(0, Math.round(cfg.listingPrice));
+    const price = counterPrice(w, cfg.listingPrice);
     // Дважды одно и то же не продают: сведения уже на руках.
     if (w.listed) return { offer, price: 'ОПИСЬ НА РУКАХ', ok: false };
     return { offer, price: `${price} ТАЛОНОВ`, ok: w.tickets >= price };
@@ -92,7 +103,7 @@ export function counterOffer(
     return { offer, price: `${take} ВЗЫСКАНИЯ`, ok: true };
   }
 
-  const price = Math.max(0, Math.round(cfg.reviewPrice));
+  const price = counterPrice(w, cfg.reviewPrice);
   return { offer, price: `${price} ТАЛОНОВ`, ok: w.tickets >= price };
 }
 
@@ -114,11 +125,11 @@ export function counterSystem(w: World): void {
     const cursed = cursedItems(w)[0];
     if (cursed !== undefined) {
       // Изъятие: приложение уходит из дела вместе со своими правками.
-      w.tickets -= Math.max(0, Math.round(cfg.seizePrice));
+      w.tickets -= counterPrice(w, cfg.seizePrice);
       const at = w.build.indexOf(cursed.id);
       if (at >= 0) w.build.splice(at, 1);
     } else {
-      w.tickets -= Math.max(0, Math.round(cfg.registryPrice));
+      w.tickets -= counterPrice(w, cfg.registryPrice);
       w.record.penalty = Math.max(0, w.record.penalty - Math.max(1, Math.round(cfg.registryClear)));
     }
   } else if (counter.kind === 'hr') {
@@ -127,7 +138,7 @@ export function counterSystem(w: World): void {
     health.hp = Math.max(1, health.hp - Math.max(1, Math.round(cfg.hrHealth)));
     w.passes = Math.min(TUNING.stash.passesMax, w.passes + Math.max(1, Math.round(cfg.hrPasses)));
   } else if (counter.kind === 'listing') {
-    w.tickets -= Math.max(0, Math.round(cfg.listingPrice));
+    w.tickets -= counterPrice(w, cfg.listingPrice);
     w.listed = true;
   } else if (counter.kind === 'request') {
     w.record.penalty = Math.min(
@@ -139,7 +150,7 @@ export function counterSystem(w: World): void {
     const item = pickItem(w, rng);
     if (item !== undefined) grantItem(w, item);
   } else {
-    w.tickets -= Math.max(0, Math.round(cfg.reviewPrice));
+    w.tickets -= counterPrice(w, cfg.reviewPrice);
     // Бросок привязан к стойке, а не к моменту: то же окошко на том же
     // seed отвечает одинаково, сколько ни ходи вокруг.
     const rng = makeRng((w.seed + w.room * cfg.seedStride + target) >>> 0);

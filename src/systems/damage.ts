@@ -9,6 +9,9 @@ import { keeperOpen } from './postKeeper';
 export function applyDamage(w: World, target: Entity, amount: number): boolean {
   const h = w.health.get(target);
   if (h === undefined || h.hp <= 0 || h.iframes > 0) return false;
+  // Снятый с должности не цель: он больше не ставка, а человек, и
+  // добивать его нечем. Это и есть смысл второго счётчика.
+  if (w.staffC.get(target)?.retired === true) return false;
   // Ревизор неуязвим, пока не закончил опись имущества участка.
   const auditor = w.auditorC.get(target);
   if (auditor !== undefined && auditor.phase !== 'open') return false;

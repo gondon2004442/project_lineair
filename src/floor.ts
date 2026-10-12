@@ -48,6 +48,12 @@ export interface RoomNode {
   cleared: boolean;
   visited: boolean;
   /**
+   * Через сколько секунд после начала волны очищение дойдёт сюда.
+   * Считается по графу от приёмной: волна идёт помещение за помещением,
+   * а не вспыхивает всюду разом.
+   */
+  cleanseDelay: number;
+  /**
    * Выдача за этот участок уже брошена. Нужна оттого, что участок можно
    * зачистить дважды: освобождение замурованного запирает двери заново и
    * выставляет волну, а второй выдачи за ту же комнату быть не должно.
@@ -381,6 +387,7 @@ function finish(drafts: Draft[], rng: Rng, scheme: FloorScheme): Floor {
     desk: false,
     cleared: d.kind === 'start',
     rewarded: false,
+    cleanseDelay: 0,
     visited: false,
     };
   });

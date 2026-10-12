@@ -4,6 +4,7 @@
  * чтобы визуал не съедал случайность симуляции.
  */
 import { Application, BlurFilter, Container, Graphics } from 'pixi.js';
+import { distortionNow } from './systems/cleanse';
 import type { World } from './ecs';
 import { createAberration, createDust, createHiss, drawSmoke, type WarpSource } from './fx';
 import { PALETTE } from './palette';
@@ -246,6 +247,7 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
       profiler.end('КАДР: ДЫМ');
 
       entityLayer.clear();
+      drawFront(entityLayer, w);
       serviceLayer.clear();
       subjectLayer.clear();
       drawSections(entityLayer, w);
@@ -979,6 +981,29 @@ function lights(w: World, alpha: number): { x: number; y: number; r: number }[] 
 }
 
 /**
+ * ФРОНТ ОЧИЩЕНИЯ. Тонкая светлая кромка, идущая по помещению.
+ *
+ * За ней палитра этажа, перед ней ещё заседание. Медленно и сознательно:
+ * это награда за начальника, её надо дать посмотреть, а не проскочить.
+ */
+function drawFront(g: Graphics, w: World): void {
+  const room = w.floor.rooms[w.room];
+  if (room === undefined || w.cleanse < 0) return;
+  const cfg = TUNING.cleanse;
+  const since = w.cleanse - room.cleanseDelay;
+  if (since < 0 || since > cfg.roomDelay) return;
+
+  const width = w.map.cols * w.map.size;
+  const height = w.map.rows * w.map.size;
+  const at = (since / Math.max(1e-6, cfg.roomDelay)) * width;
+  g.rect(at - cfg.frontWidth, 0, cfg.frontWidth, height).fill({
+    color: PALETTE.concrete100,
+    alpha: TUNING.render.frontAlpha,
+  });
+  g.rect(at - 2, 0, 2, height).fill(PALETTE.concrete100);
+}
+
+/**
  * ТЕМНОТА. Видно только вокруг источников света.
  *
  * Считается по клеткам и заливается прямоугольниками, слитыми в строки:
@@ -990,7 +1015,9 @@ function lights(w: World, alpha: number): { x: number; y: number; r: number }[] 
  * Поэтому таблички рисуются ПОВЕРХ тьмы, а не под ней.
  */
 function drawDark(g: Graphics, w: World, alpha: number): void {
-  if (floorAt(w.depth).distortion !== 'dark' || w.scene !== 'run') return;
+  // Свет не подключён, пока идут работы. Приёмка их закрывает — и
+  // лампы загораются сами, без отдельного выключателя.
+  if (distortionNow(w, floorAt(w.depth)) !== 'dark' || w.scene !== 'run') return;
   const cfg = TUNING.dark;
   const src = lights(w, alpha);
   const map = w.map;
@@ -1557,7 +1584,7 @@ function drawEntities(
     }
 
     const health = w.health.get(e);
-    let color = draw.color;
+    let color = w.staffC.get(e)?.retired === true ? PALETTE.skin : draw.color;
     if (health !== undefined) {
       if (health.flash > 0) color = PALETTE.concrete300;
       else if (health.iframes > 0 && Math.floor(time * TUNING.feel.blinkRate) % 2 === 0) continue;
@@ -1637,6 +1664,10 @@ function drawEntities(
 
     const staff = staffHere;
     if (staff === undefined) continue;
+
+    // Снятый с должности: назначение аннулировано, бетон отступил, кожа
+    // вернулась. Табличек нет — снимать с груди больше нечего.
+    if (staff.retired) continue;
 
     // Внеплановая проверка: двойной неподвижный контур. Цвет самый
     // светлый из палитры — красный занят субъектом.
@@ -2201,8 +2232,11 @@ function drawVacancyCount(g: Graphics, x: number, y: number, size: number, open:
  * ручками staffGlowAlpha и staffGlowSpread.
  */
 function drawGlow(g: Graphics, w: World, alpha: number): void {
-  // Сотрудники: ореол шире силуэта и тусклее субъекта.
-  for (const [e] of w.staffC) {
+  // Сотрудники: ореол шире силуэта и тусклее субъекта. Снятым с
+  // должности ореола нет вовсе: он означает угрозу, а сидящий человек
+  // не угроза — и красного вокруг него быть не должно тем более.
+  for (const [e, staff] of w.staffC) {
+    if (staff.retired) continue;
     const draw = w.drawC.get(e);
     const t = w.transform.get(e);
     if (draw === undefined || t === undefined) continue;

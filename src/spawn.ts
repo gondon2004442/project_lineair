@@ -128,6 +128,7 @@ export function spawnStaff(w: World, post: string, priority: number, x: number, 
     plateFlash: 0,
     control,
     frozen: 0,
+    retired: false,
     pinned: 0,
   });
   w.drawC.set(e, {

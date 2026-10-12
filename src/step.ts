@@ -22,6 +22,7 @@ import {
 } from './systems/staff';
 import { feedbackSystem, liftSystem, lifecycleSystem, statusSystem } from './systems/lifecycle';
 import { hissSystem } from './systems/hiss';
+import { cleanseSystem } from './systems/cleanse';
 import { physicsSystem } from './systems/physics';
 import { propPushSystem, propSystem } from './systems/props';
 import { railSystem } from './systems/rails';
@@ -110,6 +111,9 @@ export function step(w: World): void {
 
   profiler.begin('СИМ: ЦИКЛ ЖИЗНИ');
   lifecycleSystem(w, STEP);
+  // Очищение идёт после цикла жизни: волну запускает снятая печать, а
+  // снимается она там.
+  cleanseSystem(w, STEP);
   // Красное состояние считается после цикла жизни: мёртвый начальник уже
   // вычеркнут, и заседание кончается тем же шагом, что и он.
   hissSystem(w, STEP);

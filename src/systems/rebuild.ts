@@ -13,13 +13,15 @@
  * обязательно: без него это не приём, а подножка.
  */
 import { floorAt } from '../data/floors';
+import { distortionNow } from './cleanse';
 import type { World } from '../ecs';
 import { TUNING } from '../tuning';
 import { rebuildRoom } from '../world';
 
 /** Перестраивается ли помещение на этом уровне. */
 export function rebuilding(w: World): boolean {
-  return floorAt(w.depth).distortion === 'rebuild';
+  // Приёмка закрывает производство: перестраивать больше нечего.
+  return distortionNow(w, floorAt(w.depth)) === 'rebuild';
 }
 
 export function rebuildSystem(w: World, dt: number): void {
