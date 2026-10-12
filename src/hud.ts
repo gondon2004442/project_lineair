@@ -130,7 +130,13 @@ export function createHud(
     map.innerHTML =
       row('УЧАСТОК', `${w.room + 1} / ${w.floor.rooms.length}`) + schematic(w);
 
-    if (w.status === 'dead') {
+    // Титр заседания перебивает всё: допуск приостановлен, и это первое,
+    // что субъект должен прочитать в комнате.
+    if (w.fx.seatTitle > 0 && w.status === 'playing') {
+      banner.hidden = false;
+      banner.innerHTML =
+        '<b>ВНЕОЧЕРЕДНОЕ ЗАСЕДАНИЕ</b><span>ДОПУСК ПРИОСТАНОВЛЕН · ПОМЕЩЕНИЕ ЗАКРЫТО</span>';
+    } else if (w.status === 'dead') {
       banner.hidden = false;
       banner.innerHTML = '<b>СУБЪЕКТ ЛИКВИДИРОВАН</b><span>[F2] ВЕРНУТЬСЯ В ВЕСТИБЮЛЬ</span>';
     } else if (w.status === 'cleared') {

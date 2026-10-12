@@ -30,6 +30,12 @@ import { ROOM_HEIGHT, ROOM_WIDTH, STEP, TUNING } from './tuning';
 export interface Renderer {
   app: Application;
   showHitboxes: boolean;
+  /**
+   * Насколько глубоко красное состояние прямо сейчас. Только для чтения
+   * и только для стенда: без него рампу входа и выхода пришлось бы
+   * мерить скриншотами, а съёмка кадра на стенде дольше самой рампы.
+   */
+  readonly hiss: number;
   screenToWorld(sx: number, sy: number): { x: number; y: number };
   layout(): void;
   draw(w: World, alpha: number): void;
@@ -141,6 +147,9 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
   const renderer: Renderer = {
     app,
     showHitboxes: TUNING.debug.hitboxes,
+    get hiss() {
+      return hissNow;
+    },
 
     screenToWorld(sx, sy) {
       const rect = app.canvas.getBoundingClientRect();
@@ -187,7 +196,10 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
       // его волной задаёт тот, кто ставит цель.
       profiler.begin('КАДР: КРАСНОЕ');
       const want = Math.max(0, Math.min(1, w.fx.hiss)) * TUNING.hiss.amount;
-      const rate = TUNING.hiss.fadeIn <= 0 ? 1 : frame / TUNING.hiss.fadeIn;
+      // Вход и выход идут с разной скоростью, и это не прихоть: допуск
+      // приостанавливают мгновенно, а снимают приостановку по процедуре.
+      const span = want > hissNow ? TUNING.hiss.fadeIn : TUNING.hiss.fadeOut;
+      const rate = span <= 0 ? 1 : frame / span;
       hissNow += Math.max(-rate, Math.min(rate, want - hissNow));
       if (Math.abs(want - hissNow) < 0.001) hissNow = want;
       const wantHiss = hissNow > 0;
