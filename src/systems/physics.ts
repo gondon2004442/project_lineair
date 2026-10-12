@@ -3,6 +3,7 @@ import type { World } from '../ecs';
 import { isSolidCell } from '../room';
 import type { TileMap } from '../room';
 import { TUNING } from '../tuning';
+import { applyDamage } from './damage';
 
 const SKIN = 0.01;
 
@@ -45,12 +46,72 @@ export function physicsSystem(w: World, dt: number): void {
     const reach = Math.max(Math.abs(b.vx), Math.abs(b.vy)) * dt * pace;
     const parts = Math.max(1, Math.ceil(reach / (w.map.size * TUNING.sim.maxMoveFraction)));
     const slice = (dt * pace) / parts;
+    // Брошенное отскакивает от бетона, а не прилипает к нему: скорость до
+    // разбора запоминается, и если стена её обнулила — возвращается
+    // обратно с потерей.
+    const prop = w.propC.get(e);
+    const bounce = prop !== undefined && prop.phase === 'thrown';
+    const vx0 = b.vx;
+    const vy0 = b.vy;
     for (let i = 0; i < parts; i++) {
       // Скорость читается заново: столкновение могло её обнулить.
       moveX(w.map, t, b, b.vx * slice);
       moveY(w.map, t, b, b.vy * slice);
     }
+    if (bounce) wallBounce(w, e, b, vx0, vy0);
+
+    const k = w.kickC.get(e);
+    if (k !== undefined) moveKick(w, e, t, b.radius, k, dt);
   }
+}
+
+/** Отскок брошенного: обнулённая стеной ось возвращается с потерей. */
+function wallBounce(w: World, e: number, b: Motion, vx0: number, vy0: number): void {
+  const cfg = TUNING.physics;
+  const e2 = cfg.wallRestitution;
+  let hit = 0;
+  if (b.vx === 0 && vx0 !== 0 && Math.abs(vx0) >= cfg.wallBounceMin) {
+    b.vx = -vx0 * e2;
+    hit = Math.abs(vx0);
+  }
+  if (b.vy === 0 && vy0 !== 0 && Math.abs(vy0) >= cfg.wallBounceMin) {
+    b.vy = -vy0 * e2;
+    hit = Math.max(hit, Math.abs(vy0));
+  }
+  if (hit <= 0) return;
+  w.sounds.push('impact');
+  // Удар о бетон бьёт и сам предмет: стул, брошенный в стену, рассыпается.
+  const h = w.health.get(e);
+  if (h !== undefined && hit >= TUNING.prop.minImpactSpeed * 1.6) {
+    h.hp -= TUNING.prop.impactSelfDamage;
+    h.flash = TUNING.feel.flashTime;
+  }
+}
+
+/**
+ * Отброс: своя скорость поверх хода, своя дробь против проскока, своё
+ * затухание. Влетел в стену на скорости — удар о бетон.
+ */
+function moveKick(w: World, e: number, t: Point, radius: number, k: { vx: number; vy: number }, dt: number): void {
+  const cfg = TUNING.physics;
+  const motion: Motion = { vx: k.vx, vy: k.vy, radius };
+  const before = Math.hypot(k.vx, k.vy);
+  const reach = before * dt;
+  const parts = Math.max(1, Math.ceil(reach / (w.map.size * TUNING.sim.maxMoveFraction)));
+  const slice = dt / parts;
+  for (let i = 0; i < parts; i++) {
+    moveX(w.map, t, motion, motion.vx * slice);
+    moveY(w.map, t, motion, motion.vy * slice);
+  }
+  const stopped = before - Math.hypot(motion.vx, motion.vy);
+  if (stopped >= cfg.slamSpeed && w.staffC.has(e)) {
+    applyDamage(w, e, cfg.slamDamage);
+    w.sounds.push('impact');
+  }
+  const decay = Math.exp(-cfg.kickDecay * dt);
+  k.vx = motion.vx * decay;
+  k.vy = motion.vy * decay;
+  if (Math.hypot(k.vx, k.vy) < 4) w.kickC.delete(e);
 }
 
 /**

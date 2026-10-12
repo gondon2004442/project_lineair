@@ -39,6 +39,7 @@ import {
 import type { Entity, World } from '../ecs';
 import { PALETTE } from '../palette';
 import { STEP, TUNING } from '../tuning';
+import { isSolidPoint } from '../room';
 import { FIXTURES_BY_ID } from '../data/fixtures';
 import { COUNTERS_BY_KIND } from '../data/counters';
 import { litAt } from '../systems/postKeeper';
@@ -50,6 +51,7 @@ import { grabCandidate } from '../systems/telekinesis';
 import { dashIFrameWindow, dashSpec } from '../systems/playerControl';
 import type { QuadBatch } from './batch';
 import { Rig, shadeAll, type RigSpec } from './rig';
+import type { Debris, DebrisKind } from './debris';
 import type { Materials } from './materials';
 
 /** Пиксели мира → клетки. */
@@ -80,6 +82,15 @@ interface View {
   rig?: Rig;
   /** Сглаженный поворот ног относительно корпуса. */
   legYaw?: number;
+  /** Скорость по последним кадрам, клеток/с: для обломков при распаде. */
+  vx?: number;
+  vz?: number;
+  /** Скорость брошенного на прошлом кадре: по её провалу виден удар. */
+  lastSpeed?: number;
+  /** Кувырок брошенного: накопленный угол и ось. */
+  tumble?: number;
+  /** Цвет основного материала: им крошится при распаде. */
+  tint?: number;
   /** Обломок: своя геометрия, её надо освободить. */
   own?: BufferGeometry[];
   seen: boolean;
@@ -102,6 +113,8 @@ export interface Batches {
 
 export interface FrameInfo {
   alpha: number;
+  /** Реальное время кадра, с: для обломков и скоростей. */
+  dt: number;
   /** Пол мягкий: ковролин глушит шаг. */
   soft: boolean;
   time: number;
@@ -135,6 +148,12 @@ export class Actors {
   private readonly puffs: { x: number; z: number; t: number; size: number; life: number }[] = [];
   private lastStep = 0;
   private lastPuff = 0;
+  /** Обломки кадра. Ставит рендер. */
+  debris: Debris | null = null;
+  /** Помещение сменилось: ушедшие сущности не умерли, а остались там. */
+  quiet = false;
+  /** Пули прошлого кадра: исчезнувшая раньше срока — попала. */
+  private flying = new Map<Entity, { x: number; z: number; vx: number; vz: number; life: number; glow: boolean; card: boolean }>();
 
   constructor(private readonly m: Materials) {
     const glowMat = new MeshBasicMaterial({ color: 0xffffff });
@@ -170,7 +189,11 @@ export class Actors {
     for (const [e] of this.views) this.drop(e);
   }
 
+  /** Время последнего кадра: распад случается вне place(). */
+  private clock = 0;
+
   sync(w: World, f: FrameInfo, b: Batches): void {
+    this.clock = f.time;
     for (const view of this.views.values()) view.seen = false;
 
     const reachStash = stashInReach(w);
@@ -185,8 +208,12 @@ export class Actors {
       const key = this.keyOf(w, e, draw.shape);
       let view = this.views.get(e);
       if (view === undefined || view.key !== key) {
-        if (view !== undefined) this.drop(e);
+        if (view !== undefined) {
+          this.transition(w, e, view, key);
+          this.drop(e);
+        }
         view = this.build(w, e, key, draw.size * U, draw.color);
+        view.tint = draw.color;
         shadeAll(view.root);
         this.views.set(e, view);
         this.group.add(view.root);
@@ -197,7 +224,12 @@ export class Actors {
       this.place(w, e, view, x, z, draw.size * U, f, b, held, reachStash, reachCounter);
     }
 
-    for (const [e, view] of this.views) if (!view.seen) this.drop(e);
+    for (const [e, view] of this.views) {
+      if (view.seen) continue;
+      if (!this.quiet) this.gone(w, e, view);
+      this.drop(e);
+    }
+    this.quiet = false;
 
     this.service(w, f, b, candidate, held);
     this.bullets(w, f, b);
@@ -701,8 +733,17 @@ export class Actors {
 
     const moved = Number.isNaN(view.lastX) ? 0 : Math.hypot(x - view.lastX, z - view.lastZ);
     if (moved < 1) view.walk += moved;
+    if (!Number.isNaN(view.lastX) && f.dt > 0 && moved < 1) {
+      view.vx = (x - view.lastX) / f.dt;
+      view.vz = (z - view.lastZ) / f.dt;
+    }
     view.lastX = x;
     view.lastZ = z;
+    // Тела расталкивают лежащие обломки: идущий раскидывает крошку ногами.
+    if (this.debris !== null && moved > 0.001 && moved < 1) {
+      const sp = Math.hypot(view.vx ?? 0, view.vz ?? 0);
+      if (sp > 0.5) this.debris.push(x, z, s * 1.6 + 0.2, sp * 0.8, 0.25);
+    }
 
     if (e === w.player) {
       this.placePlayer(w, view, x, z, s, f, b, hurtBlink(w), flash);
@@ -749,6 +790,21 @@ export class Actors {
         still,
       });
       if (view.retinue !== undefined) view.retinue.rotation.y = f.time * TUNING.render.chiefRetinueSpin;
+      // Отброс: тело не успевает за ногами и заваливается по ходу удара.
+      const kc = w.kickC.get(e);
+      if (kc !== undefined) {
+        const ks = Math.hypot(kc.vx, kc.vy);
+        const lean = Math.min(0.55, ks / 900);
+        const yawNow = root.rotation.y;
+        const lx = Math.cos(yawNow) * kc.vx - Math.sin(yawNow) * kc.vy;
+        const lz = Math.sin(yawNow) * kc.vx + Math.cos(yawNow) * kc.vy;
+        view.body.rotation.x = (lz / (ks || 1)) * lean;
+        view.body.rotation.z = -(lx / (ks || 1)) * lean;
+      } else {
+        view.body.rotation.x *= 0.85;
+        view.body.rotation.z *= 0.85;
+      }
+      this.smoke(e, x, z, s, f, b);
       // Ореол заражения на полу.
       if (TUNING.render.staffGlowAlpha > 0) {
         const r = s * TUNING.render.staffGlowSpread * 2.2;
@@ -760,13 +816,39 @@ export class Actors {
     const prop = w.propC.get(e);
     if (prop !== undefined) {
       const cfg = TUNING.telekinesis;
+      const pb = w.body.get(e);
+      const speed = pb === undefined ? 0 : Math.hypot(pb.vx, pb.vy);
       const lift = e === held ? (cfg.liftHeight + Math.sin(f.time * cfg.liftBobRate) * cfg.liftBob) * U * 4 : 0;
-      view.body.position.y = prop.phase === 'cover' ? s * 0.95 : lift;
-      if (prop.phase === 'thrown') {
-        view.body.rotation.y += 0.25;
+      // Брошенное летит над полом и кувыркается вокруг оси поперёк хода;
+      // выдохлось — падает и встаёт на основание.
+      const hop = prop.phase === 'thrown' ? Math.min(0.55, Math.max(0, (speed - 120) / 1200)) : 0;
+      view.body.position.y = prop.phase === 'cover' ? s * 0.95 : lift + hop;
+      if (prop.phase === 'thrown' && pb !== undefined && speed > 1) {
+        view.tumble = (view.tumble ?? 0) + speed * U * f.dt * 1.6;
+        const yaw = Math.atan2(pb.vx, pb.vy);
+        view.root.rotation.y = yaw;
+        view.body.rotation.set(view.tumble, 0, 0);
       } else if (prop.phase !== 'cover') {
+        // Докатился: доворачивается на ближайшую грань, а не прыгает.
+        const t0 = view.tumble ?? 0;
+        const snap = Math.round(t0 / (Math.PI / 2)) * (Math.PI / 2);
+        view.tumble = t0 + (snap - t0) * 0.25;
+        view.body.rotation.x = Math.abs(view.tumble - snap) < 0.01 ? 0 : view.tumble - snap;
         view.body.rotation.y = approachAngle(view.body.rotation.y, 0, 0.1);
+        view.body.rotation.z = 0;
       }
+      // Удар: скорость брошенного провалилась за кадр — во что-то влетело.
+      const was = view.lastSpeed ?? 0;
+      if (this.debris !== null && was > TUNING.prop.minImpactSpeed && speed < was * 0.55) {
+        const kind = this.pieceKind(view);
+        this.debris.burst('chip', 6, x, 0.3, z, 3.2, 0.06, view.tint ?? PALETTE.concrete500);
+        this.debris.burst(kind, 3, x, 0.4, z, 2.6, 0.12, view.tint ?? PALETTE.furniture);
+        this.debris.push(x, z, 1.2, was * U * 0.4, 0.5);
+        this.puffs.push({ x, z, t: f.time, size: s * 2.2, life: 0.8 });
+        this.events.push('step');
+      }
+      view.lastSpeed = speed;
+      if (this.debris !== null && prop.phase === 'thrown') this.debris.push(x, z, s * 1.8, speed * U * 0.6, 0.6);
       if (e === held) b.glow.flat(x, z, s * 3, s * 3, 0.02, PALETTE.concrete100, 0.25);
       return;
     }
@@ -1172,9 +1254,147 @@ export class Actors {
     this.puffs.length = keep;
   }
 
+  // --- Физика кадра: распад, рассыпанное, дым --------------------------------
+
+  /** Вид обломков, на которые рассыпается предмет. */
+  private pieceKind(view: View): DebrisKind {
+    const kind = view.key.split(':')[1] ?? '';
+    if (kind === 'rubble') return 'chunk';
+    if (kind === 'cabinet' || kind === 'faxstand' || kind === 'tank' || kind === 'typewriter') return 'metal';
+    return 'splinter';
+  }
+
+  /**
+   * Сущность ушла из мира не со сменой помещения — значит, её не стало.
+   * Сотрудник распадается кусками по суставам, предмет — щепой и
+   * железом, и всё это падает, катится и остаётся лежать.
+   */
+  private gone(w: World, e: Entity, view: View): void {
+    const d = this.debris;
+    if (d === null || Number.isNaN(view.lastX)) return;
+    const kind = view.key.split(':')[0];
+    const x = view.lastX;
+    const z = view.lastZ;
+    if (kind === 'staff') {
+      this.shatter(view, 'chunk', 2.2);
+      d.burst('chip', 26, x, 0.9, z, 3.4, 0.07, view.tint ?? PALETTE.concrete500);
+      d.burst('paper', 6, x, 1.1, z, 2.2, 0.22, PALETTE.paper);
+      this.puffs.push({ x, z, t: this.clock, size: 1.4, life: 1.4 });
+      this.puffs.push({ x, z, t: this.clock + 0.08, size: 1.0, life: 1.1 });
+      d.push(x, z, 2.2, 3.5, 0.6);
+    } else if (kind === 'prop') {
+      const piece = this.pieceKind(view);
+      this.shatter(view, piece, 1.6);
+      d.burst(piece, 10, x, 0.5, z, 2.8, 0.1, view.tint ?? PALETTE.furniture);
+      d.burst('chip', 10, x, 0.4, z, 2.4, 0.05, PALETTE.concrete500);
+      if (view.key.includes('cardbox')) d.burst('paper', 24, x, 0.6, z, 2.6, 0.2, PALETTE.paper);
+      this.puffs.push({ x, z, t: this.clock, size: 1.1, life: 1.0 });
+    }
+    void w;
+    void e;
+  }
+
+  /**
+   * Разобрать узел на части: каждая деталь фигуры становится обломком
+   * своего размера и цвета и вылетает из того места, где была.
+   */
+  private shatter(view: View, piece: DebrisKind, power: number): void {
+    const d = this.debris;
+    if (d === null) return;
+    view.root.updateMatrixWorld(true);
+    const cx = view.lastX;
+    const cz = view.lastZ;
+    const pos = new Vector3();
+    const scl = new Vector3();
+    let n = 0;
+    view.root.traverse((o) => {
+      const mesh = o as Mesh;
+      if (mesh.isMesh !== true || n >= 40) return;
+      const mat = mesh.material as MeshStandardMaterial;
+      if (view.rimMat !== undefined && mat === (view.rimMat as unknown as MeshStandardMaterial)) return;
+      if (mat.transparent === true) return;
+      mesh.getWorldPosition(pos);
+      mesh.getWorldScale(scl);
+      const geo = mesh.geometry;
+      if (geo.boundingBox === null) geo.computeBoundingBox();
+      const bb = geo.boundingBox;
+      const gx = bb === null ? 1 : bb.max.x - bb.min.x;
+      const gy = bb === null ? 1 : bb.max.y - bb.min.y;
+      const gz = bb === null ? 1 : bb.max.z - bb.min.z;
+      const clamp = (v: number): number => Math.max(0.035, Math.min(0.55, v));
+      const kind: DebrisKind = mat.metalness >= 0.5 ? 'metal' : piece;
+      const dx = pos.x - cx;
+      const dz = pos.z - cz;
+      const len = Math.hypot(dx, dz) || 1;
+      const out = power * (0.4 + Math.random() * 0.6);
+      d.spawn(
+        kind,
+        pos.x,
+        Math.max(0.05, pos.y),
+        pos.z,
+        (dx / len) * out + (view.vx ?? 0) * 0.5,
+        1.2 + Math.random() * power,
+        (dz / len) * out + (view.vz ?? 0) * 0.5,
+        clamp(gx * scl.x),
+        clamp(gy * scl.y),
+        clamp(gz * scl.z),
+        mat.color?.getHex() ?? 0x888888,
+        10,
+      );
+      n += 1;
+    });
+  }
+
+  /** Смена вида: опрокинули, вскрыли, положили набок. Высыпаем содержимое. */
+  private transition(w: World, e: Entity, view: View, next: string): void {
+    const d = this.debris;
+    if (d === null || Number.isNaN(view.lastX)) return;
+    const [a, kind, was] = view.key.split(':');
+    const now = next.split(':')[2];
+    const x = view.lastX;
+    const z = view.lastZ;
+    if (a === 'fix' && was === 'false' && now === 'true') {
+      const fx = w.fixtureC.get(e);
+      const dx = fx?.spillX ?? 0;
+      const dz = fx?.spillY ?? 0;
+      if (kind === 'cooler') d.burst('drop', 26, x, 1.0, z, 2.6, 0.07, 0x9fb4c0, dx, dz);
+      else if (kind === 'ficus') {
+        d.burst('chip', 22, x, 0.4, z, 2.0, 0.06, 0x3a2a1c, dx, dz);
+        d.burst('paper', 8, x, 0.8, z, 1.8, 0.14, PALETTE.leaf, dx, dz);
+      } else if (kind === 'rack') d.burst('paper', 4, x, 1.4, z, 1.6, 0.4, 0x6b665a, dx, dz);
+      else d.burst('paper', 14, x, 0.7, z, 2.4, 0.2, PALETTE.paper, dx, dz);
+      this.puffs.push({ x, z, t: this.clock, size: 0.9, life: 0.9 });
+    } else if (a === 'stash' && was === 'false' && now === 'true') {
+      d.burst('paper', 12, x, 1.0, z, 2.2, 0.2, PALETTE.paper, 0, 0, 1.4);
+    } else if (a === 'prop' && was === 'false' && now === 'true') {
+      this.puffs.push({ x, z, t: this.clock, size: 1.2, life: 0.8 });
+      d.burst('chip', 8, x, 0.1, z, 1.6, 0.05, PALETTE.concrete500);
+    } else if (a === 'counter' && was === 'false' && now === 'true') {
+      d.burst('paper', 5, x, 1.1, z, 1.4, 0.18, PALETTE.paper);
+    }
+  }
+
+  /**
+   * Дым заражения: бетонная взвесь кружит вокруг сотрудника. В плоском
+   * виде это были незамкнутые контуры, здесь — мягкие клубы.
+   */
+  private smoke(e: Entity, x: number, z: number, s: number, f: FrameInfo, b: Batches): void {
+    const cfg = TUNING.fx;
+    const puffs = Math.max(0, Math.round(cfg.smokePuffs));
+    if (puffs === 0 || cfg.smokeAlpha <= 0) return;
+    for (let i = 0; i < puffs; i++) {
+      const seed = e * 7 + i * 13;
+      const spin = f.time * cfg.smokeSpin * (i % 2 === 0 ? 1 : -1) + seed;
+      const r = s + cfg.smokeRadius * U + Math.sin(f.time + seed) * cfg.smokeSpread * U;
+      const size = 0.28 + 0.1 * Math.sin(f.time * 1.3 + seed);
+      b.puff.flat(x + Math.cos(spin) * r, z + Math.sin(spin) * r, size, size, 0.35 + i * 0.3, PALETTE.concrete500, cfg.smokeAlpha * 0.9 * (1 - i / (puffs + 1)));
+    }
+  }
+
   // --- Снаряды ---------------------------------------------------------------
 
   private bullets(w: World, f: FrameInfo, b: Batches): void {
+    const seen = new Map<Entity, { x: number; z: number; vx: number; vz: number; life: number; glow: boolean; card: boolean }>();
     const counts: Record<string, number> = {};
     for (const name of Object.keys(this.shots)) counts[name] = 0;
     const h = TUNING.view3d.shotHeight;
@@ -1186,6 +1406,9 @@ export class Actors {
       const z = lerp(t.py, t.y, f.alpha) * U;
       const s = draw.size * U;
       const glow = draw.color === PALETTE.red;
+      const bc = w.bulletC.get(e);
+      const bb = w.body.get(e);
+      seen.set(e, { x, z, vx: (bb?.vx ?? 0) * U, vz: (bb?.vy ?? 0) * U, life: bc?.life ?? 0, glow, card: draw.shape === 'card' });
       const shape = SHOT_SHAPES.includes(draw.shape as (typeof SHOT_SHAPES)[number]) ? draw.shape : 'dot';
       const name = glow ? `glow:${shape === 'card' ? 'dot' : shape}` : `solid:${shape}`;
       const mesh = this.shots[name];
@@ -1220,6 +1443,24 @@ export class Actors {
       mesh.setColorAt(i, this.tmpC);
       if (glow) b.glow.upright(x, h, z, s * 4, s * 4, draw.color, 0.9);
     }
+    // Исчезла раньше срока — во что-то попала: бетон крошится, бумага рвётся.
+    if (this.debris !== null && !this.quiet) {
+      for (const [e, p] of this.flying) {
+        if (seen.has(e) || p.life <= STEP * 1.5) continue;
+        const ix = p.x + p.vx * STEP;
+        const iz = p.z + p.vz * STEP;
+        const wall = isSolidPoint(w.map, ix / U, iz / U);
+        const h = TUNING.view3d.shotHeight;
+        const back = Math.hypot(p.vx, p.vz) || 1;
+        const rx = (-p.vx / back) * 1.5;
+        const rz = (-p.vz / back) * 1.5;
+        if (wall) this.debris.burst('chip', 5, ix, h, iz, 2.4, 0.04, 0x8a8d91, rx, rz);
+        if (p.glow) this.debris.burst('spark', 7, ix, h, iz, 4.5, 0.035, 0xff6a3a, rx, rz, 0.6);
+        else if (p.card) this.debris.burst('paper', 3, ix, h, iz, 1.6, 0.09, PALETTE.paper, rx * 0.5, rz * 0.5, 0.5);
+        else this.debris.burst('spark', 4, ix, h, iz, 3, 0.03, 0xfff1d0, rx, rz, 0.6);
+      }
+    }
+    this.flying = seen;
     for (const [name, mesh] of Object.entries(this.shots)) {
       mesh.count = counts[name] ?? 0;
       mesh.instanceMatrix.needsUpdate = true;

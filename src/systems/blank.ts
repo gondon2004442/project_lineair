@@ -12,6 +12,7 @@
 import { destroyEntity, type World } from '../ecs';
 import { TUNING } from '../tuning';
 import { applyDamage } from './damage';
+import { bodyMass, kick, shove } from './impulse';
 
 export function blankSystem(w: World): void {
   if (!w.input.blankQueued) return;
@@ -59,6 +60,25 @@ export function blankSystem(w: World): void {
       body.vx += (dx / len) * cfg.pushForce;
       body.vy += (dy / len) * cfg.pushForce;
     }
+    // Волна сильнее у центра и слабеет к краю.
+    const falloff = 1 - Math.min(1, len / cfg.cancelRadius);
+    const k = (TUNING.physics.blankKick * falloff) / bodyMass(w, e);
+    kick(w, e, (dx / len) * k, (dy / len) * k);
     applyDamage(w, e, cfg.damage);
+  }
+
+  // Мебель разлетается от субъекта: волна бланка толкает всё, что не
+  // прибито, и быстрое становится снарядом.
+  for (const [e] of w.propC) {
+    const pt = w.transform.get(e);
+    if (pt === undefined) continue;
+    const dx = pt.x - t.x;
+    const dy = pt.y - t.y;
+    const d2 = dx * dx + dy * dy;
+    if (d2 > reach || d2 === 0) continue;
+    const len = Math.sqrt(d2);
+    const falloff = 1 - Math.min(1, len / cfg.cancelRadius);
+    const push = TUNING.physics.blankPropPush * falloff;
+    shove(w, e, (dx / len) * push, (dy / len) * push);
   }
 }

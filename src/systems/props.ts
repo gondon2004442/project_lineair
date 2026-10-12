@@ -11,6 +11,7 @@ import { statAt } from '../weapon';
 import { applyDamage } from './damage';
 import { spillAt, toppleAt } from './fixtures';
 import { PROPS_BY_ID } from '../data/props';
+import { bodyMass, kick, shove } from './impulse';
 
 export function propSystem(w: World, dt: number): void {
   const cfg = TUNING.prop;
@@ -86,6 +87,17 @@ function strike(
     w.sounds.push('impact');
     prop.lastHit = target;
     health.hp -= TUNING.prop.impactSelfDamage;
+    // Удар передаёт импульс: сотрудника отбрасывает по ходу предмета, а
+    // сам предмет теряет большую часть скорости — он отдал её телу.
+    const pb = w.body.get(e);
+    if (pb !== undefined && speed > 0) {
+      const imp = mass * speed * TUNING.physics.kickPerImpulse * TUNING.physics.chainFactor;
+      const m = bodyMass(w, target);
+      kick(w, target, (pb.vx / speed) * (imp / m), (pb.vy / speed) * (imp / m));
+      const keep = Math.max(0, 1 - Math.min(1, m / (m + mass)) * (1 + TUNING.physics.propRestitution));
+      pb.vx *= keep;
+      pb.vy *= keep;
+    }
     return;
   }
 
@@ -146,6 +158,7 @@ export function propPushSystem(w: World, dt: number): void {
     const pb = w.body.get(e);
     if (pt === undefined || pb === undefined) continue;
 
+    const player = w.playerC.get(w.player);
     for (const target of [w.player, ...w.staffC.keys()]) {
       const tt = w.transform.get(target);
       const tb = w.body.get(target);
@@ -155,6 +168,11 @@ export function propPushSystem(w: World, dt: number): void {
       const dist = Math.hypot(dx, dy);
       const minDist = pb.radius + tb.radius;
       if (dist >= minDist || dist === 0) continue;
+      // Рывок пинает: влетел в стул — стул летит, тяжёлый стол едва сдвинется.
+      if (target === w.player && player !== undefined && player.phase === 'dash' && TUNING.physics.dashKick > 0) {
+        shove(w, e, player.dashX * TUNING.physics.dashKick, player.dashY * TUNING.physics.dashKick);
+        continue;
+      }
       const push = (1 - dist / minDist) * TUNING.prop.pushForce * dt;
       tt.x += (dx / dist) * push;
       tt.y += (dy / dist) * push;

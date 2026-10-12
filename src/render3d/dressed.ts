@@ -857,6 +857,12 @@ export function buildDressed(w: World, m: Materials): RoomView {
     warm: t.id === 'office',
     floors: [floorMesh],
     aoHidden,
+    shard:
+      template === 'cubicles'
+        ? { kind: 'paper', color: 0x5b6168 }
+        : t.id === 'boiler'
+          ? { kind: 'metal', color: 0xb9bec2 }
+          : { kind: 'glass', color: t.id === 'void' ? 0xf2f2f2 : 0xffffff },
     look: () => ({
       sun: t.sun,
       sky: t.sky,

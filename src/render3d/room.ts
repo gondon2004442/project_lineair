@@ -11,6 +11,7 @@ import type { World } from '../ecs';
 import { buildDressed } from './dressed';
 import { buildLobby } from './lobby';
 import type { Materials } from './materials';
+import type { DebrisKind } from './debris';
 
 export interface Lamp {
   x: number;
@@ -60,6 +61,8 @@ export interface RoomView {
   aoHidden: Object3D[];
   /** Читается каждый кадр: крутилки меняют свет на живую. */
   look?: () => RoomLook;
+  /** Чем осыпается разрушаемая перегородка: стекло, рабица, ткань. */
+  shard?: { kind: DebrisKind; color: number };
   /** Живое помещения: часы, мерцание экрана, ветер в листьях. */
   tick?(time: number): void;
   dispose(): void;

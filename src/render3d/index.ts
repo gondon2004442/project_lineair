@@ -20,6 +20,7 @@ import {
   HemisphereLight,
   Mesh,
   MeshBasicMaterial,
+  MeshStandardMaterial,
   NormalBlending,
   PCFShadowMap,
   PerspectiveCamera,
@@ -40,6 +41,8 @@ import {
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
 import { Reflection } from './reflect';
+import { Debris, heightsFor } from './debris';
+import { TILE_WALL, TILE_WEAK } from '../room';
 import type { World } from '../ecs';
 import type { Renderer } from '../renderer';
 import { PALETTE } from '../palette';
@@ -194,6 +197,15 @@ export async function createRenderer3D(host: HTMLElement): Promise<Renderer> {
 
   const actors = new Actors(m);
   scene.add(actors.group);
+  // Обломки: физика кадра поверх симуляции.
+  const debris = new Debris(new MeshStandardMaterial({ color: 0xffffff, roughness: 0.85, side: 2 }));
+  scene.add(debris.group);
+  actors.debris = debris;
+  /** Карта прошлого кадра: по разнице видно, что разбили и что выросло. */
+  let prevTiles: Uint8Array | null = null;
+  let prevWeak: Uint8Array | null = null;
+  let prevPlace = '';
+  let prevBlank = 0;
 
   const aoHidden: Object3D[] = [keyBeam, dust, decal.mesh, glow.mesh, puff.mesh];
   const aoBase = aoHidden.length;
@@ -292,6 +304,35 @@ export async function createRenderer3D(host: HTMLElement): Promise<Renderer> {
     fit();
   }
 
+  let lastWorldForPlace: World | null = null;
+
+  /**
+   * Разница карты в одной комнате. Прочность стекла упала — сыплются
+   * осколки; клетка стала полом — перегородки больше нет, сыплется всё;
+   * пол стал стеной — помещение перестроилось, поднимается пыль.
+   */
+  function mapDiff(w: World, tiles: Uint8Array, weak: Uint8Array): void {
+    const map = w.map;
+    if (tiles.length !== map.tiles.length) return;
+    const shard = room?.shard ?? { kind: 'glass' as const, color: 0xffffff };
+    for (let i = 0; i < map.tiles.length; i++) {
+      const cx = (i % map.cols) + 0.5;
+      const cz = Math.floor(i / map.cols) + 0.5;
+      const was = tiles[i];
+      const now = map.tiles[i];
+      if (was === TILE_WEAK && now === TILE_WEAK && (map.weakHp[i] ?? 0) < (weak[i] ?? 0)) {
+        debris.burst(shard.kind, 7, cx, 0.9, cz, 2.4, 0.12, shard.color);
+      } else if (was === TILE_WEAK && now !== TILE_WEAK) {
+        debris.burst(shard.kind, 28, cx, 1.0, cz, 3.2, 0.16, shard.color);
+        debris.burst('metal', 4, cx, 1.5, cz, 2.2, 0.06, 0x8a8f96);
+      } else if (was !== TILE_WALL && now === TILE_WALL) {
+        debris.burst('chip', 14, cx, 0.2, cz, 3.0, 0.07, PALETTE.concrete500);
+      } else if (was === TILE_WALL && now !== TILE_WALL) {
+        debris.burst('chunk', 10, cx, 0.6, cz, 2.6, 0.18, PALETTE.concrete500);
+      }
+    }
+  }
+
   function rebuildRoom(w: World): void {
     if (room !== null) {
       room.group.removeFromParent();
@@ -334,11 +375,24 @@ export async function createRenderer3D(host: HTMLElement): Promise<Renderer> {
       }
       const signed = w.seals.includes(w.depth);
       const keyNow = [w.mapToken, w.room, w.scene, w.depth, signed, v.wallHeight, v.innerWallHeight, v.southWallHeight, v.doorHeight].join('|');
+      const place = [w.room, w.scene, w.depth, w === lastWorldForPlace ? 1 : 0].join('|');
+      lastWorldForPlace = w;
       if (keyNow !== roomKey) {
+        // Та же комната, карта сменилась: разбили стекло или выросла стена.
+        if (place === prevPlace && prevTiles !== null && prevWeak !== null) mapDiff(w, prevTiles, prevWeak);
+        else {
+          debris.clear();
+          actors.quiet = true;
+        }
         roomKey = keyNow;
         rebuildRoom(w);
         fit();
+        const v3 = TUNING.view3d;
+        debris.world = { map: w.map, height: heightsFor(w.map, v3.wallHeight, 1.0, Math.max(0.25, v3.southWallHeight)) };
       }
+      prevPlace = place;
+      prevTiles = Uint8Array.from(w.map.tiles);
+      prevWeak = Uint8Array.from(w.map.weakHp);
       profiler.end('КАДР: ТАЙЛМАП');
 
       // Красное состояние ведётся к цели ровно, как в плоском виде.
@@ -505,8 +559,12 @@ export async function createRenderer3D(host: HTMLElement): Promise<Renderer> {
       puff.begin();
       glow.right.copy(camRight);
       glow.up.copy(camUp);
+      // Волна бланка сдувает всё лежащее.
+      if (w.fx.blankTime > prevBlank + 1e-4) debris.push(w.fx.blankX * U, w.fx.blankY * U, TUNING.blank.cancelRadius * U, 9, 0.6);
+      prevBlank = w.fx.blankTime;
       actors.sync(w, {
         alpha,
+        dt: frame,
         soft: room?.warm === true && w.scene === 'run',
         time: w.tick * STEP,
         skin,
@@ -520,6 +578,7 @@ export async function createRenderer3D(host: HTMLElement): Promise<Renderer> {
       glow.end();
       svc.end();
       puff.end();
+      debris.update(frame, time);
       if (actors.playerRoot !== null) actors.playerRoot.traverse((o) => o.layers.enable(SUBJECT_LAYER));
       profiler.end('КАДР: СУЩНОСТИ');
 
@@ -601,7 +660,7 @@ export async function createRenderer3D(host: HTMLElement): Promise<Renderer> {
   };
 
   // Отладочная ручка: стенд и консоль добираются до сцены и проходов.
-  Object.defineProperty(window, 'lineair3d', { value: { gl, scene, camera, post, debugView }, configurable: true });
+  Object.defineProperty(window, 'lineair3d', { value: { gl, scene, camera, post, debugView, debris }, configurable: true });
 
   return renderer;
 }

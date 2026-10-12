@@ -6,6 +6,7 @@ import { spawnProp } from '../spawn';
 import { TUNING } from '../tuning';
 import { applyDamage } from './damage';
 import { PROPS_BY_ID } from '../data/props';
+import { bodyMass, kick, shove } from './impulse';
 
 export function bulletSystem(w: World, dt: number): void {
   for (const [e, bullet] of w.bulletC) {
@@ -55,6 +56,8 @@ export function bulletSystem(w: World, dt: number): void {
         health.hp -= bullet.damage;
         health.flash = TUNING.feel.flashTime;
       }
+      // Пуля толкает мебель: лёгкий стул ползёт под огнём, шкаф стоит.
+      pushAlong(w, prop, b, TUNING.physics.bulletPush * bullet.damage, false);
       bullet.lastHit = prop;
       if (bullet.pierce <= 0) {
         destroyEntity(w, e);
@@ -82,6 +85,8 @@ export function bulletSystem(w: World, dt: number): void {
         if (target === bullet.lastHit || !hit(w, e, b.radius, target)) continue;
         applyDamage(w, target, bullet.damage);
         if (bullet.pin > 0) pinTo(w, target, b.vx, b.vy, bullet.pin);
+        // Попадание отбрасывает. Пришитого не трогаем: скоба держит.
+        else pushAlong(w, target, b, (TUNING.physics.bulletKick * bullet.damage) / bodyMass(w, target), true);
         bullet.lastHit = target;
         // Пробивающий снаряд идёт дальше, пока не выберет запас.
         if (bullet.pierce <= 0) {
@@ -207,6 +212,16 @@ function steer(
   const next = current + turn;
   b.vx = Math.cos(next) * speed;
   b.vy = Math.sin(next) * speed;
+}
+
+/** Толкнуть цель по ходу снаряда: мебель — скоростью, тело — отбросом. */
+function pushAlong(w: World, target: Entity, b: { vx: number; vy: number }, amount: number, body: boolean): void {
+  const len = Math.hypot(b.vx, b.vy);
+  if (len === 0 || amount <= 0) return;
+  const dx = b.vx / len;
+  const dy = b.vy / len;
+  if (body) kick(w, target, dx * amount, dy * amount);
+  else shove(w, target, dx * amount, dy * amount);
 }
 
 function hit(w: World, bulletEntity: number, bulletRadius: number, target: number): boolean {
