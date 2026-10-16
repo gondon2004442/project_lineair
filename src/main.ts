@@ -20,6 +20,7 @@ import { spawnProp, spawnStaff } from './spawn';
 import { damageFactorAgainst, hasTrait, penaltyOf, statAt } from './weapon';
 import { applyDamage } from './systems/damage';
 import { ticketValue } from './systems/tickets';
+import { toppleAt } from './systems/fixtures';
 import { counterInReach, counterOffer } from './systems/counter';
 import { deskPrice, issueOffer, safeContents } from './systems/issue';
 import { DECOR, DECOR_BY_ID, DECOR_TOO_LIGHT } from './data/decor';
@@ -149,6 +150,9 @@ async function boot(): Promise<void> {
       // Глубина красного состояния в этом кадре: стенд мерит по ней
       // рампу входа и выхода.
       hissNow: () => renderer.hiss,
+      // Экран ↔ мир: стендам нужно знать, куда в кадре попал объект, а
+      // масштаб сцены зависит от ширины панели крутилок.
+      screenToWorld: (sx: number, sy: number) => renderer.screenToWorld(sx, sy),
       createWorld,
       enterRoom,
       // Вертикаль: стенд спускает мир руками и сверяет, что переехало.
@@ -172,6 +176,9 @@ async function boot(): Promise<void> {
       spawnStaff,
       // Мебель нужна стенду скобы: к ней пришивают так же, как к стене.
       spawnProp,
+      // Опрокидывание нужно стенду подвешенных: иначе не проверить, что
+      // его не роняют, а опускают.
+      toppleAt,
       statAt,
       // Ось «против должности» проверяется только так: путь тюнинга
       // про цель ничего не знает.

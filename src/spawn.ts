@@ -12,7 +12,7 @@ import { WEAPON_FORMS } from './data/weaponForms';
 import { createEntity, type Entity, type Faction, type Shape, type StashKind, type World } from './ecs';
 import { PALETTE } from './palette';
 import type { CounterSpec } from './data/counters';
-import type { FixtureSpec } from './data/fixtures';
+import { FIXTURE_HUNG, type FixtureSpec } from './data/fixtures';
 import { TUNING } from './tuning';
 import { penaltyOf } from './weapon';
 
@@ -382,7 +382,15 @@ export function spawnFixture(w: World, spec: FixtureSpec, x: number, y: number):
   const e = createEntity(w);
   w.transform.set(e, { x, y, px: x, py: y });
   w.body.set(e, { vx: 0, vy: 0, radius: spec.radius });
-  w.fixtureC.set(e, { kind: spec.id, title: spec.title, toppled: false, spillX: 1, spillY: 0 });
+  w.fixtureC.set(e, {
+    kind: spec.id,
+    title: spec.title,
+    toppled: false,
+    // Подвешенный появляется поднятым: это его состояние, а не событие.
+    hung: spec.id === FIXTURE_HUNG,
+    spillX: 1,
+    spillY: 0,
+  });
   w.drawC.set(e, {
     shape: 'square',
     size: spec.radius,

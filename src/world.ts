@@ -1,6 +1,6 @@
 /** Сборка этажа и вход в помещение. Всё случайное — из seeded PRNG. */
 import { destroyEntity, type World, componentStores } from './ecs';
-import { cleansedRoom, distortionNow, retire } from './systems/cleanse';
+import { cleansedRoom, distortionNow, landHung, retire } from './systems/cleanse';
 import { POST_COURIER, POST_ARCHIVIST, POST_KEEPER } from './data/posts';
 import { MINI_BOSS_POSTS, STAFFING_BY_ID, type StaffPost } from './data/staffing';
 import { DEEPEST, floorAt } from './data/floors';
@@ -34,7 +34,7 @@ import { SUBJECT_START, subjectAt, walledAt } from './data/subjects';
 import { ENDINGS } from './data/endings';
 import { ammoMax, reserveMax } from './weapon';
 import { COUNTERS, type CounterSpec } from './data/counters';
-import { FIXTURES_BY_ID } from './data/fixtures';
+import { FIXTURE_HUNG, FIXTURES_BY_ID } from './data/fixtures';
 import { spillAt } from './systems/fixtures';
 import {
   postNumbers,
@@ -353,6 +353,7 @@ export function enterRoom(w: World, index: number, fromDir: Dir | null): void {
   placeWalled(w, room, spot.x, spot.y);
   placeForm(w, room, spot.x, spot.y);
   placeVerdict(w, room);
+  placeHung(w, room, spot.x, spot.y);
   placeSections(w, room);
   if (!room.cleared) staffRoom(w, room, spot.x, spot.y);
   // Помещение, до которого волна уже дошла: штат в нём набирается, как
@@ -360,6 +361,7 @@ export function enterRoom(w: World, index: number, fromDir: Dir | null): void {
   // бы пустым, а он не пустой — в нём сидят люди.
   if (cleansedRoom(w, index)) {
     for (const [e] of [...w.staffC]) retire(w, e);
+    landHung(w, room);
   }
   if (w.staffC.size === 0 && !room.cleared) {
     room.cleared = true;
@@ -634,6 +636,44 @@ function placeWalled(w: World, room: RoomNode, entryX: number, entryY: number): 
   if (!wanted || where !== room.index) return;
   const spot = findSpawnSpot(w.map, rng, entryX, entryY, TUNING.stash.clearance, cfg.radius);
   spawnStash(w, 'walled', spec.id, `ЗАМУРОВАННЫЙ · ${spec.title}`, spot.x, spot.y);
+}
+
+/**
+ * ПОДВЕШЕННЫЕ. Их тем больше, чем глубже.
+ *
+ * Считаются от посевной этажа, а не раскладываются по ходу: вернувшись
+ * в помещение, застанешь того же подвешенного на том же месте. В
+ * вестибюле он один на весь этаж, в натурной части они почти в каждом
+ * помещении — и это единственная шкала, по которой видно глубину, не
+ * заглядывая в номер уровня.
+ */
+function placeHung(w: World, room: RoomNode, entryX: number, entryY: number): void {
+  const cfg = TUNING.hung;
+  const want = Math.max(0, Math.round(cfg.base + cfg.perDepth * (Math.abs(w.depth) - 1)));
+  if (want <= 0) return;
+  const spec = FIXTURES_BY_ID.get(FIXTURE_HUNG);
+  if (spec === undefined) return;
+
+  const rng = makeRng((w.seed + Math.abs(w.depth) * cfg.seedStride) >>> 0);
+  // Коридоры годятся: в проходе он читается даже лучше, чем в зале.
+  // Не годится только вход — там здание ещё притворяется.
+  const pool = w.floor.rooms.filter((r) => r.kind !== 'start').map((r) => r.index);
+  // Выбор помещений делается целиком и всегда, даже если нас в них нет:
+  // иначе набор зависел бы от порядка обхода этажа. Перетасовка, а не
+  // попытки наугад: иначе на глубине, где их много, половина попыток
+  // уходила бы в уже занятые помещения и подвешенных недоставало.
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = rng.int(i + 1);
+    const a = pool[i];
+    const b = pool[j];
+    if (a === undefined || b === undefined) continue;
+    pool[i] = b;
+    pool[j] = a;
+  }
+  if (!pool.slice(0, want).includes(room.index)) return;
+  const spot = findSpawnSpot(w.map, rng, entryX, entryY, TUNING.fixture.clearance, spec.radius);
+  if (!onOpenFloor(w.map, spot.x, spot.y, spec.radius)) return;
+  spawnFixture(w, spec, spot.x, spot.y);
 }
 
 /**

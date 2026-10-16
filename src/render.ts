@@ -646,14 +646,41 @@ function drawDecor(g: Graphics, w: World): void {
  */
 function drawFixture(
   g: Graphics,
-  fixture: { kind: string; toppled: boolean; spillX: number; spillY: number },
+  fixture: { kind: string; toppled: boolean; hung: boolean; spillX: number; spillY: number },
   draw: { size: number; color: number },
   x: number,
   y: number,
+  /** Номер сущности: по нему считается неподвижный шум частиц. */
+  e: number,
 ): void {
   const spec = FIXTURES_BY_ID.get(fixture.kind);
   const cfg = TUNING.fixture;
   const half = draw.size;
+
+  // Подвешенный: тело поднято, а тень лежит в стороне и меньше его.
+  // Больше ничего и не нужно — именно по разъехавшейся тени сверху
+  // читается, что он висит, а не стоит.
+  if (fixture.hung) {
+    const hung = TUNING.hung;
+    contactShadow(g, x + hung.shadowShift, y + hung.shadowShift, half * hung.shadowScale, 1);
+    // Частицы, стекающие вниз: шум неподвижный, от номера сущности, —
+    // иначе они дрожали бы каждый кадр и читались как помеха.
+    const motes = Math.max(0, Math.round(hung.motes));
+    for (let i = 0; i < motes; i++) {
+      const sx = x + (spillNoise(e, i) - 0.5) * half * 1.6;
+      const sy = y + half * 0.4 + spillNoise(e, i + 31) * hung.moteFall;
+      g.rect(sx, sy, hung.moteSize, hung.moteSize).fill({
+        color: PALETTE.concrete300,
+        alpha: 0.5,
+      });
+    }
+    const lift = hung.lift;
+    block(g, x - half, y - half - lift, half * 2, half * 2, draw.color);
+    // Светлая полоса поперёк: то же место, где у должности табличка.
+    // Её здесь нет и быть не может — его никуда не назначили.
+    g.rect(x - half, y - lift, half * 2, 2).fill(PALETTE.concrete700);
+    return;
+  }
 
   if (!fixture.toppled) {
     contactShadow(g, x, y, half, 1);
@@ -1555,7 +1582,7 @@ function drawEntities(
     // Оборудование: стоящее видно как мебель, лежащее — как след.
     const fixture = w.fixtureC.get(e);
     if (fixture !== undefined) {
-      drawFixture(g, fixture, draw, x, y);
+      drawFixture(g, fixture, draw, x, y, e);
       continue;
     }
 

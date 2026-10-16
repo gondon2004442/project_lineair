@@ -101,6 +101,26 @@ export function retire(w: World, e: Entity): void {
 }
 
 /** Числится ли сотрудник на ставке: снятые в штат не входят. */
+/**
+ * Опустить подвешенных этого помещения. Считаются они ровно один раз на
+ * помещение: оборудование ставится заново при каждом входе, а спасённый
+ * остаётся тем же человеком, сколько раз ни возвращайся.
+ */
+export function landHung(w: World, room: { landed: boolean }): boolean {
+  let landed = 0;
+  for (const [, fixture] of w.fixtureC) {
+    if (!fixture.hung) continue;
+    fixture.hung = false;
+    landed += 1;
+  }
+  if (landed === 0) return false;
+  if (!room.landed) {
+    room.landed = true;
+    w.record.retired += landed;
+  }
+  return true;
+}
+
 export function onDuty(w: World): number {
   let count = 0;
   for (const [, staff] of w.staffC) {
@@ -124,5 +144,8 @@ export function cleanseSystem(w: World, dt: number): void {
     retire(w, e);
     any = true;
   }
+  // Подвешенные опускаются на пол. Приёмка закрывает и их дела тоже —
+  // по ним решение не принимали, а теперь приняли.
+  if (landHung(w, room)) any = true;
   if (any) w.sounds.push('stamp');
 }
