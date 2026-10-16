@@ -683,8 +683,14 @@ function placeHung(w: World, room: RoomNode, entryX: number, entryY: number): vo
  * решением. Стойки стоят в ряд, подписаны и ничего не стоят — платить
  * за собственное дело не надо, его надо выбрать.
  */
-function placeVerdict(w: World, room: RoomNode): void {
+export function placeVerdict(w: World, room: RoomNode): void {
   if (floorAt(w.depth).verdict !== true || room.index !== w.floor.end) return;
+  // Центральный архив лежит ЗА Комиссией: пока она заседает, решать
+  // нечего. Стойки выставляются по снятой печати, то есть после неё.
+  if (!w.seals.includes(w.depth)) return;
+  for (const [, stash] of w.stashC) {
+    if (stash.kind === 'verdict') return;
+  }
   const centre = roomCenter(w.map);
   const gap = TUNING.stash.deskGap;
   ENDINGS.forEach((ending, i) => {

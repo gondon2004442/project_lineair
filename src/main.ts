@@ -29,6 +29,7 @@ import { isSolidPoint, liftOpen } from './room';
 import { floorAt } from './data/floors';
 import { SUBJECTS, SUBJECT_START, subjectAt } from './data/subjects';
 import { shownRoom } from './hud';
+import { signLie } from './render';
 import { createWorld, descend, enterLobby, enterRoom, startRun } from './world';
 import type { World } from './ecs';
 
@@ -172,6 +173,9 @@ async function boot(): Promise<void> {
       // Искажение схемы проверяется только так: на экране это метка,
       // а числом — номер участка, который она показывает.
       shownRoom,
+      // Ложь указателей нужна стенду: на экране это табличка, а числом —
+      // номер помещения, который она называет.
+      signLie,
       step,
       spawnStaff,
       // Мебель нужна стенду скобы: к ней пришивают так же, как к стене.

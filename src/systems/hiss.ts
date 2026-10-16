@@ -9,14 +9,30 @@
  * Так её нельзя рассинхронить — ни смертью босса, ни сменой участка, ни
  * перестройкой. Как цель превращается в кадр, решает рендер.
  */
+import { floorAt } from '../data/floors';
 import type { World } from '../ecs';
 import { TUNING } from '../tuning';
 
-/** Идёт ли в этом помещении заседание: жив ли кто-то из начальников. */
+/**
+ * Идёт ли заседание: мы в приёмной, и держатель печати этого уровня ещё
+ * жив.
+ *
+ * Признак именно такой, а не «есть компонент одного из боссов». Во-
+ * первых, держатель печати у каждого уровня свой и меняется вместе с
+ * темой этажа — по компонентам это пришлось бы помнить в двух местах.
+ * Во-вторых, старшая ставка встречается и на рядовом участке как
+ * мини-босс, а заседание бывает только в приёмной: именно там
+ * приостанавливают допуск.
+ */
 export function seated(w: World): boolean {
-  return (
-    w.chiefC.size > 0 || w.archivistC.size > 0 || w.keeperC.size > 0 || w.commissionC.size > 0
-  );
+  if (w.room !== w.floor.end) return false;
+  const holder = floorAt(w.depth).sealHolder;
+  if (holder === '') return false;
+  for (const [e, staff] of w.staffC) {
+    if (staff.post !== holder || staff.retired) continue;
+    if ((w.health.get(e)?.hp ?? 0) > 0) return true;
+  }
+  return false;
 }
 
 /**

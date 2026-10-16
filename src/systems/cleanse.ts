@@ -16,6 +16,8 @@
 import { DIRS } from '../room';
 import type { Entity, World } from '../ecs';
 import { TUNING } from '../tuning';
+import { floorAt } from '../data/floors';
+import { placeVerdict } from '../world';
 
 /** Подписан ли акт приёмки этого уровня. */
 export function cleansed(w: World): boolean {
@@ -144,6 +146,11 @@ export function cleanseSystem(w: World, dt: number): void {
     retire(w, e);
     any = true;
   }
+  // Центральный архив открывается, как только приёмка дошла до него:
+  // Комиссия отстранена, и дело наконец можно взять в руки.
+  const spec = floorAt(w.depth);
+  if (spec.verdict === true && w.room === w.floor.end) placeVerdict(w, room);
+
   // Подвешенные опускаются на пол. Приёмка закрывает и их дела тоже —
   // по ним решение не принимали, а теперь приняли.
   if (landHung(w, room)) any = true;

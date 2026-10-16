@@ -18,7 +18,7 @@ import { dashIFrameWindow, dashSpec } from './systems/playerControl';
 import { COUNTERS_BY_KIND } from './data/counters';
 import { grabCandidate } from './systems/telekinesis';
 import { DIRS, TILE_DOOR, TILE_GATE, TILE_WALL, TILE_WEAK, liftOpen, type TileMap } from './room';
-import { roomNumber } from './floor';
+import { roomNumber, type RoomNode } from './floor';
 import { currentRoom } from './world';
 import { floorAt } from './data/floors';
 import { litAt } from './systems/postKeeper';
@@ -1087,6 +1087,20 @@ function drawDark(g: Graphics, w: World, alpha: number): void {
   }
 }
 
+/**
+ * Какое помещение напишут на табличке. Врёт она устойчиво: номер
+ * считается от посевной, участка и стороны, а не бросается заново
+ * каждый кадр. Иначе указатель читался бы как помеха, а не как ложь —
+ * а соврать он должен один раз и держаться этого.
+ */
+export function signLie(w: World, from: number, dir: number, honest: RoomNode): RoomNode {
+  const rng = makeRng((w.seed + from * TUNING.render.signSeedStride + dir) >>> 0);
+  if (rng.float() >= TUNING.render.signLieShare) return honest;
+  // Врёт она правдоподобно: называет помещение, которое на этаже есть.
+  const pool = w.floor.rooms.filter((r) => r.index !== from && r.index !== honest.index);
+  return pool[rng.int(Math.max(1, pool.length))] ?? honest;
+}
+
 /** Ширина набора в пикселях при заданном размере пикселя знака. */
 function signWidth(text: string, digit: number, gap: number): number {
   if (text.length === 0) return 0;
@@ -1131,10 +1145,15 @@ function drawDoorSigns(g: Graphics, w: World): void {
   const pad = Math.max(0, Math.round(cfg.signPad));
   const inset = Math.max(0, Math.round(cfg.signInset));
 
+  // Указатели врут: часть стрелок показывает не туда, куда ведёт дверь.
+  // Самое лёгкое искажение в игре — оно ничего не отнимает, но учит, что
+  // зданию нельзя верить, и учит на первом же этаже.
+  const lying = distortionNow(w, floorAt(w.depth)) === 'signs';
+
   for (const dir of DIRS) {
     const next = w.floor.rooms[room.neighbors[dir]];
     if (next === undefined) continue;
-    const text = roomNumber(next);
+    const text = roomNumber(lying ? signLie(w, room.index, dir, next) : next);
 
     // Собираем зев: клетки двери идут подряд вдоль своей стороны.
     const horizontal = dir === 0 || dir === 2;

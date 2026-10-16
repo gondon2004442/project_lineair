@@ -43,7 +43,7 @@ export const POSTS: PostSpec[] = [
   { id: 'inspector', title: 'ИНСПЕКТОР', skin: 50, silhouette: 'armed', plateMarks: 1, plates: 1, desk: false },
   { id: 'registrar', title: 'РЕГИСТРАТОР', skin: 35, silhouette: 'wide', plateMarks: 2, plates: 2, desk: true },
   { id: 'auditor', title: 'РЕВИЗОР', skin: 12, silhouette: 'bulk', plateMarks: 3, plates: 1, desk: false },
-  { id: 'chief', title: 'ЗАВЕДУЮЩИЙ СЕКТОРОМ', skin: 4, silhouette: 'desk', plateMarks: 4, plates: 2, desk: true },
+  { id: 'chief', title: 'ЗАВЕДУЮЩИЙ ВЕСТИБЮЛЕМ', skin: 4, silhouette: 'desk', plateMarks: 4, plates: 2, desk: true },
   { id: 'courier', title: 'КУРЬЕР', skin: 70, silhouette: 'slim', plateMarks: 2, plates: 1, desk: false },
   {
     /**
@@ -52,7 +52,7 @@ export const POSTS: PostSpec[] = [
      * него по шкале только центральный архив.
      */
     id: 'archivist',
-    title: 'ГЛАВНЫЙ АРХИВАРИУС',
+    title: 'УПРАВЛЯЮЩИЙ ДЕЛАМИ',
     skin: 2,
     silhouette: 'counter',
     plateMarks: 4,
