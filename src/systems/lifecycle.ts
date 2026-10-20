@@ -41,6 +41,10 @@ export function lifecycleSystem(w: World, dt: number): void {
       // инструмент: не выдаётся по описи, а снимается с него — заодно и
       // причина драться с ним помимо печати.
       if (w.chiefC.has(e)) dropCircular(w, e);
+      // Начальник отдела кадров: его распоряжения теряют силу вместе с
+      // ним. Иначе лист висит до конца участка, и отнятое им — форма,
+      // рывок, инвентарь — не возвращается уже ничем.
+      if (w.personnelC.has(e)) revokeOrders(w);
       // Печать уровня: снимается с того, кто им заведует. Это и есть
       // единственная причина убивать начальника — не добыча, а подпись.
       takeSeal(w, e);
@@ -68,6 +72,19 @@ function dropCircular(w: World, e: Entity): void {
   if (t === undefined) return;
   spawnStash(w, 'form', form.id, `${form.code} · ${form.title}`, t.x, t.y);
   w.sounds.push('ring');
+}
+
+/**
+ * Отозвать все распоряжения. Листы не просто перестают действовать —
+ * они исчезают: распоряжение без того, кто его подписал, не бумага.
+ */
+function revokeOrders(w: World): void {
+  for (const [e] of [...w.orderC]) {
+    w.orderC.delete(e);
+    w.propC.delete(e);
+    destroyEntity(w, e);
+  }
+  w.sounds.push('fan');
 }
 
 /** Благодарность: контейнер здоровья, который остаётся до конца забега. */

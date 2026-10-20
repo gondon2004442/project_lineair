@@ -94,6 +94,9 @@ export function buildWiring(w: World): void {
     const b = pool[rng.int(pool.length)];
     if (a === undefined || b === undefined || a === b) continue;
     if (a.to === b.to) continue;
+    // Дверь не должна вести в своё же помещение: вышел — и ты там же.
+    // Это читается как поломка, а не как искажение.
+    if (a.room === b.to || b.room === a.to) continue;
     const beforeA = wiring[slot(a.room, a.dir)];
     const beforeB = wiring[slot(b.room, b.dir)];
     wiring[slot(a.room, a.dir)] = b.to;
@@ -143,6 +146,7 @@ export function patchBoard(w: World): boolean {
     const a = честные[i];
     const b = честные[i + 1];
     if (a === undefined || b === undefined || a.to === b.to) continue;
+    if (a.room === b.to || b.room === a.to) continue;
     wiring[slot(a.room, a.dir)] = b.to;
     wiring[slot(b.room, b.dir)] = a.to;
     if (!connected(w, wiring)) {
