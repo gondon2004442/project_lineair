@@ -21,6 +21,7 @@ import { DIRS, TILE_DOOR, TILE_GATE, TILE_WALL, TILE_WEAK, liftOpen, type TileMa
 import { roomNumber, type RoomNode } from './floor';
 import { currentRoom } from './world';
 import { floorAt } from './data/floors';
+import { floorPalette, type FloorPalette } from './data/palettes';
 import { litAt } from './systems/postKeeper';
 import { statAt } from './weapon';
 import { DECOR_BY_ID } from './data/decor';
@@ -177,7 +178,7 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
       if (w.mapToken !== drawnToken) {
         drawnToken = w.mapToken;
         markLayer.clear();
-        drawRoom(roomLayer, markLayer, w.map, warmSector(w));
+        drawRoom(roomLayer, markLayer, w.map, warmSector(w), floorPalette(w.depth));
         drawDoorSigns(roomLayer, w);
         drawLift(roomLayer, w);
         drawDecor(decorLayer, w);
@@ -363,7 +364,13 @@ function warmSector(w: World): boolean {
   return TEMPLATES_BY_ID.get(room.template)?.sector === 'office';
 }
 
-function drawRoom(g: Graphics, svc: Graphics, map: TileMap, warm: boolean): void {
+function drawRoom(
+  g: Graphics,
+  svc: Graphics,
+  map: TileMap,
+  warm: boolean,
+  th: FloorPalette,
+): void {
   g.clear();
   const size = map.size;
   for (let cy = 0; cy < map.rows; cy++) {
@@ -373,11 +380,11 @@ function drawRoom(g: Graphics, svc: Graphics, map: TileMap, warm: boolean): void
       const tile = map.tiles[cy * map.cols + cx];
 
       if (tile === TILE_WALL) {
-        drawPanelledWall(g, map, cx, cy, x, y, size, warm);
+        drawPanelledWall(g, map, cx, cy, x, y, size, warm, th);
         continue;
       }
       if (tile === TILE_WEAK) {
-        drawGlassPartition(g, map, cx, cy, x, y, size);
+        drawGlassPartition(g, map, cx, cy, x, y, size, th);
         continue;
       }
       if (tile === TILE_GATE) {
@@ -385,7 +392,7 @@ function drawRoom(g: Graphics, svc: Graphics, map: TileMap, warm: boolean): void
         // служебная, поэтому уходит в слой разметки, а провал остаётся
         // в мире: он часть помещения.
         const inset = TUNING.render.gateInset;
-        g.rect(x, y, size, size).fill(PALETTE.black);
+        g.rect(x, y, size, size).fill(th.pit);
         svc.rect(x + inset, y + inset, size - inset * 2, size - inset * 2).stroke({
           width: TUNING.render.gateWidth,
           color: PALETTE.yellow,
@@ -394,15 +401,16 @@ function drawRoom(g: Graphics, svc: Graphics, map: TileMap, warm: boolean): void
         continue;
       }
 
-      // Пол: плитка и шов по краю. Пол светлее стен — на светлом полу
-      // тёмный силуэт читается, а не тонет.
-      g.rect(x, y, size, size).fill(PALETTE.floor);
+      // Пол: плитка и шов по краю. Цвет у обоих свой на каждом этаже:
+      // в холле пол светлее бетона, в бойлерной темнее, и ни одно из
+      // этих отношений в коде не зашито.
+      g.rect(x, y, size, size).fill(th.floor);
       g.rect(x, y, size, TUNING.render.floorGrid)
         .rect(x, y, TUNING.render.floorGrid, size)
-        .fill(PALETTE.floorSeam);
+        .fill(th.floorSeam);
 
       if (tile !== TILE_DOOR) continue;
-      drawDoorway(g, svc, map, cx, cy, x, y, size);
+      drawDoorway(g, svc, map, cx, cy, x, y, size, th);
     }
   }
 }
@@ -1331,13 +1339,14 @@ function drawPanelledWall(
   y: number,
   size: number,
   warm: boolean,
+  th: FloorPalette,
 ): void {
   // Сплошная заливка без выреза: соседние клетки стены сливаются в одну
   // массу, и сетки тайлов в стене не видно. Раньше у каждой клетки был
   // свой шов, и стена читалась как кладка из кубиков.
   // Выше обшивки побелка, а не голый бетон: контора делала ремонт.
   // Бетонный сектор остаётся бетонным — там ремонта не делали.
-  g.rect(x, y, size, size).fill(warm ? PALETTE.plaster : PALETTE.wall);
+  g.rect(x, y, size, size).fill(warm ? PALETTE.plaster : th.wall);
 
   const band = TUNING.render.wainscotBand;
   const rail = TUNING.render.brassRail;
@@ -1350,7 +1359,7 @@ function drawPanelledWall(
       ? { x, y: dy < 0 ? y : y + size - band, w: size, h: band }
       : { x: dx < 0 ? x : x + size - band, y, w: band, h: size };
     // Ореховая обшивка до полутора метров: сверху её видно полосой.
-    g.rect(face.x, face.y, face.w, face.h).fill(warm ? PALETTE.woodDark : PALETTE.concrete500);
+    g.rect(face.x, face.y, face.w, face.h).fill(warm ? PALETTE.woodDark : th.detail);
     const edge = horizontal
       ? { x, y: dy < 0 ? y + band : y + size - band - rail, w: size, h: rail }
       : { x: dx < 0 ? x + band : x + size - band - rail, y, w: rail, h: size };
@@ -1393,10 +1402,11 @@ function drawGlassPartition(
   x: number,
   y: number,
   size: number,
+  th: FloorPalette,
 ): void {
-  g.rect(x, y, size, size).fill(PALETTE.floor);
+  g.rect(x, y, size, size).fill(th.floor);
   const sill = TUNING.render.glassSill;
-  g.rect(x, y, size, size).stroke({ width: sill, color: PALETTE.furniture, alignment: 1 });
+  g.rect(x, y, size, size).stroke({ width: sill, color: th.furniture, alignment: 1 });
 
   const maxHp = Math.max(1, TUNING.room.weakWallHp);
   const left = map.weakHp[cy * map.cols + cx] ?? maxHp;
@@ -1423,9 +1433,10 @@ function drawDoorway(
   x: number,
   y: number,
   size: number,
+  th: FloorPalette,
 ): void {
   const horizontal = cy === 0 || cy === map.rows - 1;
-  g.rect(x, y, size, size).fill(PALETTE.black);
+  g.rect(x, y, size, size).fill(th.pit);
 
   if (map.doorsLocked) {
     // Заперто: служебная полоса поперёк зева.
@@ -1442,7 +1453,7 @@ function drawDoorway(
   const frame = horizontal
     ? { x, y: cy === 0 ? y : y + size - jamb, w: size, h: jamb }
     : { x: cx === 0 ? x : x + size - jamb, y, w: jamb, h: size };
-  g.rect(frame.x, frame.y, frame.w, frame.h).fill(PALETTE.furniture);
+  g.rect(frame.x, frame.y, frame.w, frame.h).fill(th.furniture);
 
   const t = TUNING.render.doorThreshold;
   for (let i = 0; i < 2; i++) {

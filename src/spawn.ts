@@ -13,6 +13,7 @@ import { createEntity, type Entity, type Faction, type Shape, type StashKind, ty
 import { PALETTE } from './palette';
 import type { CounterSpec } from './data/counters';
 import { FIXTURE_HUNG, type FixtureSpec } from './data/fixtures';
+import { floorPalette } from './data/palettes';
 import { TUNING } from './tuning';
 import { penaltyOf } from './weapon';
 
@@ -282,18 +283,30 @@ export function propNumbers(kind: string): PropNumbers {
  * светлый, кресло тёмное. Три ступени — три разных предмета на глаз,
  * даже если смотреть на кадр без цвета.
  */
-const PROP_SHADE: Record<string, number> = {
-  cabinet: PALETTE.furniture,
-  rubble: PALETTE.concrete500,
-  desk: PALETTE.furniture,
-  typewriter: PALETTE.concrete500,
-  cardbox: PALETTE.concrete700,
-  faxstand: PALETTE.concrete500,
-  tank: PALETTE.furniture,
+/**
+ * Чем красить укрытие. Ключи — роли в палитре этажа, а не цвета: мебель
+ * бойлерной и мебель холла это одна и та же мебель, просто на разных
+ * этажах она сделана из разного.
+ */
+const PROP_SHADE: Record<string, 'furniture' | 'detail' | 'accent'> = {
+  cabinet: 'furniture',
+  rubble: 'detail',
+  desk: 'furniture',
+  typewriter: 'detail',
+  cardbox: 'accent',
+  faxstand: 'detail',
+  tank: 'furniture',
 };
 
-function propShade(kind: string): number {
-  return PROP_SHADE[kind] ?? PALETTE.concrete700;
+/**
+ * Цвет берётся в момент появления, а не при отрисовке: сущности участка
+ * стираются при переходе, поэтому на новом этаже мебель и так родится
+ * заново — и родится уже в его цвете.
+ */
+function propShade(w: World, kind: string): number {
+  const th = floorPalette(w.depth);
+  const role = PROP_SHADE[kind] ?? 'furniture';
+  return role === 'detail' ? th.detail : role === 'accent' ? th.accent : th.furniture;
 }
 
 export function spawnProp(w: World, kind: string, x: number, y: number): Entity {
@@ -314,7 +327,7 @@ export function spawnProp(w: World, kind: string, x: number, y: number): Entity 
   w.drawC.set(e, {
     shape: 'square',
     size: numbers.radius,
-    color: propShade(kind),
+    color: propShade(w, kind),
     hollow: spec !== undefined && spec.hollow,
     desk: false,
   });
@@ -394,7 +407,12 @@ export function spawnFixture(w: World, spec: FixtureSpec, x: number, y: number):
   w.drawC.set(e, {
     shape: 'square',
     size: spec.radius,
-    color: PALETTE[spec.color as keyof typeof PALETTE],
+    // Оборудование тоже красит этаж: кулер в бойлерной не из того же
+    // материала, что кулер в холле.
+    color:
+      spec.color === 'furniture'
+        ? floorPalette(w.depth).furniture
+        : PALETTE[spec.color as keyof typeof PALETTE],
     hollow: false,
     desk: false,
   });
