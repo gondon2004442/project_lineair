@@ -2250,6 +2250,17 @@ function drawStash(
         g.rect(x - m, y - m * 0.5, m * 1.4, 2).fill(PALETTE.concrete100);
         g.rect(x - m * 0.4, y + m * 0.4, m * 1.4, 2).fill(PALETTE.concrete100);
       }
+    } else if (kind === 'board') {
+      // Щит с гнёздами: три пары точек и шнур между ними. Читается как
+      // коммутатор, а не как ящик с выдачей.
+      const m = half * 0.55;
+      for (let i = 0; i < 3; i++) {
+        const gx = x - m + i * m;
+        g.rect(gx - 1, y - m, 2, 2).fill(PALETTE.concrete100);
+        g.rect(gx - 1, y + m - 2, 2, 2).fill(PALETTE.concrete100);
+      }
+      g.moveTo(x - m, y - m + 1).lineTo(x, y + m - 1).stroke(pen);
+      g.moveTo(x, y - m + 1).lineTo(x + m, y + m - 1).stroke(pen);
     } else if (kind === 'form') {
       // Ящик с инструментом: уголок с перекладиной. Знак служебный и
       // прямой — это не предмет в дело, это выданное по описи.

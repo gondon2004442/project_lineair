@@ -10,6 +10,7 @@ import { DIRS, opposite, standingInDoor } from '../room';
 import { TUNING } from '../tuning';
 import { enterRoom } from '../world';
 import { onDuty } from './cleanse';
+import { linkOf } from './reroute';
 import { formStat, infiniteReserve, penaltyOf, reserveMax, statAt } from '../weapon';
 
 export function roomSystem(w: World): void {
@@ -45,7 +46,9 @@ export function roomSystem(w: World): void {
   for (const dir of DIRS) {
     const next = room.neighbors[dir];
     if (next < 0 || !standingInDoor(w.map, dir, t.x, t.y)) continue;
-    enterRoom(w, next, opposite(dir));
+    // Куда ведёт проём, решает раскоммутация этажа, а не схема: на
+    // уровне связи они расходятся, и это всё искажение целиком.
+    enterRoom(w, linkOf(w, room.index, dir), opposite(dir));
     return;
   }
 }

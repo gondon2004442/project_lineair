@@ -8,6 +8,7 @@
  * чтобы получить предмет потом.
  */
 import { ENDINGS_BY_ID } from '../data/endings';
+import { patchBoard } from './reroute';
 import { POST_INSPECTOR } from '../data/posts';
 import { SUBJECTS_BY_ID } from '../data/subjects';
 import { WEAPON_FORMS } from '../data/weaponForms';
@@ -60,6 +61,10 @@ export function issueCost(
   // эвакуации тоже даром: это починка схемы, а не добыча, и платить за
   // то, чтобы интерфейс перестал врать, игрок не должен.
   if (stash.kind === 'case' || stash.kind === 'evac') return 'free';
+
+  // Коммутатор не оформляют: к нему подходят и переключают. Платить за
+  // то, чтобы здание перестало путать двери, субъект не должен.
+  if (stash.kind === 'board') return w.patched ? '' : 'free';
 
   // Исход ничего не стоит: за собственное дело не платят, его решают.
   // Подшить чужое вместо своего можно только если кого-то освободили.
@@ -173,6 +178,7 @@ export function issueOffer(w: World, target: Entity): { text: string; ok: boolea
     return { text: `НУЖНО ${deskPrice(w, stash.kind)} ТАЛОНОВ`, ok: false };
   }
   if (stash.kind === 'verdict') return { text: 'НЕКОГО ПОДШИТЬ', ok: false };
+  if (stash.kind === 'board') return { text: 'УЖЕ ПЕРЕКОММУТИРОВАН', ok: false };
   // Ни замурованного, ни инструмент бланком не выпишут.
   if (stash.kind === 'walled' || stash.kind === 'form') {
     return { text: 'НУЖЕН ДОПУСК', ok: false };
@@ -343,6 +349,11 @@ export function issueSystem(w: World): void {
 
   if (stash.kind === 'verdict') {
     decide(w, stash.item);
+    return;
+  }
+
+  if (stash.kind === 'board') {
+    patchBoard(w);
     return;
   }
 

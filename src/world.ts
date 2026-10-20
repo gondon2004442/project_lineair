@@ -1,6 +1,7 @@
 /** Сборка этажа и вход в помещение. Всё случайное — из seeded PRNG. */
 import { destroyEntity, type World, componentStores } from './ecs';
 import { cleansedRoom, distortionNow, landHung, retire } from './systems/cleanse';
+import { buildWiring, rerouting } from './systems/reroute';
 import { POST_COURIER, POST_ARCHIVIST, POST_KEEPER } from './data/posts';
 import { MINI_BOSS_POSTS, STAFFING_BY_ID, type StaffPost } from './data/staffing';
 import { DEEPEST, floorAt } from './data/floors';
@@ -114,6 +115,8 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     tickets: 0,
     listed: false,
     evacPlan: false,
+    wiring: [],
+    patched: false,
     rebuildIn: 0,
     rebuilds: 0,
     sections: [],
@@ -226,6 +229,7 @@ export function startRun(w: World): void {
   w.record.service = 0;
   w.record.broken = 0;
   w.record.roomClean = true;
+  buildWiring(w);
   w.record.retired = 0;
   w.record.killed = 0;
   restorePlayer(w);
@@ -251,6 +255,8 @@ export function descend(w: World): void {
   w.evacPlan = false;
   // Новый уровень — новые работы: акт приёмки на него ещё не подписан.
   w.cleanse = -1;
+  // И своя раскоммутация, если этаж её требует.
+  buildWiring(w);
   w.note = [];
   w.noteSlot = -1;
   w.blanks = Math.max(w.blanks, TUNING.blank.refillTo);
@@ -354,6 +360,7 @@ export function enterRoom(w: World, index: number, fromDir: Dir | null): void {
   placeForm(w, room, spot.x, spot.y);
   placeVerdict(w, room);
   placeHung(w, room, spot.x, spot.y);
+  placeBoard(w, room, spot.x, spot.y);
   placeSections(w, room);
   if (!room.cleared) staffRoom(w, room, spot.x, spot.y);
   // Помещение, до которого волна уже дошла: штат в нём набирается, как
@@ -636,6 +643,21 @@ function placeWalled(w: World, room: RoomNode, entryX: number, entryY: number): 
   if (!wanted || where !== room.index) return;
   const spot = findSpawnSpot(w.map, rng, entryX, entryY, TUNING.stash.clearance, cfg.radius);
   spawnStash(w, 'walled', spec.id, `ЗАМУРОВАННЫЙ · ${spec.title}`, spot.x, spot.y);
+}
+
+/**
+ * КОММУТАТОР. Щит с гнёздами и шнурами в середине этажа.
+ *
+ * Стоит он в приёмной — там, куда субъект всё равно дойдёт, и где
+ * переключать раскоммутацию уже поздно настолько, чтобы это было
+ * решением, а не починкой.
+ */
+function placeBoard(w: World, room: RoomNode, entryX: number, entryY: number): void {
+  if (!rerouting(w) || w.patched || room.index !== w.floor.end) return;
+  const cfg = TUNING.reroute;
+  const rng = makeRng((w.seed + Math.abs(w.depth) * cfg.seedStride + 1) >>> 0);
+  const spot = findSpawnSpot(w.map, rng, entryX, entryY, TUNING.stash.clearance, cfg.radius);
+  spawnStash(w, 'board', '', 'КОММУТАТОР', spot.x, spot.y);
 }
 
 /**

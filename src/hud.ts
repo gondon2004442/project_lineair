@@ -1,6 +1,7 @@
 /** Служебный оверлей: состояние субъекта, схема этажа, отладка, seed. */
 import { TEMPLATES_BY_ID } from './data/roomTemplates';
 import { cleansed, cleansedRoom, distortionNow } from './systems/cleanse';
+import { patchedLinks } from './systems/reroute';
 import { issuedDirectives, type Directive } from './data/directives';
 import { floorAt } from './data/floors';
 import { ENDINGS, ENDINGS_BY_ID } from './data/endings';
@@ -541,6 +542,17 @@ function auditRow(w: World): string {
  * Приглашение к оформлению. Строка появляется только у шкафа или ячейки
  * и сразу говорит, чем платить: иначе игрок жмёт F наугад.
  */
+/**
+ * Коммутатор в строке приглашения: сколько связей переставлено сейчас.
+ * Больше ничего он не обещает — куда именно поведёт дверь после
+ * переключения, субъект узнает, пройдя в неё.
+ */
+function boardLine(w: World): string {
+  const links = patchedLinks(w);
+  if (links.length === 0) return 'СВЯЗИ В ПОРЯДКЕ';
+  return `ПЕРЕСТАВЛЕНО СВЯЗЕЙ: ${links.length}`;
+}
+
 function stashRow(w: World): string {
   const target = stashInReach(w);
   if (target < 0) return '';
@@ -549,7 +561,8 @@ function stashRow(w: World): string {
   const offer = issueOffer(w, target);
   // Оплаченная опись дописывается к названию шкафа: за этим её и берут.
   const listed = w.listed ? safeContents(w, target) : '';
-  const title = listed === '' ? stash.title : `${stash.title} · ${listed}`;
+  const extra = stash.kind === 'board' ? boardLine(w) : listed;
+  const title = extra === '' ? stash.title : `${stash.title} · ${extra}`;
   if (!offer.ok) return row(title, `<span class="warn">${offer.text}</span>`);
   return row(`F · ${title}`, `<span class="ok">${offer.text}</span>`);
 }

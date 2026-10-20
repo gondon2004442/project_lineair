@@ -30,6 +30,7 @@ import { floorAt } from './data/floors';
 import { SUBJECTS, SUBJECT_START, subjectAt } from './data/subjects';
 import { shownRoom } from './hud';
 import { signLie } from './render';
+import { linkOf, patchedLinks } from './systems/reroute';
 import { createWorld, descend, enterLobby, enterRoom, startRun } from './world';
 import type { World } from './ecs';
 
@@ -173,6 +174,10 @@ async function boot(): Promise<void> {
       // Искажение схемы проверяется только так: на экране это метка,
       // а числом — номер участка, который она показывает.
       shownRoom,
+      // Раскоммутация нужна стенду: на экране это дверь, а числом —
+      // помещение, в которое она на самом деле ведёт.
+      linkOf,
+      patchedLinks,
       // Ложь указателей нужна стенду: на экране это табличка, а числом —
       // номер помещения, который она называет.
       signLie,
