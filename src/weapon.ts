@@ -7,6 +7,7 @@
  */
 import { issuedDirectives } from './data/directives';
 import { subjectAt, SUBJECTS_BY_ID } from './data/subjects';
+import { GRANT_MODS } from './data/trials';
 import { ITEMS_BY_ID, type Item, type ItemMod } from './data/items';
 import { WEAPON_FORMS, type WeaponForm } from './data/weaponForms';
 import type { World } from './ecs';
@@ -52,6 +53,12 @@ export function statAt(w: World, path: string): number {
   // Субъект считается первым и тем же порядком, что приложение: он
   // такая же правка к путям, просто выписанная на него, а не на предмет.
   apply(subjectAt(w.subject).mods);
+  // Полномочия аттестации: выданы натурной частью и действуют до конца
+  // забега, как и всё, что контора оформила.
+  for (const id of w.grants) {
+    const mods = GRANT_MODS[id];
+    if (mods !== undefined) apply(mods);
+  }
   // Освобождённый отдаёт своё: только сильная сторона, без своей цены.
   for (const id of w.freed) {
     const freed = SUBJECTS_BY_ID.get(id);

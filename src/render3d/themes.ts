@@ -4,11 +4,11 @@
  * буфет на первом этаже и котельная на третьем стоят на одной сетке.
  *
  * Соответствие уровней концепту:
- *   −1 УЧАСТОК           → холл: светлый камень, окна, солнце
- *   −2 АРХИВ             → головной офис: ковролин, орех, вечерний свет
- *   −3 ТЕПЛОВОЙ УЗЕЛ     → бойлерная: сырой бетон, трубы, котлы
- *   −4 НАТУРНАЯ ЧАСТЬ    → белая пустота с чёрными монолитами
- *   −5 ЦЕНТРАЛЬНЫЙ АРХИВ → картотека: ряды серых шкафов, тусклый свет
+ *   −1 ВЕСТИБЮЛЬ И ХОЛЛ → светлый камень, окна, солнце
+ *   −2 ГОЛОВНОЙ ОФИС    → ковролин, орех, вечерний свет
+ *   −3 СВЯЗЬ И КАДРЫ    → холодный серый, бумага и латунь, коммутаторы
+ *   −4 БОЙЛЕРНАЯ        → сырой бетон, трубы, котлы
+ *   −5 НАТУРНАЯ ЧАСТЬ   → тёмные плиты в белой пустоте, золото по сколу
  */
 import { MeshStandardMaterial, type Material } from 'three';
 import { PALETTE } from '../palette';
@@ -26,7 +26,7 @@ import {
   type PbrSet,
 } from './textures';
 
-export type ThemeId = 'hall' | 'office' | 'boiler' | 'void' | 'files';
+export type ThemeId = 'hall' | 'office' | 'comms' | 'boiler' | 'void';
 
 export interface Theme {
   id: ThemeId;
@@ -84,7 +84,7 @@ function pbr(set: PbrSet, color: number, ns: number, rough?: number, metal = 0):
 export function themeFor(depth: number, m: Materials, L: PropMats): Theme {
   if (cache === null) cache = buildThemes(m, L);
   const id: ThemeId =
-    depth === -2 ? 'office' : depth === -3 ? 'boiler' : depth === -4 ? 'void' : depth <= -5 ? 'files' : 'hall';
+    depth === -2 ? 'office' : depth === -3 ? 'comms' : depth === -4 ? 'boiler' : depth <= -5 ? 'void' : 'hall';
   const theme = cache.get(id);
   if (theme === undefined) throw new Error(`Нет темы ${id}`);
   return theme;
@@ -184,9 +184,9 @@ function buildThemes(m: Materials, L: PropMats): Map<ThemeId, Theme> {
     bloom: 1.2,
   });
 
-  // Натурная часть: здание перестало притворяться. Белое, пустое, свет
-  // столбами, и только чёрные монолиты там, где были стены.
-  const white = pbr(whiteConcrete(), 0xffffff, 0.5);
+  // Натурная часть: здание перестало притворяться. Стен нет — тёмные
+  // плиты висят в белой пустоте, и по сколу у них золотая прожилка.
+  const white = pbr(whiteConcrete(), 0x3a434c, 0.9);
   const whiteWall = pbr(pl, 0xf2f2ef, 0.3);
   out.set('void', {
     id: 'void',
@@ -199,8 +199,8 @@ function buildThemes(m: Materials, L: PropMats): Map<ThemeId, Theme> {
     inner: 2.0,
     windows: false,
     pilasters: false,
-    sun: { az: 20, el: 62, intensity: 2.2, color: 0xffffff },
-    sky: 0.75,
+    sun: { az: 20, el: 62, intensity: 3.2, color: 0xffffff },
+    sky: 0.9,
     skyColor: 0xffffff,
     groundColor: 0x4a4a4a,
     env: 0.35,
@@ -215,31 +215,31 @@ function buildThemes(m: Materials, L: PropMats): Map<ThemeId, Theme> {
     bloom: 0,
   });
 
-  // Картотека: тёмный линолеум, крашеные в серо-зелёный стены, лампы
-  // дневного света через одну.
-  const lino = pbr(linoleum(0x3b423f), 0xffffff, 0.6);
-  const greyPaint = pbr(pl, 0x8d978f, 0.5);
-  const greyLow = pbr(pl, 0x4f5a55, 0.5);
-  out.set('files', {
-    id: 'files',
+  // Связь и кадры: холодный серый линолеум, стены в серо-зелёной масляной
+  // краске до плеча, выше побелка. Лампы дневного света, бумага и латунь.
+  const lino = pbr(linoleum(0x3a3f44), 0xffffff, 0.6);
+  const greyPaint = pbr(pl, 0x9aa19d, 0.5);
+  const greyLow = pbr(pl, 0x38483f, 0.5);
+  out.set('comms', {
+    id: 'comms',
     floor: lino,
     wall: greyPaint,
     clad: greyLow,
-    wainscot: 1.4,
+    wainscot: 1.45,
     cut,
-    height: 3.0,
+    height: 3.2,
     inner: 2.6,
     windows: false,
-    pilasters: false,
+    pilasters: true,
     sun: { az: 0, el: 80, intensity: 0, color: 0xffffff },
-    sky: 0.22,
-    skyColor: 0xd6e4dc,
-    groundColor: 0x1d2220,
+    sky: 0.2,
+    skyColor: 0xd6e0e4,
+    groundColor: 0x1d2224,
     env: 0.2,
-    exposure: 1.35,
-    panels: 2.4,
-    panelColor: 0xe2f2ea,
-    fill: 12,
+    exposure: 1.3,
+    panels: 2.2,
+    panelColor: 0xe6f0f2,
+    fill: 11,
     cones: false,
     voidColor: 0x000000,
     fog: 0.008,

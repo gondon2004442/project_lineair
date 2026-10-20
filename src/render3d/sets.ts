@@ -575,7 +575,7 @@ function hollow(c: Ctx, r: Rect, t: Theme): void {
   kit.box(t.cut, x0, h, z0 + wt, x0 + wt, h + 0.02, z1 - wt);
   kit.box(t.cut, x1 - wt, h, z0 + wt, x1, h + 0.02, z1 - wt);
   // Пол кабинетов.
-  const inner = t.id === 'boiler' ? t.floor : t.id === 'office' ? t.floor : t.id === 'files' ? t.floor : L.terrazzo;
+  const inner = t.id === 'boiler' ? t.floor : t.id === 'office' ? t.floor : t.id === 'comms' ? t.floor : L.terrazzo;
   kit.box(inner, x0 + wt, 0, z0 + wt, x1 - wt, 0.01, z1 - wt);
   // Поперечные перегородки по длинной оси.
   const alongX = x1 - x0 >= z1 - z0;
@@ -625,7 +625,7 @@ function office(c: Ctx, r: Rect, t: Theme): void {
   const dp = r.z1 - r.z0;
   if (wd < 1.2 || dp < 1.2) return;
   const desks = Math.max(1, Math.min(3, Math.floor(wd / 1.6)));
-  const top = t.id === 'files' ? S.greyCab : S.oak;
+  const top = t.id === 'comms' ? S.greyCab : S.oak;
   for (let i = 0; i < desks; i++) {
     const cx = r.x0 + (wd / desks) * (i + 0.5);
     const cz = r.z0 + Math.min(dp * 0.55, 1.4);

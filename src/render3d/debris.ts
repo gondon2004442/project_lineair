@@ -313,7 +313,13 @@ export class Debris {
 
       // Пол: отскок, трение, гаснущее вращение.
       const floor = this.world.height(Math.floor(x), Math.floor(z));
-      const ground = floor > 0 && y >= floor - 0.05 ? floor : 0;
+      // Отрицательная высота — провал: под клеткой пустота, обломок падает.
+      const ground = floor < 0 ? -Infinity : floor > 0 && y >= floor - 0.05 ? floor : 0;
+      if (y < -14) {
+        this.alive[i] = 0;
+        this.count -= 1;
+        continue;
+      }
       if (y - r < ground) {
         y = ground + r;
         if (this.vy[i]! < 0) this.vy[i] = -this.vy[i]! * k.bounce;
@@ -397,11 +403,19 @@ export class Debris {
 }
 
 /** Высоты по клеткам карты: стена в рост, мебель по пояс, перегородка — стекло. */
-export function heightsFor(map: TileMap, wallH: number, innerH: number, southH: number): (cx: number, cz: number) => number {
+export function heightsFor(
+  map: TileMap,
+  wallH: number,
+  innerH: number,
+  southH: number,
+  /** Края вместо стен: непроходимое — провал, а не бетон. */
+  holes = false,
+): (cx: number, cz: number) => number {
   return (cx, cz) => {
-    if (cx < 0 || cz < 0 || cx >= map.cols || cz >= map.rows) return wallH;
+    if (cx < 0 || cz < 0 || cx >= map.cols || cz >= map.rows) return holes ? -1 : wallH;
     const t = map.tiles[cz * map.cols + cx];
     if (t === TILE_WALL) {
+      if (holes) return -1;
       if (cz >= map.rows - 1) return southH;
       const border = cx < 1 || cz < 1 || cx >= map.cols - 1;
       return border ? wallH : innerH;

@@ -5,6 +5,7 @@
 import type { Entity, PlayerC, PropC, World } from '../ecs';
 import { propNumbers } from '../spawn';
 import { TUNING } from '../tuning';
+import { PROPS_BY_ID } from '../data/props';
 import { statAt } from '../weapon';
 
 export function telekinesisSystem(w: World, dt: number): void {
@@ -160,6 +161,8 @@ function nearestProp(w: World, x: number, y: number, range: number): Entity {
   let bestDist = range;
   for (const [e, prop] of w.propC) {
     if (prop.phase === 'held') continue;
+    // Лист распоряжения не берут: его держит аномалия, а не стол.
+    if (PROPS_BY_ID.get(prop.kind)?.grabbable === false) continue;
     const t = w.transform.get(e);
     if (t === undefined) continue;
     const dist = Math.hypot(t.x - x, t.y - y);

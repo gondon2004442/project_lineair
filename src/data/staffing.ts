@@ -63,9 +63,9 @@ export const STAFFING: Staffing[] = [
   },
   {
     id: 'head_office',
-    label: 'ПРИЁМНАЯ ЗАВЕДУЮЩЕГО',
+    label: 'ПРИЁМНАЯ ЗАВЕДУЮЩЕГО ВЕСТИБЮЛЕМ',
     posts: [
-      { post: 'chief', title: 'ЗАВЕДУЮЩИЙ СЕКТОРОМ', count: 1, priority: 0 },
+      { post: 'chief', title: 'ЗАВЕДУЮЩИЙ ВЕСТИБЮЛЕМ', count: 1, priority: 0 },
       { post: 'inspector', title: 'ИНСПЕКТОР', count: 3, priority: 2 },
       { post: 'intern', title: 'СТАЖЁР', count: 4, priority: 3 },
     ],
@@ -76,17 +76,26 @@ export const STAFFING: Staffing[] = [
      * меньше: весь бой — это стеллажи, а не подчинённые.
      */
     id: 'head_archive',
-    label: 'КОНТОРКА ГЛАВНОГО АРХИВАРИУСА',
+    label: 'КАБИНЕТ УПРАВЛЯЮЩЕГО ДЕЛАМИ',
     posts: [
-      { post: 'archivist', title: 'ГЛАВНЫЙ АРХИВАРИУС', count: 1, priority: 0 },
+      { post: 'archivist', title: 'УПРАВЛЯЮЩИЙ ДЕЛАМИ', count: 1, priority: 0 },
       { post: 'inspector', title: 'ИНСПЕКТОР', count: 2, priority: 2 },
     ],
   },
   {
-    /** Узел: смотритель и никого больше. Весь бой — это свет. */
+    /** Бойлерная: смотритель и никого больше. Весь бой — это свет. */
     id: 'head_node',
-    label: 'ЩИТОВАЯ ТЕПЛОВОГО УЗЛА',
+    label: 'ЩИТОВАЯ БОЙЛЕРНОЙ',
     posts: [{ post: 'keeper', title: 'СМОТРИТЕЛЬ УЗЛА', count: 1, priority: 0 }],
+  },
+  {
+    /** Отдел кадров: начальник и двое при нём. */
+    id: 'head_personnel',
+    label: 'ОТДЕЛ КАДРОВ',
+    posts: [
+      { post: 'personnel', title: 'НАЧАЛЬНИК ОТДЕЛА КАДРОВ', count: 1, priority: 0 },
+      { post: 'inspector', title: 'ИНСПЕКТОР', count: 2, priority: 2 },
+    ],
   },
   {
     /**

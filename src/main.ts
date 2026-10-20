@@ -21,6 +21,7 @@ import { spawnProp, spawnStaff } from './spawn';
 import { damageFactorAgainst, hasTrait, penaltyOf, statAt } from './weapon';
 import { applyDamage } from './systems/damage';
 import { ticketValue } from './systems/tickets';
+import { toppleAt } from './systems/fixtures';
 import { counterInReach, counterOffer } from './systems/counter';
 import { deskPrice, issueOffer, safeContents } from './systems/issue';
 import { DECOR, DECOR_BY_ID, DECOR_TOO_LIGHT } from './data/decor';
@@ -29,6 +30,11 @@ import { isSolidPoint, liftOpen } from './room';
 import { floorAt } from './data/floors';
 import { SUBJECTS, SUBJECT_START, subjectAt } from './data/subjects';
 import { shownRoom } from './hud';
+import { signLie } from './render';
+import { linkOf, patchedLinks } from './systems/reroute';
+import { demoteFactor } from './systems/postPersonnel';
+import { bossPhase } from './systems/arena';
+import { activeTrial, trialOf } from './systems/trial';
 import { createWorld, descend, enterLobby, enterRoom, startRun } from './world';
 import type { World } from './ecs';
 
@@ -149,6 +155,12 @@ async function boot(): Promise<void> {
     // пришлось бы вычитывать числа с экрана.
     value: {
       world: () => world,
+      // Глубина красного состояния в этом кадре: стенд мерит по ней
+      // рампу входа и выхода.
+      hissNow: () => renderer.hiss,
+      // Экран ↔ мир: стендам нужно знать, куда в кадре попал объект, а
+      // масштаб сцены зависит от ширины панели крутилок.
+      screenToWorld: (sx: number, sy: number) => renderer.screenToWorld(sx, sy),
       createWorld,
       enterRoom,
       // Вертикаль: стенд спускает мир руками и сверяет, что переехало.
@@ -168,10 +180,29 @@ async function boot(): Promise<void> {
       // Искажение схемы проверяется только так: на экране это метка,
       // а числом — номер участка, который она показывает.
       shownRoom,
+      // Раскоммутация нужна стенду: на экране это дверь, а числом —
+      // помещение, в которое она на самом деле ведёт.
+      linkOf,
+      patchedLinks,
+      // Перевод на нижестоящую ставку: стенд сверяет множитель урона.
+      demoteFactor,
+      // Сигнатура фаз: стенд сверяет, что перестройку запускает именно
+      // её изменение.
+      bossPhase,
+      // Аттестация: стенду нужно знать, какому помещению какое
+      // испытание досталось и сдано ли оно.
+      trialOf,
+      activeTrial,
+      // Ложь указателей нужна стенду: на экране это табличка, а числом —
+      // номер помещения, который она называет.
+      signLie,
       step,
       spawnStaff,
       // Мебель нужна стенду скобы: к ней пришивают так же, как к стене.
       spawnProp,
+      // Опрокидывание нужно стенду подвешенных: иначе не проверить, что
+      // его не роняют, а опускают.
+      toppleAt,
       statAt,
       // Ось «против должности» проверяется только так: путь тюнинга
       // про цель ничего не знает.

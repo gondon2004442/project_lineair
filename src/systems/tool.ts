@@ -12,11 +12,12 @@
 import { PROP_RUBBLE } from '../data/props';
 import { ITEMS_BY_ID, type Item } from '../data/items';
 import { WEAPON_FORMS } from '../data/weaponForms';
-import { destroyEntity, type World } from '../ecs';
+import { destroyEntity, type ToolState, type World } from '../ecs';
 import { DIRS, entryPosition } from '../room';
 import { TUNING, getTuning } from '../tuning';
 import { ammoMax } from '../weapon';
 import { scatterTickets } from './tickets';
+import { orderActive } from './postPersonnel';
 
 /** Реестр эффектов. Ключ тот же, что в TUNING.tool. */
 const EFFECTS: Record<string, (w: World) => boolean> = {
@@ -26,14 +27,26 @@ const EFFECTS: Record<string, (w: World) => boolean> = {
   writeoff: writeOffProperty,
 };
 
-/** Положить предмет в слот. Занятый слот заменяется: слот один. */
+/** Все слоты инвентаря, какие есть. Второй выдаётся аттестацией. */
+export function toolSlots(w: World): ToolState[] {
+  return hasSecondSlot(w) ? [w.tool, w.tool2] : [w.tool];
+}
+
+/** Открыт ли второй слот: это одно из полномочий натурной части. */
+export function hasSecondSlot(w: World): boolean {
+  return w.grants.includes('slot');
+}
+
+/**
+ * Положить предмет в слот. Первый свободный, а если свободных нет — в
+ * первый: слотов один или два, и выбирать между ними субъекту нечем.
+ */
 export function equipTool(w: World, item: Item): void {
   if (item.active === undefined) return;
-  w.tool = {
-    id: item.id,
-    cooldown: 0,
-    charges: item.active.charges ?? -1,
-  };
+  const slot = toolSlots(w).find((s) => s.id === '') ?? w.tool;
+  slot.id = item.id;
+  slot.cooldown = 0;
+  slot.charges = item.active.charges ?? -1;
 }
 
 /**
@@ -49,14 +62,21 @@ export function toolCooldown(w: World, effect: string): number {
 }
 
 export function toolSystem(w: World, dt: number): void {
-  const slot = w.tool;
-  if (slot.cooldown > 0) slot.cooldown = Math.max(0, slot.cooldown - dt);
+  // Изъятие инвентаря: слот недоступен, пока лист цел.
+  if (orderActive(w, 'tool')) w.input.toolQueued = false;
+  const slots = toolSlots(w);
+  for (const s of slots) {
+    if (s.cooldown > 0) s.cooldown = Math.max(0, s.cooldown - dt);
+  }
 
   if (!w.input.toolQueued) return;
   w.input.toolQueued = false;
   // В вестибюле E занято перевыдачей seed, и спорить с ней незачем.
   if (w.scene !== 'run' || w.status === 'dead') return;
-  if (slot.id === '' || slot.cooldown > 0 || slot.charges === 0) return;
+  // Применяется первый готовый: отдельной клавиши у второго слота нет,
+  // и спорить им не о чем — у каждого свой предмет и свой откат.
+  const slot = slots.find((s) => s.id !== '' && s.cooldown <= 0 && s.charges !== 0);
+  if (slot === undefined) return;
 
   const item = ITEMS_BY_ID.get(slot.id);
   const effect = item?.active?.effect;

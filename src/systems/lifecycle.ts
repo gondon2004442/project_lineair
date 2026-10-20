@@ -4,6 +4,7 @@ import { floorAt } from '../data/floors';
 import { isGatePoint, liftOpen, openLift } from '../room';
 import { descend, deeperExists } from '../world';
 import { dropTickets } from './tickets';
+import { cleansed, cleansedRoom, startCleanse } from './cleanse';
 import { WEAPON_FORMS } from '../data/weaponForms';
 import { spawnStash } from '../spawn';
 import { TUNING } from '../tuning';
@@ -40,9 +41,17 @@ export function lifecycleSystem(w: World, dt: number): void {
       // инструмент: не выдаётся по описи, а снимается с него — заодно и
       // причина драться с ним помимо печати.
       if (w.chiefC.has(e)) dropCircular(w, e);
+      // Начальник отдела кадров: его распоряжения теряют силу вместе с
+      // ним. Иначе лист висит до конца участка, и отнятое им — форма,
+      // рывок, инвентарь — не возвращается уже ничем.
+      if (w.personnelC.has(e)) revokeOrders(w);
       // Печать уровня: снимается с того, кто им заведует. Это и есть
       // единственная причина убивать начальника — не добыча, а подпись.
       takeSeal(w, e);
+      // Ликвидированные считаются здесь и только здесь: это второй из
+      // двух счётчиков забега, и он обязан совпадать с тем, что видел
+      // игрок, а не с тем, сколько тел успело исчезнуть.
+      if (w.staffC.has(e)) w.record.killed += 1;
       // Талоны сыплются до удаления: место ставки ещё известно.
       dropTickets(w, e);
       destroyEntity(w, e);
@@ -63,6 +72,19 @@ function dropCircular(w: World, e: Entity): void {
   if (t === undefined) return;
   spawnStash(w, 'form', form.id, `${form.code} · ${form.title}`, t.x, t.y);
   w.sounds.push('ring');
+}
+
+/**
+ * Отозвать все распоряжения. Листы не просто перестают действовать —
+ * они исчезают: распоряжение без того, кто его подписал, не бумага.
+ */
+function revokeOrders(w: World): void {
+  for (const [e] of [...w.orderC]) {
+    w.orderC.delete(e);
+    w.propC.delete(e);
+    destroyEntity(w, e);
+  }
+  w.sounds.push('fan');
 }
 
 /** Благодарность: контейнер здоровья, который остаётся до конца забега. */
@@ -87,7 +109,10 @@ export function statusSystem(w: World): void {
   // Приёмная сдана — открывается лифт. Забег на этом больше не кончается:
   // здание глубже, и это единственное место, где видно, насколько.
   // На дне шахты нет: ниже ничего, и дыра в полу обещала бы продолжение.
-  if (deeperExists(w) && w.room === w.floor.end && !liftOpen(w.map)) {
+  // Сданный этаж возит лифт из любого помещения: ходить за ним в
+  // приёмную незачем, работы закрыты везде.
+  const anyRoom = cleansed(w) && cleansedRoom(w, w.room);
+  if (deeperExists(w) && (w.room === w.floor.end || anyRoom) && !liftOpen(w.map)) {
     openLift(w.map);
     // Карта запечена: без отметки шахта не появится до смены участка.
     w.mapToken += 1;
@@ -121,6 +146,9 @@ function takeSeal(w: World, e: Entity): void {
   if (w.seals.includes(w.depth)) return;
   w.seals.push(w.depth);
   w.sounds.push('stamp');
+  // Печать забрана — значит подписан акт приёмки. Дальше этаж сдаётся
+  // сам: волна идёт по графу от приёмной.
+  startCleanse(w);
 }
 
 /** Подписан ли спуск с этого уровня: печать в деле. */
@@ -136,7 +164,8 @@ export function liftSystem(w: World): void {
   if (w.scene !== 'run' || w.status !== 'playing') return;
   if (!deeperExists(w)) return;
   const office = w.floor.rooms[w.floor.end];
-  if (office === undefined || !office.cleared || w.room !== w.floor.end) return;
+  if (office === undefined || !office.cleared) return;
+  if (w.room !== w.floor.end && !(cleansed(w) && cleansedRoom(w, w.room))) return;
   // Распоряжение о спуске действительно только с печатью уровня.
   if (!descentSigned(w)) return;
   const t = w.transform.get(w.player);

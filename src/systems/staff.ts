@@ -11,6 +11,9 @@ export function rosterSystem(w: World, dt: number): void {
   for (const [, staff] of w.staffC) {
     // Табличку зажигают системы поведения, гаснет она здесь.
     staff.plateFlash = Math.max(0, staff.plateFlash - dt);
+    // Снятый с должности ставку не занимает: его назначение
+    // аннулировано вместе с этажом.
+    if (staff.retired) continue;
     const entry = w.roster.find((r) => r.post === staff.post);
     if (entry !== undefined) entry.occupied += 1;
   }

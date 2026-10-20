@@ -11,10 +11,13 @@
  */
 import { destroyEntity, type World } from '../ecs';
 import { TUNING } from '../tuning';
+import { orderActive } from './postPersonnel';
 import { applyDamage } from './damage';
 import { bodyMass, kick, shove } from './impulse';
 
 export function blankSystem(w: World): void {
+  // Бланки изымаются тем же распоряжением, что и инвентарь.
+  if (orderActive(w, 'tool')) w.input.blankQueued = false;
   if (!w.input.blankQueued) return;
   w.input.blankQueued = false;
   if (w.scene !== 'run' || w.status !== 'playing') return;

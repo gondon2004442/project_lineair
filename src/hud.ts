@@ -1,5 +1,8 @@
 /** Служебный оверлей: состояние субъекта, схема этажа, отладка, seed. */
 import { TEMPLATES_BY_ID } from './data/roomTemplates';
+import { cleansed, cleansedRoom, distortionNow } from './systems/cleanse';
+import { patchedLinks } from './systems/reroute';
+import { activeTrial } from './systems/trial';
 import { issuedDirectives, type Directive } from './data/directives';
 import { floorAt } from './data/floors';
 import { ENDINGS, ENDINGS_BY_ID } from './data/endings';
@@ -114,6 +117,9 @@ export function createHud(
       weaponRows(w),
       energyRow(w),
       row('ВАКАНСИЙ', vacancyLine(w)),
+      staffCountRow(w),
+      orderRow(w),
+      trialRow(w),
       row('Q БЛАНК · ДОПУСК · ТАЛОН', suppliesLine(w)),
       toolRow(w),
       promptRow(w),
@@ -128,9 +134,22 @@ export function createHud(
     // Под схемой остаётся только номер участка: планировку и расписание
     // видно в самой комнате, а не в списке.
     map.innerHTML =
-      row('УЧАСТОК', `${w.room + 1} / ${w.floor.rooms.length}`) + schematic(w);
+      row('УЧАСТОК', `${w.room + 1} / ${w.floor.rooms.length}`) +
+      (cleansed(w) ? row('ЭТАЖ', '<span class="ok">СДАН ПО АКТУ</span>') : '') +
+      schematic(w);
 
-    if (w.status === 'dead') {
+    // Титр заседания перебивает всё: допуск приостановлен, и это первое,
+    // что субъект должен прочитать в комнате.
+    const trial = activeTrial(w);
+    if (w.trialNote > 0 && trial !== undefined && w.status === 'playing') {
+      banner.hidden = false;
+      banner.innerHTML =
+        `<b>${trial.title}</b><span>${trial.report[0] ?? ''} · ${trial.grantTitle}</span>`;
+    } else if (w.fx.seatTitle > 0 && w.status === 'playing') {
+      banner.hidden = false;
+      banner.innerHTML =
+        '<b>ВНЕОЧЕРЕДНОЕ ЗАСЕДАНИЕ</b><span>ДОПУСК ПРИОСТАНОВЛЕН · ПОМЕЩЕНИЕ ЗАКРЫТО</span>';
+    } else if (w.status === 'dead') {
       banner.hidden = false;
       banner.innerHTML = '<b>СУБЪЕКТ ЛИКВИДИРОВАН</b><span>[F2] ВЕРНУТЬСЯ В ВЕСТИБЮЛЬ</span>';
     } else if (w.status === 'cleared') {
@@ -531,6 +550,17 @@ function auditRow(w: World): string {
  * Приглашение к оформлению. Строка появляется только у шкафа или ячейки
  * и сразу говорит, чем платить: иначе игрок жмёт F наугад.
  */
+/**
+ * Коммутатор в строке приглашения: сколько связей переставлено сейчас.
+ * Больше ничего он не обещает — куда именно поведёт дверь после
+ * переключения, субъект узнает, пройдя в неё.
+ */
+function boardLine(w: World): string {
+  const links = patchedLinks(w);
+  if (links.length === 0) return 'СВЯЗИ В ПОРЯДКЕ';
+  return `ПЕРЕСТАВЛЕНО СВЯЗЕЙ: ${links.length}`;
+}
+
 function stashRow(w: World): string {
   const target = stashInReach(w);
   if (target < 0) return '';
@@ -539,7 +569,8 @@ function stashRow(w: World): string {
   const offer = issueOffer(w, target);
   // Оплаченная опись дописывается к названию шкафа: за этим её и берут.
   const listed = w.listed ? safeContents(w, target) : '';
-  const title = listed === '' ? stash.title : `${stash.title} · ${listed}`;
+  const extra = stash.kind === 'board' ? boardLine(w) : listed;
+  const title = extra === '' ? stash.title : `${stash.title} · ${extra}`;
   if (!offer.ok) return row(title, `<span class="warn">${offer.text}</span>`);
   return row(`F · ${title}`, `<span class="ok">${offer.text}</span>`);
 }
@@ -580,6 +611,57 @@ function energyRow(w: World): string {
 function inForce(w: World): Directive[] {
   return issuedDirectives(w.build).filter(
     (d) => d.requiresTrait === undefined || hasTrait(w, d.requiresTrait),
+  );
+}
+
+/**
+ * Аттестация: что требуется и сколько уже сделано. Условие держится
+ * титром первые секунды, дальше остаётся счёт — читать его надо на
+ * ходу, а не вчитываться.
+ */
+function trialRow(w: World): string {
+  const trial = activeTrial(w);
+  if (trial === undefined) return '';
+  const need = Math.max(1, Math.round(trial.need));
+  const done = Math.max(0, Math.min(need, Math.round(w.trialDone)));
+  return row(
+    `${trial.code} · ${trial.title}`,
+    `<span class="${done >= need ? 'ok' : 'warn'}">${gauge(done, need)} ${done}/${need}</span>`,
+  );
+}
+
+/**
+ * Распоряжения отдела кадров: что именно сейчас отнято. Строка есть,
+ * только пока листы висят, — и исчезает ровно тогда, когда начальник
+ * открывается.
+ */
+function orderRow(w: World): string {
+  if (w.appointed > 0) {
+    return row('НАЗНАЧЕНИЕ', '<span class="warn">ВЫ В ШТАТЕ · ВЫХОД ЗАКРЫТ</span>');
+  }
+  if (w.orderC.size === 0) return '';
+  const названия: Record<string, string> = {
+    form: 'ФОРМА ОТСТРАНЕНА',
+    dash: 'РЫВОК ЗАПРЕЩЁН',
+    tool: 'ИНВЕНТАРЬ ИЗЪЯТ',
+    demote: 'СТАВКА НИЖЕ',
+  };
+  const список = [...new Set([...w.orderC.values()].map((o) => названия[o.kind] ?? o.kind))];
+  return row('РАСПОРЯЖЕНИЯ', `<span class="warn">${список.join(' · ')}</span>`);
+}
+
+/**
+ * Два счёта рядом и без единого слова оценки: снятых с должности и
+ * ликвидированных. Убил ставку — получил талоны сейчас; оставил —
+ * получил человека после очищения. Никакой морали в тексте: числа
+ * говорят сами.
+ */
+function staffCountRow(w: World): string {
+  const { retired, killed } = w.record;
+  if (retired === 0 && killed === 0) return '';
+  return row(
+    'СНЯТО С ДОЛЖНОСТИ · ЛИКВИДИРОВАНО',
+    `<span class="ok">${retired}</span> · ${killed}`,
   );
 }
 
@@ -634,7 +716,23 @@ function dossierBody(w: World): string {
     return `<div class="dossier-item"><div class="dossier-code">${d.number} · ${d.title}</div>${lines}</div>`;
   });
 
-  return head + subject + verdictBlock(w) + note + blocks.join('') + orders.join('');
+  return head + subject + savedBlock(w) + verdictBlock(w) + note + blocks.join('') + orders.join('');
+}
+
+/**
+ * Дела спасённых на руках. Они и есть выбор в финале: подшить вместо
+ * своего можно только то, что подобрал.
+ */
+function savedBlock(w: World): string {
+  if (w.savedCases.length === 0) return '';
+  const lines = w.savedCases
+    .map((c) => `<div class="dossier-line">${c.title}</div>`)
+    .join('');
+  return (
+    '<div class="dossier-item"><div class="dossier-code">ДЕЛА СПАСЁННЫХ</div>' +
+    lines +
+    '</div>'
+  );
 }
 
 /** Принятое решение: что именно сделали с делом. */
@@ -664,7 +762,7 @@ function gauge(current: number, max: number): string {
  * помеха, а не как неверная схема.
  */
 export function shownRoom(w: World): number {
-  if (w.evacPlan || floorAt(w.depth).distortion !== 'shuffle') return w.room;
+  if (w.evacPlan || distortionNow(w, floorAt(w.depth)) !== 'shuffle') return w.room;
   const room = w.floor.rooms[w.room];
   if (room === undefined) return w.room;
   for (const dir of DIRS) {
@@ -715,6 +813,12 @@ function schematic(w: World): string {
       stroke = hex(PALETTE.concrete500);
     } else if (room.visited || mapped) {
       stroke = hex(PALETTE.concrete300);
+    }
+    // Волна очищения идёт по схеме: сданное помещение светлеет само,
+    // и видно, как этаж сдаётся по частям, а не разом.
+    if (cleansedRoom(w, room.index) && !current) {
+      fill = hex(PALETTE.concrete500);
+      stroke = hex(PALETTE.concrete100);
     }
     parts.push(
       `<rect x="${x}" y="${y}" width="${cell}" height="${cell}" fill="${fill}" stroke="${stroke}" stroke-width="${TUNING.hud.mapStroke}"/>`,

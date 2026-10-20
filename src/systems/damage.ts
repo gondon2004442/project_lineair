@@ -4,11 +4,15 @@ import { TUNING } from '../tuning';
 import { damageFactorAgainst } from '../weapon';
 import { archivistOpen } from './postArchivist';
 import { commissionOpen } from './postCommission';
+import { personnelOpen } from './postPersonnel';
 import { keeperOpen } from './postKeeper';
 
 export function applyDamage(w: World, target: Entity, amount: number): boolean {
   const h = w.health.get(target);
   if (h === undefined || h.hp <= 0 || h.iframes > 0) return false;
+  // Снятый с должности не цель: он больше не ставка, а человек, и
+  // добивать его нечем. Это и есть смысл второго счётчика.
+  if (w.staffC.get(target)?.retired === true) return false;
   // Ревизор неуязвим, пока не закончил опись имущества участка.
   const auditor = w.auditorC.get(target);
   if (auditor !== undefined && auditor.phase !== 'open') return false;
@@ -20,6 +24,9 @@ export function applyDamage(w: World, target: Entity, amount: number): boolean {
   // пока молчит.
   if (!keeperOpen(w, target)) return false;
   if (!commissionOpen(w, target)) return false;
+  // Начальник отдела кадров — пока ни одно его распоряжение не
+  // действует. Окно открывает игрок, снося листы.
+  if (!personnelOpen(w, target)) return false;
 
   // Распоряжение против должности: множитель знает только эта точка,
   // потому что только здесь известно, в кого прилетело.

@@ -40,6 +40,9 @@ export function ticketValue(w: World, e: Entity): number {
  * участка влиять не должен.
  */
 export function dropTickets(w: World, e: Entity): void {
+  // Назначенному талоны за ставки не падают: он теперь сам штат, а штат
+  // за штат не получает.
+  if (w.appointed > 0) return;
   const t = w.transform.get(e);
   if (t === undefined) return;
   scatterTickets(w, t.x, t.y, ticketValue(w, e), e);

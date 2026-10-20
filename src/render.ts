@@ -4,6 +4,7 @@
  * чтобы визуал не съедал случайность симуляции.
  */
 import { Application, BlurFilter, Container, Graphics } from 'pixi.js';
+import { distortionNow } from './systems/cleanse';
 import type { World } from './ecs';
 import type { Renderer } from './renderer';
 import { createAberration, createDust, createHiss, drawSmoke, type WarpSource } from './fx';
@@ -18,9 +19,11 @@ import { dashIFrameWindow, dashSpec } from './systems/playerControl';
 import { COUNTERS_BY_KIND } from './data/counters';
 import { grabCandidate } from './systems/telekinesis';
 import { DIRS, TILE_DOOR, TILE_GATE, TILE_WALL, TILE_WEAK, liftOpen, type TileMap } from './room';
-import { roomNumber } from './floor';
+import { roomNumber, type RoomNode } from './floor';
 import { currentRoom } from './world';
 import { floorAt } from './data/floors';
+import { floorPalette, type FloorPalette } from './data/palettes';
+import { voidEdges } from './systems/edge';
 import { litAt } from './systems/postKeeper';
 import { statAt } from './weapon';
 import { DECOR_BY_ID } from './data/decor';
@@ -136,6 +139,9 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
   const renderer: Renderer = {
     app,
     showHitboxes: TUNING.debug.hitboxes,
+    get hiss() {
+      return hissNow;
+    },
 
     screenToWorld(sx, sy) {
       const rect = app.canvas.getBoundingClientRect();
@@ -162,7 +168,7 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
       if (w.mapToken !== drawnToken) {
         drawnToken = w.mapToken;
         markLayer.clear();
-        drawRoom(roomLayer, markLayer, w.map, warmSector(w));
+        drawRoom(roomLayer, markLayer, w.map, warmSector(w), floorPalette(w.depth), voidEdges(w));
         drawDoorSigns(roomLayer, w);
         drawLift(roomLayer, w);
         drawDecor(decorLayer, w);
@@ -182,7 +188,10 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
       // его волной задаёт тот, кто ставит цель.
       profiler.begin('КАДР: КРАСНОЕ');
       const want = Math.max(0, Math.min(1, w.fx.hiss)) * TUNING.hiss.amount;
-      const rate = TUNING.hiss.fadeIn <= 0 ? 1 : frame / TUNING.hiss.fadeIn;
+      // Вход и выход идут с разной скоростью, и это не прихоть: допуск
+      // приостанавливают мгновенно, а снимают приостановку по процедуре.
+      const span = want > hissNow ? TUNING.hiss.fadeIn : TUNING.hiss.fadeOut;
+      const rate = span <= 0 ? 1 : frame / span;
       hissNow += Math.max(-rate, Math.min(rate, want - hissNow));
       if (Math.abs(want - hissNow) < 0.001) hissNow = want;
       const wantHiss = hissNow > 0;
@@ -229,6 +238,7 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
       profiler.end('КАДР: ДЫМ');
 
       entityLayer.clear();
+      drawFront(entityLayer, w);
       serviceLayer.clear();
       subjectLayer.clear();
       drawSections(entityLayer, w);
@@ -344,7 +354,15 @@ function warmSector(w: World): boolean {
   return TEMPLATES_BY_ID.get(room.template)?.sector === 'office';
 }
 
-function drawRoom(g: Graphics, svc: Graphics, map: TileMap, warm: boolean): void {
+function drawRoom(
+  g: Graphics,
+  svc: Graphics,
+  map: TileMap,
+  warm: boolean,
+  th: FloorPalette,
+  /** Этаж без стен: непроходимое здесь не бетон, а пустота. */
+  voidRoom: boolean,
+): void {
   g.clear();
   const size = map.size;
   for (let cy = 0; cy < map.rows; cy++) {
@@ -354,11 +372,12 @@ function drawRoom(g: Graphics, svc: Graphics, map: TileMap, warm: boolean): void
       const tile = map.tiles[cy * map.cols + cx];
 
       if (tile === TILE_WALL) {
-        drawPanelledWall(g, map, cx, cy, x, y, size, warm);
+        if (voidRoom) drawVoid(g, map, cx, cy, x, y, size, th);
+        else drawPanelledWall(g, map, cx, cy, x, y, size, warm, th);
         continue;
       }
       if (tile === TILE_WEAK) {
-        drawGlassPartition(g, map, cx, cy, x, y, size);
+        drawGlassPartition(g, map, cx, cy, x, y, size, th);
         continue;
       }
       if (tile === TILE_GATE) {
@@ -366,7 +385,7 @@ function drawRoom(g: Graphics, svc: Graphics, map: TileMap, warm: boolean): void
         // служебная, поэтому уходит в слой разметки, а провал остаётся
         // в мире: он часть помещения.
         const inset = TUNING.render.gateInset;
-        g.rect(x, y, size, size).fill(PALETTE.black);
+        g.rect(x, y, size, size).fill(th.pit);
         svc.rect(x + inset, y + inset, size - inset * 2, size - inset * 2).stroke({
           width: TUNING.render.gateWidth,
           color: PALETTE.yellow,
@@ -375,15 +394,16 @@ function drawRoom(g: Graphics, svc: Graphics, map: TileMap, warm: boolean): void
         continue;
       }
 
-      // Пол: плитка и шов по краю. Пол светлее стен — на светлом полу
-      // тёмный силуэт читается, а не тонет.
-      g.rect(x, y, size, size).fill(PALETTE.floor);
+      // Пол: плитка и шов по краю. Цвет у обоих свой на каждом этаже:
+      // в холле пол светлее бетона, в бойлерной темнее, и ни одно из
+      // этих отношений в коде не зашито.
+      g.rect(x, y, size, size).fill(th.floor);
       g.rect(x, y, size, TUNING.render.floorGrid)
         .rect(x, y, TUNING.render.floorGrid, size)
-        .fill(PALETTE.floorSeam);
+        .fill(th.floorSeam);
 
       if (tile !== TILE_DOOR) continue;
-      drawDoorway(g, svc, map, cx, cy, x, y, size);
+      drawDoorway(g, svc, map, cx, cy, x, y, size, th);
     }
   }
 }
@@ -627,14 +647,41 @@ function drawDecor(g: Graphics, w: World): void {
  */
 function drawFixture(
   g: Graphics,
-  fixture: { kind: string; toppled: boolean; spillX: number; spillY: number },
+  fixture: { kind: string; toppled: boolean; hung: boolean; spillX: number; spillY: number },
   draw: { size: number; color: number },
   x: number,
   y: number,
+  /** Номер сущности: по нему считается неподвижный шум частиц. */
+  e: number,
 ): void {
   const spec = FIXTURES_BY_ID.get(fixture.kind);
   const cfg = TUNING.fixture;
   const half = draw.size;
+
+  // Подвешенный: тело поднято, а тень лежит в стороне и меньше его.
+  // Больше ничего и не нужно — именно по разъехавшейся тени сверху
+  // читается, что он висит, а не стоит.
+  if (fixture.hung) {
+    const hung = TUNING.hung;
+    contactShadow(g, x + hung.shadowShift, y + hung.shadowShift, half * hung.shadowScale, 1);
+    // Частицы, стекающие вниз: шум неподвижный, от номера сущности, —
+    // иначе они дрожали бы каждый кадр и читались как помеха.
+    const motes = Math.max(0, Math.round(hung.motes));
+    for (let i = 0; i < motes; i++) {
+      const sx = x + (spillNoise(e, i) - 0.5) * half * 1.6;
+      const sy = y + half * 0.4 + spillNoise(e, i + 31) * hung.moteFall;
+      g.rect(sx, sy, hung.moteSize, hung.moteSize).fill({
+        color: PALETTE.concrete300,
+        alpha: 0.5,
+      });
+    }
+    const lift = hung.lift;
+    block(g, x - half, y - half - lift, half * 2, half * 2, draw.color);
+    // Светлая полоса поперёк: то же место, где у должности табличка.
+    // Её здесь нет и быть не может — его никуда не назначили.
+    g.rect(x - half, y - lift, half * 2, 2).fill(PALETTE.concrete700);
+    return;
+  }
 
   if (!fixture.toppled) {
     contactShadow(g, x, y, half, 1);
@@ -962,6 +1009,63 @@ function lights(w: World, alpha: number): { x: number; y: number; r: number }[] 
 }
 
 /**
+ * ПУСТОТА. Там, где на других этажах бетон, здесь нет ничего.
+ *
+ * Рисуется она светлой заливкой без панелей и обшивки: отделывать
+ * пустоту нечем. Плита рядом с ней получает золотую прожилку по
+ * сколу — единственное, чем здание обозначает край.
+ */
+function drawVoid(
+  g: Graphics,
+  map: TileMap,
+  cx: number,
+  cy: number,
+  x: number,
+  y: number,
+  size: number,
+  th: FloorPalette,
+): void {
+  g.rect(x, y, size, size).fill(th.wall);
+
+  const vein = TUNING.render.veinWidth;
+  for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]] as const) {
+    const nx = cx + dx;
+    const ny = cy + dy;
+    if (nx < 0 || ny < 0 || nx >= map.cols || ny >= map.rows) continue;
+    // Прожилка ложится на грань, обращённую к плите, и только на неё.
+    if (map.tiles[ny * map.cols + nx] === TILE_WALL) continue;
+    const horizontal = dx === 0;
+    const face = horizontal
+      ? { x, y: dy < 0 ? y : y + size - vein, w: size, h: vein }
+      : { x: dx < 0 ? x : x + size - vein, y, w: vein, h: size };
+    g.rect(face.x, face.y, face.w, face.h).fill(th.accent);
+  }
+}
+
+/**
+ * ФРОНТ ОЧИЩЕНИЯ. Тонкая светлая кромка, идущая по помещению.
+ *
+ * За ней палитра этажа, перед ней ещё заседание. Медленно и сознательно:
+ * это награда за начальника, её надо дать посмотреть, а не проскочить.
+ */
+function drawFront(g: Graphics, w: World): void {
+  const room = w.floor.rooms[w.room];
+  if (room === undefined || w.cleanse < 0) return;
+  const cfg = TUNING.cleanse;
+  const since = w.cleanse - room.cleanseDelay;
+  if (since < 0 || since > cfg.roomDelay) return;
+
+  const width = w.map.cols * w.map.size;
+  const height = w.map.rows * w.map.size;
+  const at = (since / Math.max(1e-6, cfg.roomDelay)) * width;
+  g.rect(at - cfg.frontWidth, 0, cfg.frontWidth, height).fill({
+    color: PALETTE.concrete100,
+    alpha: TUNING.render.frontAlpha,
+  });
+  g.rect(at - 2, 0, 2, height).fill(PALETTE.concrete100);
+}
+
+/**
  * ТЕМНОТА. Видно только вокруг источников света.
  *
  * Считается по клеткам и заливается прямоугольниками, слитыми в строки:
@@ -973,7 +1077,9 @@ function lights(w: World, alpha: number): { x: number; y: number; r: number }[] 
  * Поэтому таблички рисуются ПОВЕРХ тьмы, а не под ней.
  */
 function drawDark(g: Graphics, w: World, alpha: number): void {
-  if (floorAt(w.depth).distortion !== 'dark' || w.scene !== 'run') return;
+  // Свет не подключён, пока идут работы. Приёмка их закрывает — и
+  // лампы загораются сами, без отдельного выключателя.
+  if (distortionNow(w, floorAt(w.depth)) !== 'dark' || w.scene !== 'run') return;
   const cfg = TUNING.dark;
   const src = lights(w, alpha);
   const map = w.map;
@@ -1014,6 +1120,20 @@ function drawDark(g: Graphics, w: World, alpha: number): void {
       g.rect(x - plate + i * (plate * 0.9), y - plate / 2, plate * 0.6, plate).fill(PALETTE.yellow);
     }
   }
+}
+
+/**
+ * Какое помещение напишут на табличке. Врёт она устойчиво: номер
+ * считается от посевной, участка и стороны, а не бросается заново
+ * каждый кадр. Иначе указатель читался бы как помеха, а не как ложь —
+ * а соврать он должен один раз и держаться этого.
+ */
+export function signLie(w: World, from: number, dir: number, honest: RoomNode): RoomNode {
+  const rng = makeRng((w.seed + from * TUNING.render.signSeedStride + dir) >>> 0);
+  if (rng.float() >= TUNING.render.signLieShare) return honest;
+  // Врёт она правдоподобно: называет помещение, которое на этаже есть.
+  const pool = w.floor.rooms.filter((r) => r.index !== from && r.index !== honest.index);
+  return pool[rng.int(Math.max(1, pool.length))] ?? honest;
 }
 
 /** Ширина набора в пикселях при заданном размере пикселя знака. */
@@ -1060,10 +1180,15 @@ function drawDoorSigns(g: Graphics, w: World): void {
   const pad = Math.max(0, Math.round(cfg.signPad));
   const inset = Math.max(0, Math.round(cfg.signInset));
 
+  // Указатели врут: часть стрелок показывает не туда, куда ведёт дверь.
+  // Самое лёгкое искажение в игре — оно ничего не отнимает, но учит, что
+  // зданию нельзя верить, и учит на первом же этаже.
+  const lying = distortionNow(w, floorAt(w.depth)) === 'signs';
+
   for (const dir of DIRS) {
     const next = w.floor.rooms[room.neighbors[dir]];
     if (next === undefined) continue;
-    const text = roomNumber(next);
+    const text = roomNumber(lying ? signLie(w, room.index, dir, next) : next);
 
     // Собираем зев: клетки двери идут подряд вдоль своей стороны.
     const horizontal = dir === 0 || dir === 2;
@@ -1134,6 +1259,15 @@ function drawPlayer(g: Graphics, w: World, alpha: number, skin: number): void {
   const y = lerp(t.py, t.y, alpha);
   const half = draw.size * TUNING.render.playerSizeFactor;
   const pose = playerPose(w, x, y);
+  // Срыв в пустоту: тело уходит вниз и уменьшается. Больше ничего не
+  // нужно — падение длится секунду, и читать его надо мгновенно.
+  if (player.fallTimer > 0) {
+    const left = Math.max(0, Math.min(1, player.fallTimer / Math.max(1e-6, TUNING.fall.time)));
+    const k = 1 - (1 - left) * TUNING.fall.shrink;
+    const size = half * k;
+    g.rect(x - size, y - size, size * 2, size * 2).fill({ color: skin, alpha: left });
+    return;
+  }
   const cx = x + pose.dx;
   const cy = y + pose.dy;
 
@@ -1241,13 +1375,14 @@ function drawPanelledWall(
   y: number,
   size: number,
   warm: boolean,
+  th: FloorPalette,
 ): void {
   // Сплошная заливка без выреза: соседние клетки стены сливаются в одну
   // массу, и сетки тайлов в стене не видно. Раньше у каждой клетки был
   // свой шов, и стена читалась как кладка из кубиков.
   // Выше обшивки побелка, а не голый бетон: контора делала ремонт.
   // Бетонный сектор остаётся бетонным — там ремонта не делали.
-  g.rect(x, y, size, size).fill(warm ? PALETTE.plaster : PALETTE.wall);
+  g.rect(x, y, size, size).fill(warm ? PALETTE.plaster : th.wall);
 
   const band = TUNING.render.wainscotBand;
   const rail = TUNING.render.brassRail;
@@ -1260,7 +1395,7 @@ function drawPanelledWall(
       ? { x, y: dy < 0 ? y : y + size - band, w: size, h: band }
       : { x: dx < 0 ? x : x + size - band, y, w: band, h: size };
     // Ореховая обшивка до полутора метров: сверху её видно полосой.
-    g.rect(face.x, face.y, face.w, face.h).fill(warm ? PALETTE.woodDark : PALETTE.concrete500);
+    g.rect(face.x, face.y, face.w, face.h).fill(warm ? PALETTE.woodDark : th.detail);
     const edge = horizontal
       ? { x, y: dy < 0 ? y + band : y + size - band - rail, w: size, h: rail }
       : { x: dx < 0 ? x + band : x + size - band - rail, y, w: rail, h: size };
@@ -1303,10 +1438,11 @@ function drawGlassPartition(
   x: number,
   y: number,
   size: number,
+  th: FloorPalette,
 ): void {
-  g.rect(x, y, size, size).fill(PALETTE.floor);
+  g.rect(x, y, size, size).fill(th.floor);
   const sill = TUNING.render.glassSill;
-  g.rect(x, y, size, size).stroke({ width: sill, color: PALETTE.furniture, alignment: 1 });
+  g.rect(x, y, size, size).stroke({ width: sill, color: th.furniture, alignment: 1 });
 
   const maxHp = Math.max(1, TUNING.room.weakWallHp);
   const left = map.weakHp[cy * map.cols + cx] ?? maxHp;
@@ -1333,9 +1469,10 @@ function drawDoorway(
   x: number,
   y: number,
   size: number,
+  th: FloorPalette,
 ): void {
   const horizontal = cy === 0 || cy === map.rows - 1;
-  g.rect(x, y, size, size).fill(PALETTE.black);
+  g.rect(x, y, size, size).fill(th.pit);
 
   if (map.doorsLocked) {
     // Заперто: служебная полоса поперёк зева.
@@ -1352,7 +1489,7 @@ function drawDoorway(
   const frame = horizontal
     ? { x, y: cy === 0 ? y : y + size - jamb, w: size, h: jamb }
     : { x: cx === 0 ? x : x + size - jamb, y, w: jamb, h: size };
-  g.rect(frame.x, frame.y, frame.w, frame.h).fill(PALETTE.furniture);
+  g.rect(frame.x, frame.y, frame.w, frame.h).fill(th.furniture);
 
   const t = TUNING.render.doorThreshold;
   for (let i = 0; i < 2; i++) {
@@ -1511,7 +1648,7 @@ function drawEntities(
     // Оборудование: стоящее видно как мебель, лежащее — как след.
     const fixture = w.fixtureC.get(e);
     if (fixture !== undefined) {
-      drawFixture(g, fixture, draw, x, y);
+      drawFixture(g, fixture, draw, x, y, e);
       continue;
     }
 
@@ -1540,7 +1677,7 @@ function drawEntities(
     }
 
     const health = w.health.get(e);
-    let color = draw.color;
+    let color = w.staffC.get(e)?.retired === true ? PALETTE.skin : draw.color;
     if (health !== undefined) {
       if (health.flash > 0) color = PALETTE.concrete300;
       else if (health.iframes > 0 && Math.floor(time * TUNING.feel.blinkRate) % 2 === 0) continue;
@@ -1618,8 +1755,35 @@ function drawEntities(
       }
     }
 
+    // Мишень аттестации: кольцо с точкой. Её водит комиссия, и читаться
+    // она должна как цель, а не как укрытие.
+    if (w.targetC.has(e)) {
+      const m = draw.size;
+      svc.circle(x, y, m).stroke({ width: 2, color: PALETTE.concrete100 });
+      svc.circle(x, y, m * 0.45).fill(PALETTE.concrete100);
+      continue;
+    }
+
+    // Лист распоряжения: бумага поверх боя, с жирной чертой поперёк.
+    // Служебный слой, а не мир: по нему принимают решение, и в красном
+    // состоянии он обязан остаться читаемым.
+    const order = w.orderC.get(e);
+    if (order !== undefined) {
+      const m = draw.size;
+      svc.rect(x - m, y - m * 1.3, m * 2, m * 2.6).fill(PALETTE.paper);
+      svc.rect(x - m, y - m * 1.3, m * 2, m * 2.6).stroke({ width: 1, color: PALETTE.concrete900 });
+      svc.rect(x - m * 0.7, y - m * 0.5, m * 1.4, 2).fill(PALETTE.concrete900);
+      svc.rect(x - m * 0.7, y + m * 0.1, m * 1.4, 2).fill(PALETTE.concrete900);
+      svc.rect(x - m * 0.7, y + m * 0.7, m * 0.8, 2).fill(PALETTE.concrete900);
+      continue;
+    }
+
     const staff = staffHere;
     if (staff === undefined) continue;
+
+    // Снятый с должности: назначение аннулировано, бетон отступил, кожа
+    // вернулась. Табличек нет — снимать с груди больше нечего.
+    if (staff.retired) continue;
 
     // Внеплановая проверка: двойной неподвижный контур. Цвет самый
     // светлый из палитры — красный занят субъектом.
@@ -2098,6 +2262,23 @@ function drawStash(
         g.rect(x - m, y - m * 0.5, m * 1.4, 2).fill(PALETTE.concrete100);
         g.rect(x - m * 0.4, y + m * 0.4, m * 1.4, 2).fill(PALETTE.concrete100);
       }
+    } else if (kind === 'saved') {
+      // Личное дело: папка с уголком. Бумага, а не ящик.
+      const m = half * 0.6;
+      g.rect(x - m, y - m, m * 2, m * 2).fill(PALETTE.paper);
+      g.rect(x - m, y - m, m * 2, m * 0.5).fill(PALETTE.concrete500);
+      g.rect(x - m * 0.6, y, m * 1.2, 2).fill(PALETTE.concrete900);
+    } else if (kind === 'board') {
+      // Щит с гнёздами: три пары точек и шнур между ними. Читается как
+      // коммутатор, а не как ящик с выдачей.
+      const m = half * 0.55;
+      for (let i = 0; i < 3; i++) {
+        const gx = x - m + i * m;
+        g.rect(gx - 1, y - m, 2, 2).fill(PALETTE.concrete100);
+        g.rect(gx - 1, y + m - 2, 2, 2).fill(PALETTE.concrete100);
+      }
+      g.moveTo(x - m, y - m + 1).lineTo(x, y + m - 1).stroke(pen);
+      g.moveTo(x, y - m + 1).lineTo(x + m, y + m - 1).stroke(pen);
     } else if (kind === 'form') {
       // Ящик с инструментом: уголок с перекладиной. Знак служебный и
       // прямой — это не предмет в дело, это выданное по описи.
@@ -2184,8 +2365,11 @@ function drawVacancyCount(g: Graphics, x: number, y: number, size: number, open:
  * ручками staffGlowAlpha и staffGlowSpread.
  */
 function drawGlow(g: Graphics, w: World, alpha: number): void {
-  // Сотрудники: ореол шире силуэта и тусклее субъекта.
-  for (const [e] of w.staffC) {
+  // Сотрудники: ореол шире силуэта и тусклее субъекта. Снятым с
+  // должности ореола нет вовсе: он означает угрозу, а сидящий человек
+  // не угроза — и красного вокруг него быть не должно тем более.
+  for (const [e, staff] of w.staffC) {
+    if (staff.retired) continue;
     const draw = w.drawC.get(e);
     const t = w.transform.get(e);
     if (draw === undefined || t === undefined) continue;

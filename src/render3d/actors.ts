@@ -91,6 +91,11 @@ interface View {
   tumble?: number;
   /** Цвет основного материала: им крошится при распаде. */
   tint?: number;
+  /**
+   * Человек, а не должность: подвешенный, опущенный или снятый. Висит,
+   * сидит на полу или сидит на стуле.
+   */
+  civ?: 'hung' | 'floor' | 'chair';
   /** Обломок: своя геометрия, её надо освободить. */
   own?: BufferGeometry[];
   seen: boolean;
@@ -240,17 +245,25 @@ export class Actors {
 
   private keyOf(w: World, e: Entity, shape: string): string {
     if (e === w.player) return 'player';
+    // Мишень аттестации — тоже предмет, но читаться должна как цель.
+    if (w.targetC.has(e)) return 'target';
     const stash = w.stashC.get(e);
     if (stash !== undefined) return `stash:${stash.kind}:${stash.opened}`;
     const fixture = w.fixtureC.get(e);
-    if (fixture !== undefined) return `fix:${fixture.kind}:${fixture.toppled}`;
+    if (fixture !== undefined) return `fix:${fixture.kind}:${fixture.toppled}:${fixture.hung}`;
     const clerk = w.clerkC.get(e);
     if (clerk !== undefined) return `clerk:${clerk.offended}`;
     const counter = w.counterC.get(e);
     if (counter !== undefined) return `counter:${counter.used}`;
     if (w.ticketC.has(e)) return 'ticket';
     const staff = w.staffC.get(e);
-    if (staff !== undefined) return `staff:${staff.silhouette}:${w.drawC.get(e)?.desk === true}`;
+    if (staff !== undefined) {
+      if (staff.retired) return 'retired';
+      // У начальника отдела кадров своей карточки должности нет: силуэт
+      // ему даёт вид, а не данные.
+      const sil = staff.post === 'personnel' ? 'personnel' : staff.silhouette;
+      return `staff:${sil}:${w.drawC.get(e)?.desk === true}`;
+    }
     const prop = w.propC.get(e);
     if (prop !== undefined) return `prop:${prop.kind}:${prop.phase === 'cover'}`;
     return `shape:${shape}`;
@@ -277,7 +290,14 @@ export class Actors {
         this.buildStash(view, kind[1] ?? '', kind[2] === 'true', s);
         break;
       case 'fix':
-        this.buildFixture(view, kind[1] ?? '', kind[2] === 'true', s);
+        if (kind[1] === 'hung') this.buildCivilian(view, s, kind[3] === 'true' ? 'hung' : 'floor', e);
+        else this.buildFixture(view, kind[1] ?? '', kind[2] === 'true', s);
+        break;
+      case 'retired':
+        this.buildCivilian(view, s, 'chair', e);
+        break;
+      case 'target':
+        this.buildTarget(view, s);
         break;
       case 'clerk':
         this.buildClerk(view, kind[1] === 'true', s);
@@ -297,6 +317,13 @@ export class Actors {
         part(body, BOX, this.tint(color, view), s * 2, s * 2, s * 2, 0, s, 0);
     }
     return view;
+  }
+
+  private brassMat: MeshStandardMaterial | null = null;
+  /** Латунь: общая на всех, не вспыхивает. */
+  private brass(): MeshStandardMaterial {
+    if (this.brassMat === null) this.brassMat = new MeshStandardMaterial({ color: 0x8a7038, metalness: 0.85, roughness: 0.35 });
+    return this.brassMat;
   }
 
   /** Материал, который принадлежит узлу и умеет вспыхивать. */
@@ -409,6 +436,10 @@ export class Actors {
       case 'slim':
         spec = { height: H, shoulder: s * 0.62, hunch: 0.22, headSink: 0, head: 0.88, bulk: 0.72, arm: 1.05 };
         break;
+      case 'personnel':
+        // Начальник отдела кадров: высокий, прямой, в длинном пальто.
+        spec = { height: H * 1.14, shoulder: s * 0.82, hunch: -0.04, headSink: 0, head: 1.0, bulk: 1.05, arm: 1.05 };
+        break;
       default:
         // Стажёр: сутулый, голова ушла в плечи.
         spec = { height: H * 0.9, shoulder: s * 0.92, hunch: 0.38, headSink: 0.6, head: 1, bulk: 1.1, arm: 0.95 };
@@ -485,6 +516,34 @@ export class Actors {
         for (const [px, pz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) part(b, BOX, this.m.darkMetal, 0.04, 0.45, 0.04, px * s * 0.9, 0.22, pz * s * 0.75);
         break;
       }
+      case 'personnel': {
+        // Пальто ниже колен, папка с распоряжениями под мышкой, штамп в
+        // руке. Над головой ходят листы — те, что он ещё не выдал.
+        const coat = this.tint(0x2b3036, view, 0.8);
+        part(rig.pelvis, CYL, coat, spec.shoulder * 2.3, rig.legLen * 0.75, spec.shoulder * 1.7, 0, -rig.legLen * 0.33, 0);
+        part(rig.torso, BOX, coat, spec.shoulder * 2.25, T * 0.95, spec.shoulder * 1.45, 0, T * 0.48, 0);
+        const lapel = part(rig.torso, BOX, this.m.paper, spec.shoulder * 0.5, T * 0.4, 0.02, 0, T * 0.72, spec.shoulder * 0.74, false);
+        lapel.rotation.z = Math.PI / 4;
+        part(rig.handL, BOX, this.m.darkMetal, 0.06, 0.34, 0.26, 0.02, -0.14, 0);
+        part(rig.handL, BOX, this.m.paper, 0.05, 0.31, 0.24, 0.05, -0.14, 0, false);
+        part(rig.handR, CYL, this.m.wood, 0.05, 0.14, 0.05, 0, -0.08, 0);
+        part(rig.handR, CYL, this.m.darkMetal, 0.11, 0.04, 0.11, 0, -0.16, 0);
+        const retinue = new Group();
+        const paper = new MeshStandardMaterial({ color: PALETTE.paper, emissive: PALETTE.paper, emissiveIntensity: 0.3, roughness: 0.8, side: 2 });
+        view.mats.push(paper);
+        for (let i = 0; i < 3; i++) {
+          const a = (i / 3) * Math.PI * 2;
+          const sheet = part(retinue, BOX, paper, s * 0.8, s * 1.1, 0.01, Math.cos(a) * s * 2.3, Math.sin(i * 2.1) * 0.12, Math.sin(a) * s * 2.3, false);
+          sheet.rotation.y = -a;
+          sheet.rotation.x = 0.4;
+        }
+        retinue.position.y = H * 1.28;
+        view.root.add(retinue);
+        view.retinue = retinue;
+        // Нарост: на спине у него вросла картотека — ровными пластами.
+        for (let i = 0; i < 4; i++) part(rig.torso, BOX, skin, spec.shoulder * 1.6, 0.05, spec.shoulder * 0.5, 0, T * (0.35 + i * 0.13), -spec.shoulder * 0.8);
+        break;
+      }
       case 'slim': {
         // Сумка через плечо: по ней видно, куда бежит.
         const bag = s * R.courierBag;
@@ -501,6 +560,57 @@ export class Actors {
     }
     void w;
     void e;
+  }
+
+  /**
+   * Человек без должности. Подвешенный висит над полом, руки плетьми;
+   * опущенный сидит на полу; снятый с должности — на стуле, ссутулившись.
+   * Бетона на нём нет: кожа вернулась вместе с назначением, которого нет.
+   */
+  private buildCivilian(view: View, s: number, how: 'hung' | 'floor' | 'chair', e: Entity): void {
+    const H = TUNING.view3d.bodyHeight;
+    const shades = [0x3b4048, 0x4a4338, 0x2f3a3f, 0x50545a];
+    const suit = this.tint(shades[e % shades.length] ?? 0x3b4048, view, 0.85);
+    const skin = this.tint(how === 'hung' ? 0x9c968f : PALETTE.skin, view, 0.6);
+    const shoe = this.tint(0x15161a, view, 0.9, 0);
+    const seated = how !== 'hung';
+    const rig = new Rig(
+      { height: H * 0.94, shoulder: s * 0.8, hunch: how === 'chair' ? 0.32 : 0.12, headSink: 0.1, head: 1, bulk: 1, arm: 1, seated },
+      { suit, skin, shoe },
+    );
+    view.body.add(rig.root);
+    view.rig = rig;
+    view.civ = how;
+    if (how === 'chair') {
+      const b = view.body;
+      part(b, BOX, this.m.darkMetal, s * 2.0, 0.05, s * 1.7, 0, 0.47, -0.05);
+      part(b, BOX, this.m.darkMetal, s * 2.0, 0.6, 0.05, 0, 0.8, -s * 0.9);
+      for (const [px, pz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) part(b, BOX, this.m.darkMetal, 0.035, 0.45, 0.035, px * s * 0.9, 0.22, pz * s * 0.75);
+    }
+    if (how === 'hung') {
+      // Нить, на которой его держит здание: тонкая, почти невидимая.
+      const thread = new MeshBasicMaterial({ color: PALETTE.concrete300, transparent: true, opacity: 0.25, depthWrite: false });
+      // Освобождается вместе с узлом, как кант субъекта.
+      view.rimMat = thread;
+      part(view.body, CYL, thread, 0.012, 3, 0.012, 0, H + 1.5, 0, false);
+    }
+  }
+
+  /** Мишень аттестации: щит на стойке, кольцо и точка. Её водит комиссия. */
+  private buildTarget(view: View, s: number): void {
+    const b = view.body;
+    const face = new MeshStandardMaterial({ color: PALETTE.concrete100, emissive: PALETTE.concrete100, emissiveIntensity: 0.35, roughness: 0.5 });
+    view.mats.push(face);
+    const disc = new Group();
+    disc.position.y = TUNING.view3d.shotHeight + s * 0.3;
+    b.add(disc);
+    part(disc, CYL, this.m.darkMetal, s * 2.4, 0.05, s * 2.4, 0, 0, 0, true, Math.PI / 2);
+    part(disc, TORUS, face, s * 2.0, s * 2.0, s * 1.2, 0, 0, 0.035, false);
+    part(disc, TORUS, face, s * 1.1, s * 1.1, s * 0.8, 0, 0, 0.035, false);
+    part(disc, CYL, face, s * 0.45, 0.04, s * 0.45, 0, 0, 0.04, false, Math.PI / 2);
+    part(b, BOX, this.m.darkMetal, 0.05, disc.position.y, 0.05, 0, disc.position.y / 2, -0.04);
+    part(b, CYL, this.m.darkMetal, s * 1.2, 0.04, s * 1.2, 0, 0.02, 0);
+    view.arm = disc;
   }
 
   private buildProp(view: View, kind: string, cover: boolean, s: number, color: number, e: Entity): void {
@@ -575,6 +685,24 @@ export class Actors {
         }
         break;
       }
+      case 'order': {
+        // Лист распоряжения: держит его не стол, а аномалия. Висит в воздухе
+        // лицом к залу, текст набран жирными строками.
+        const sheet = new Group();
+        b.add(sheet);
+        const paper = new MeshStandardMaterial({ color: PALETTE.paper, emissive: PALETTE.paper, emissiveIntensity: 0.25, roughness: 0.8, side: 2 });
+        view.mats.push(paper);
+        part(sheet, BOX, paper, s * 1.6, s * 2.2, 0.012, 0, 0, 0);
+        const ink = this.m.darkMetal;
+        for (const [y, wd] of [[0.62, 1.1], [0.32, 1.1], [0.02, 1.1], [-0.28, 0.7], [-0.62, 0.45]] as const) {
+          part(sheet, BOX, ink, s * wd, s * 0.1, 0.016, -s * (1.1 - wd) * 0.5, s * y, 0, false);
+        }
+        part(sheet, BOX, ink, s * 1.66, s * 0.06, 0.018, 0, s * 1.08, 0, false);
+        // Печать в углу — латунью, а не красным: красное у субъекта.
+        part(sheet, CYL, this.brass(), s * 0.42, 0.02, s * 0.42, s * 0.5, -s * 0.7, 0.01, false, Math.PI / 2);
+        view.arm = sheet;
+        break;
+      }
       case 'tank': {
         // Огнетушитель: в жизни он красный, но красное — только субъект.
         part(b, CYL, tone, s * 1.2, 0.85, s * 1.2, 0, 0.43, 0);
@@ -618,6 +746,50 @@ export class Actors {
       } else {
         part(b, BOX, seal, s * 2.04, 0.07, s * 2.04, 0, h * 0.45, 0, false);
       }
+      return;
+    }
+    if (kind === 'saved') {
+      // Личное дело спасённого: папка на конторке. Бумага, а не ящик.
+      part(b, BOX, this.m.darkMetal, s * 1.6, 0.04, s * 1.4, 0, 0.72, 0);
+      part(b, BOX, this.m.darkMetal, 0.06, 0.72, 0.06, 0, 0.36, 0);
+      part(b, CYL, this.m.darkMetal, s * 1.2, 0.03, s * 1.2, 0, 0.015, 0);
+      if (!opened) {
+        const lid = part(b, BOX, this.tint(0x8a8577, view, 0.85), s * 1.3, 0.025, s * 1.0, 0, 0.76, 0);
+        lid.rotation.y = 0.2;
+        part(b, BOX, this.m.paper, s * 1.2, 0.012, s * 0.95, 0.02, 0.75, 0.01, false);
+        part(b, BOX, this.tint(PALETTE.concrete500, view), s * 0.4, 0.03, s * 0.2, -s * 0.3, 0.775, -s * 0.45, false);
+        part(b, BOX, seal, s * 1.32, 0.03, 0.04, 0, 0.78, s * 0.1, false);
+      }
+      return;
+    }
+    if (kind === 'board') {
+      // Коммутатор: щит с гнёздами и шнурами. Переключён — шнуры перекинуты.
+      const h = 1.6;
+      const shell = this.tint(0x38483f, view, 0.55, 0.3);
+      part(b, BOX, shell, s * 2.4, h, s * 1.0, 0, h / 2, -s * 0.3);
+      part(b, BOX, this.m.wood, s * 2.5, 0.06, s * 1.4, 0, 0.82, s * 0.2);
+      const jack = this.brass();
+      for (let r = 0; r < 4; r++) {
+        for (let c = 0; c < 5; c++) {
+          part(b, CYL, jack, 0.05, 0.03, 0.05, -s * 0.9 + c * s * 0.45, 1.0 + r * 0.14, s * 0.21, false, Math.PI / 2);
+        }
+      }
+      const lampMat = new MeshStandardMaterial({ color: PALETTE.yellow, emissive: PALETTE.yellow, emissiveIntensity: opened ? 1.6 : 0.2 });
+      view.mats.push(lampMat);
+      for (let c = 0; c < 5; c++) part(b, SPHERE, lampMat, 0.05, 0.05, 0.05, -s * 0.9 + c * s * 0.45, 1.6, s * 0.21, false);
+      const cord = this.tint(0x15161a, view, 0.7);
+      const pairs: [number, number, number, number][] = opened ? [[0, 0, 4, 3], [1, 2, 3, 0], [2, 1, 0, 3]] : [[0, 0, 0, 3], [2, 1, 2, 2], [4, 0, 4, 3]];
+      for (const [c0, r0, c1, r1] of pairs) {
+        const x0 = -s * 0.9 + c0 * s * 0.45;
+        const x1 = -s * 0.9 + c1 * s * 0.45;
+        const y0 = 1.0 + r0 * 0.14;
+        const y1 = 1.0 + r1 * 0.14;
+        const mx = (x0 + x1) / 2;
+        const len = Math.hypot(x1 - x0, y1 - y0);
+        const seg = part(b, CYL, cord, 0.02, len + 0.25, 0.02, mx, (y0 + y1) / 2 - 0.1, s * 0.27, false);
+        seg.rotation.z = Math.atan2(x1 - x0, y1 - y0);
+      }
+      if (!opened) part(b, BOX, seal, s * 2.44, 0.05, s * 1.04, 0, h + 0.03, -s * 0.3, false);
       return;
     }
     // Ячейка стола выдачи: шкафчик с ярлыком.
@@ -761,6 +933,12 @@ export class Actors {
       view.lamp.color.setHex(open ? PALETTE.yellow : PALETTE.concrete700);
     }
 
+    // Люди без должности: висят или сидят, ни шага, ни ореола.
+    if (view.civ !== undefined) {
+      this.placeCivilian(e, view, x, z, f, b);
+      return;
+    }
+
     const staff = w.staffC.get(e);
     if (staff !== undefined) {
       const bodyC = w.body.get(e);
@@ -823,6 +1001,20 @@ export class Actors {
       // выдохлось — падает и встаёт на основание.
       const hop = prop.phase === 'thrown' ? Math.min(0.55, Math.max(0, (speed - 120) / 1200)) : 0;
       view.body.position.y = prop.phase === 'cover' ? s * 0.95 : lift + hop;
+      if (prop.kind === 'order' || w.targetC.has(e)) {
+        // Распоряжение висит в воздухе и медленно поворачивается; под ним
+        // бледное пятно — так видно, где он, даже за спинами.
+        const sheet = view.arm;
+        if (sheet !== undefined && !w.targetC.has(e)) {
+          sheet.position.y = 1.25 + Math.sin(f.time * 1.7 + e) * 0.07;
+          sheet.rotation.y = Math.sin(f.time * 0.6 + e * 0.3) * 0.6;
+          sheet.rotation.z = Math.sin(f.time * 1.1 + e) * 0.06;
+        }
+        b.glow.flat(x, z, s * 3.2, s * 3.2, 0.02, PALETTE.concrete100, w.targetC.has(e) ? 0.3 : 0.22);
+        if (w.targetC.has(e)) b.svc.ring(x, z, s * 1.9, 0.03, 0.03, PALETTE.concrete100, 0.8, 32);
+        view.lastSpeed = speed;
+        return;
+      }
       if (prop.phase === 'thrown' && pb !== undefined && speed > 1) {
         view.tumble = (view.tumble ?? 0) + speed * U * f.dt * 1.6;
         const yaw = Math.atan2(pb.vx, pb.vy);
@@ -890,12 +1082,68 @@ export class Actors {
     }
   }
 
+  /** Подвешенный, опущенный, снятый: поза человека, а не должности. */
+  private placeCivilian(e: Entity, view: View, x: number, z: number, f: FrameInfo, b: Batches): void {
+    const rig = view.rig;
+    if (rig === undefined) return;
+    rig.pose({ phase: 0, amp: 0, time: f.time + e * 0.7, aim: false });
+    if (view.civ === 'hung') {
+      // Висит: ноги не держат, руки плетьми, голова упала на грудь.
+      const lift = Math.max(0.2, TUNING.hung.lift * U * 4.2);
+      view.body.position.y = lift + Math.sin(f.time * 0.9 + e) * 0.05;
+      view.root.rotation.y += 0.0025;
+      rig.head.rotation.x = 0.55;
+      rig.hipL.rotation.x = 0.08;
+      rig.hipR.rotation.x = -0.04;
+      rig.kneeL.rotation.x = 0.18;
+      rig.kneeR.rotation.x = 0.1;
+      rig.shoulderL.rotation.z = -0.04;
+      rig.shoulderR.rotation.z = 0.04;
+      // С него стекает пыль: медленно, по неподвижному шуму.
+      const motes = Math.max(0, Math.round(TUNING.hung.motes)) + 2;
+      for (let i = 0; i < motes; i++) {
+        const ph = (f.time * 0.35 + hash01(e * 17 + i)) % 1;
+        const ox = (hash01(e * 5 + i * 3) - 0.5) * 0.5;
+        const oz = (hash01(e * 11 + i * 7) - 0.5) * 0.4;
+        const y = lift + 0.1 - ph * (lift + 0.1);
+        b.glow.upright(x + ox, y, z + oz, 0.018, 0.018, PALETTE.concrete300, 0.7 * (1 - ph));
+      }
+      return;
+    }
+    if (view.civ === 'floor') {
+      // Опустили: сидит на полу, ноги вперёд.
+      view.body.position.y = -0.36;
+      rig.kneeL.rotation.x = 0.25;
+      rig.kneeR.rotation.x = 0.4;
+      rig.head.rotation.x = 0.3;
+      return;
+    }
+    // Снят с должности: сидит, опустив голову, руки на коленях.
+    rig.head.rotation.x = 0.4;
+    rig.shoulderL.rotation.x = -0.45;
+    rig.shoulderR.rotation.x = -0.45;
+  }
+
   private placePlayer(w: World, view: View, x: number, z: number, s: number, f: FrameInfo, b: Batches, blink: boolean, flash: boolean): void {
     const player = w.playerC.get(w.player);
     const bodyC = w.body.get(w.player);
     if (player === undefined) return;
     const root = view.root;
     root.visible = !blink;
+    // Срыв в пустоту: тело уходит вниз, кувыркается и уменьшается.
+    if (player.fallTimer > 0) {
+      const k = 1 - Math.max(0, Math.min(1, player.fallTimer / Math.max(1e-6, TUNING.fall.time)));
+      root.position.y = -k * k * 9;
+      root.scale.setScalar(Math.max(0.05, 1 - k * TUNING.fall.shrink));
+      view.body.rotation.x = k * 2.4;
+      view.rig?.pose({ phase: 0, amp: 0, time: f.time, aim: false, dash: true });
+      if (view.rimMat !== undefined) view.rimMat.visible = false;
+      for (const g of view.ghosts ?? []) g.visible = false;
+      return;
+    }
+    root.position.y = 0;
+    root.scale.setScalar(1);
+    view.body.rotation.x = 0;
     const suit = view.mats[0];
     if (suit !== undefined) {
       const c = flash ? PALETTE.concrete100 : f.skin;
@@ -1057,8 +1305,9 @@ export class Actors {
       if (a !== null && t !== null) svc.line(a.x, a.z, t.x, t.z, line, shotH, PALETTE.concrete100, R.holdRayAlpha);
     }
 
-    // Знаки над штатом.
+    // Знаки над штатом. Снятым с должности табличек не положено.
     for (const [e, staff] of w.staffC) {
+      if (staff.retired) continue;
       const p = pos(e);
       const draw = w.drawC.get(e);
       if (p === null || draw === undefined) continue;
@@ -1259,6 +1508,7 @@ export class Actors {
   /** Вид обломков, на которые рассыпается предмет. */
   private pieceKind(view: View): DebrisKind {
     const kind = view.key.split(':')[1] ?? '';
+    if (kind === 'order') return 'paper';
     if (kind === 'rubble') return 'chunk';
     if (kind === 'cabinet' || kind === 'faxstand' || kind === 'tank' || kind === 'typewriter') return 'metal';
     return 'splinter';
@@ -1282,6 +1532,10 @@ export class Actors {
       this.puffs.push({ x, z, t: this.clock, size: 1.4, life: 1.4 });
       this.puffs.push({ x, z, t: this.clock + 0.08, size: 1.0, life: 1.1 });
       d.push(x, z, 2.2, 3.5, 0.6);
+    } else if (kind === 'target') {
+      // Мишень сбита: щит разлетается железом.
+      this.shatter(view, 'metal', 1.4);
+      d.burst('spark', 14, x, TUNING.view3d.shotHeight, z, 3.0, 0.03, 0xfff1d0);
     } else if (kind === 'prop') {
       const piece = this.pieceKind(view);
       this.shatter(view, piece, 1.6);
@@ -1371,6 +1625,15 @@ export class Actors {
       d.burst('chip', 8, x, 0.1, z, 1.6, 0.05, PALETTE.concrete500);
     } else if (a === 'counter' && was === 'false' && now === 'true') {
       d.burst('paper', 5, x, 1.1, z, 1.4, 0.18, PALETTE.paper);
+    } else if (a === 'staff' && next === 'retired') {
+      // Снят с должности: таблички падают с груди, бетон осыпается с кожи.
+      d.burst('paper', 4, x, 1.2, z, 1.4, 0.16, PALETTE.paper);
+      d.burst('chip', 30, x, 1.0, z, 2.0, 0.06, view.tint ?? PALETTE.concrete500);
+      this.puffs.push({ x, z, t: this.clock, size: 1.3, life: 1.6 });
+    } else if (a === 'fix' && kind === 'hung' && view.key.split(':')[3] === 'true' && next.split(':')[3] === 'false') {
+      // Опустили: сел на пол, из-под него — пыль.
+      this.puffs.push({ x, z, t: this.clock, size: 1.4, life: 1.4 });
+      d.burst('chip', 10, x, 0.3, z, 1.2, 0.05, PALETTE.concrete300);
     }
   }
 

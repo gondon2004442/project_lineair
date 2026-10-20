@@ -9,6 +9,7 @@ import { spawnBullet, type BulletSpec } from '../spawn';
 import { DEG, TUNING } from '../tuning';
 import { ammoMax, formStat, infiniteReserve, statAt } from '../weapon';
 import { addShake } from './damage';
+import { demoteFactor, lockedForm, orderActive } from './postPersonnel';
 
 /**
  * Числа рывка в текущей схеме.
@@ -95,6 +96,15 @@ export function playerControlSystem(w: World, dt: number): void {
     return;
   }
 
+  // Сорвавшийся не управляется: он летит. Возврат и цену считает
+  // система края.
+  if (p.fallTimer > 0) {
+    w.input.dashQueued = false;
+    w.input.formStep = 0;
+    w.input.firePressed = false;
+    return;
+  }
+
   const toAimX = w.input.aimX - t.x;
   const toAimY = w.input.aimY - t.y;
   const aimLen = Math.hypot(toAimX, toAimY);
@@ -152,7 +162,11 @@ export function playerControlSystem(w: World, dt: number): void {
   // Рывок из буфера: нажатие за десяток миллисекунд до готовности
   // раньше просто пропадало, и это читалось как «игра не слушается».
   if (w.input.dashQueued) {
-    if (p.phase === 'normal' && p.dashCooldown <= 0) {
+    // Запрет передвижения вне маршрута: рывка нет, пока лист цел.
+    if (orderActive(w, 'dash')) {
+      w.input.dashQueued = false;
+      w.input.dashAge = 0;
+    } else if (p.phase === 'normal' && p.dashCooldown <= 0) {
       w.input.dashQueued = false;
       w.input.dashAge = 0;
       startDash(w, p, h, spec);
@@ -288,6 +302,13 @@ export function startReload(w: World, p: PlayerC): boolean {
 function fireSystem(w: World, p: PlayerC, x: number, y: number, dt: number): void {
   const form = WEAPON_FORMS[p.form];
   if (form === undefined || w.status === 'dead' || p.reloading) return;
+  // Временное отстранение от формы: этой стрелять нельзя, другой можно.
+  // Колесо при этом не заблокировано — в том и смысл, что распоряжение
+  // отнимает не оружие, а право на него.
+  if (lockedForm(w) === p.form) {
+    w.input.firePressed = false;
+    return;
+  }
 
   // Залп доигрывается сам, даже если ЛКМ уже отпущена.
   if (p.queued > 0) {
@@ -421,7 +442,7 @@ function launchPrecise(w: World, p: PlayerC, x: number, y: number): void {
   const spec: BulletSpec = {
     speed: formStat(w, 'precise', 'speed'),
     radius: formStat(w, 'precise', 'radius'),
-    damage: formStat(w, 'precise', 'damage'),
+    damage: formStat(w, 'precise', 'damage') * demoteFactor(w),
     life: formStat(w, 'precise', 'life'),
     shape: 'dot',
   };
@@ -443,7 +464,7 @@ function launchScatter(w: World, p: PlayerC, x: number, y: number): void {
     const spec: BulletSpec = {
       speed: formStat(w, 'scatter', 'speed') + w.rng.spread(jitter),
       radius: formStat(w, 'scatter', 'radius'),
-      damage: formStat(w, 'scatter', 'damage'),
+      damage: formStat(w, 'scatter', 'damage') * demoteFactor(w),
       life: formStat(w, 'scatter', 'life'),
       shape: 'dot',
     };
@@ -462,7 +483,7 @@ function launchLance(w: World, p: PlayerC, x: number, y: number, charge: number)
   const spec: BulletSpec = {
     speed: formStat(w, 'lance', 'speed'),
     radius: formStat(w, 'lance', 'radius'),
-    damage: low + (high - low) * ratio,
+    damage: (low + (high - low) * ratio) * demoteFactor(w),
     life: formStat(w, 'lance', 'life'),
     pierce: Math.max(0, Math.round(formStat(w, 'lance', 'pierce'))),
     shape: 'bar',
@@ -485,7 +506,7 @@ function launchStaple(w: World, p: PlayerC, x: number, y: number): void {
   const spec: BulletSpec = {
     speed: formStat(w, 'staple', 'speed'),
     radius: formStat(w, 'staple', 'radius'),
-    damage: formStat(w, 'staple', 'damage'),
+    damage: formStat(w, 'staple', 'damage') * demoteFactor(w),
     life: formStat(w, 'staple', 'life'),
     pin: formStat(w, 'staple', 'pinTime'),
     shape: 'bar',
@@ -509,7 +530,7 @@ function launchCircular(w: World, p: PlayerC, x: number, y: number): void {
   const spec: BulletSpec = {
     speed: formStat(w, 'circular', 'speed'),
     radius: formStat(w, 'circular', 'radius'),
-    damage: formStat(w, 'circular', 'damage'),
+    damage: formStat(w, 'circular', 'damage') * demoteFactor(w),
     life: formStat(w, 'circular', 'life'),
     shape: 'dot',
   };
@@ -533,7 +554,7 @@ function launchVolleyShot(w: World, p: PlayerC, x: number, y: number): void {
   const spec: BulletSpec = {
     speed: formStat(w, 'volley', 'speed'),
     radius: formStat(w, 'volley', 'radius'),
-    damage: formStat(w, 'volley', 'damage'),
+    damage: formStat(w, 'volley', 'damage') * demoteFactor(w),
     life: formStat(w, 'volley', 'life'),
     homing: formStat(w, 'volley', 'homingDeg') * DEG,
     shape: 'diamond',

@@ -11,6 +11,7 @@ import { chiefSystem } from './systems/postChief';
 import { archivistSystem } from './systems/postArchivist';
 import { keeperSystem } from './systems/postKeeper';
 import { commissionSystem } from './systems/postCommission';
+import { personnelSystem } from './systems/postPersonnel';
 import { courierSystem } from './systems/postCourier';
 import { registrarSystem } from './systems/postRegistrar';
 import {
@@ -21,11 +22,16 @@ import {
   suspensionSystem,
 } from './systems/staff';
 import { feedbackSystem, liftSystem, lifecycleSystem, statusSystem } from './systems/lifecycle';
+import { hissSystem } from './systems/hiss';
+import { cleanseSystem } from './systems/cleanse';
 import { physicsSystem } from './systems/physics';
+import { edgeSystem } from './systems/edge';
 import { propPushSystem, propSystem } from './systems/props';
 import { propCollisionSystem } from './systems/impulse';
 import { railSystem } from './systems/rails';
 import { rebuildSystem } from './systems/rebuild';
+import { arenaSystem } from './systems/arena';
+import { trialSystem } from './systems/trial';
 import { telekinesisSystem } from './systems/telekinesis';
 import { ticketSystem } from './systems/tickets';
 import { fixtureSystem } from './systems/fixtures';
@@ -81,6 +87,7 @@ export function step(w: World): void {
   archivistSystem(w, STEP);
   keeperSystem(w, STEP);
   commissionSystem(w, STEP);
+  personnelSystem(w, STEP);
   courierSystem(w, STEP);
   separationSystem(w, STEP);
   playerBodySystem(w, STEP);
@@ -104,6 +111,9 @@ export function step(w: World): void {
   // Оборудование разбирается ПОСЛЕ физики: она уже поставила субъекта
   // туда, куда он дошёл, и только теперь видно, во что он влетел.
   fixtureSystem(w);
+  // Край — сразу после физики: она уже поставила субъекта туда, куда он
+  // дошёл, и только теперь видно, что под ним ничего нет.
+  edgeSystem(w, STEP);
   profiler.end('СИМ: ФИЗИКА');
 
   profiler.begin('СИМ: ПУЛИ');
@@ -112,6 +122,12 @@ export function step(w: World): void {
 
   profiler.begin('СИМ: ЦИКЛ ЖИЗНИ');
   lifecycleSystem(w, STEP);
+  // Очищение идёт после цикла жизни: волну запускает снятая печать, а
+  // снимается она там.
+  cleanseSystem(w, STEP);
+  // Красное состояние считается после цикла жизни: мёртвый начальник уже
+  // вычеркнут, и заседание кончается тем же шагом, что и он.
+  hissSystem(w, STEP);
   feedbackSystem(w, STEP);
 
   flushDoomed(w);
@@ -123,6 +139,12 @@ export function step(w: World): void {
     // Перестройка в самом конце шага: она меняет карту под всеми, и
     // пусть это случается между шагами, а не посреди разбора движения.
     rebuildSystem(w, STEP);
+    // Арена: перестройка по смене фазы начальника. Идёт сразу за
+    // перестройкой натурной части — она же её и выполняет.
+    arenaSystem(w, STEP);
+    // Аттестация: её проверки читают уже сложившийся шаг — и падение, и
+    // перестройку, и то, что держит телекинез.
+    trialSystem(w, STEP);
     // Лифт после статуса: шахту пробивает он, а шагнуть в неё можно уже
     // на следующем шаге. И то и другое — шаг в проём, после которого
     // мир собирается заново.

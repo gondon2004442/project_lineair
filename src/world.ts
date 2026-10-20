@@ -1,9 +1,12 @@
 /** Сборка этажа и вход в помещение. Всё случайное — из seeded PRNG. */
 import { destroyEntity, type World, componentStores } from './ecs';
+import { cleansedRoom, distortionNow, landHung, retire } from './systems/cleanse';
+import { buildWiring, rerouting } from './systems/reroute';
+import { setupTrial } from './systems/trial';
 import { POST_COURIER, POST_ARCHIVIST, POST_KEEPER } from './data/posts';
 import { MINI_BOSS_POSTS, STAFFING_BY_ID, type StaffPost } from './data/staffing';
 import { DEEPEST, floorAt } from './data/floors';
-import { generateFloor, roomDoors, type RoomNode } from './floor';
+import { generateFloor, roomDoors, type RoomNode, roomNumber } from './floor';
 import type { InputSnapshot } from './input';
 import { pickItem } from './paperwork';
 import { makeRng, type Rng } from './rng';
@@ -33,7 +36,7 @@ import { SUBJECT_START, subjectAt, walledAt } from './data/subjects';
 import { ENDINGS } from './data/endings';
 import { ammoMax, reserveMax } from './weapon';
 import { COUNTERS, type CounterSpec } from './data/counters';
-import { FIXTURES_BY_ID } from './data/fixtures';
+import { FIXTURE_HUNG, FIXTURES_BY_ID } from './data/fixtures';
 import { spillAt } from './systems/fixtures';
 import {
   postNumbers,
@@ -78,6 +81,7 @@ export function createWorld(seed: number, input: InputSnapshot): World {
       shotX: 0,
       shotY: 0,
       hiss: 0,
+      seatTitle: 0,
     },
     sounds: [],
     status: 'playing',
@@ -86,12 +90,29 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     roster: [],
     build: [],
     tool: { id: '', cooldown: 0, charges: -1 },
+    tool2: { id: '', cooldown: 0, charges: -1 },
+    grants: [],
+    trials: [],
+    savedCases: [],
+    trialDone: 0,
+    trialTimer: 0,
+    trialBeat: 0,
+    trialNote: 0,
     blanks: TUNING.blank.refillTo,
     passes: TUNING.stash.passesStart,
     reward: { chance: TUNING.reward.base, dry: 0, lastItem: '', lastOrder: '', lastWeight: 1 },
-    record: { penalty: 0, service: 0, broken: 0, roomClean: true, controlHere: 0 },
+    record: {
+      penalty: 0,
+      service: 0,
+      broken: 0,
+      roomClean: true,
+      controlHere: 0,
+      retired: 0,
+      killed: 0,
+    },
     depth: -1,
     seals: [],
+    cleanse: -1,
     subject: SUBJECT_START,
     freed: [],
     unlocked: [SUBJECT_START],
@@ -103,6 +124,11 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     tickets: 0,
     listed: false,
     evacPlan: false,
+    wiring: [],
+    patched: false,
+    appointed: 0,
+    arena: -1,
+    arenaGap: 0,
     rebuildIn: 0,
     rebuilds: 0,
     sections: [],
@@ -128,6 +154,9 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     chiefC: new Map(),
     archivistC: new Map(),
     keeperC: new Map(),
+    personnelC: new Map(),
+    orderC: new Map(),
+    targetC: new Map(),
     commissionC: new Map(),
     courierC: new Map(),
     propC: new Map(),
@@ -163,6 +192,9 @@ export function enterLobby(w: World): void {
   w.record.controlHere = 0;
   w.metronome = TUNING.post.inspector.metronomeInterval;
   w.beat = 0;
+  // Титр заседания принадлежит помещению, а не забегу: вышел — и он
+  // гаснет вместе с дверью за спиной.
+  w.fx.seatTitle = 0;
 
   const center = roomCenter(w.map);
   // Ставим субъекта ниже проёма, чтобы забег не начался сам собой.
@@ -181,6 +213,13 @@ export function startRun(w: World): void {
   // наряду. Колесо Картографа короче не из-за числа, а из-за того, что
   // остальные формы ему ещё не выписаны.
   w.freed = [];
+  w.tool2 = { id: '', cooldown: 0, charges: -1 };
+  w.grants = [];
+  w.trials = [];
+  w.savedCases = [];
+  w.trialDone = 0;
+  w.trialTimer = 0;
+  w.trialBeat = 0;
   const subject = subjectAt(w.subject);
   w.forms = WEAPON_FORMS.map((f) => subject.forms.includes(f.id));
   // Табельная точная одиночная есть у всякого: без неё забег начинался
@@ -208,10 +247,14 @@ export function startRun(w: World): void {
   w.depth = -1;
   // Печати аннулируются вместе с допуском: подписывать спуск заново.
   w.seals = [];
+  w.cleanse = -1;
   w.record.penalty = 0;
   w.record.service = 0;
   w.record.broken = 0;
   w.record.roomClean = true;
+  buildWiring(w);
+  w.record.retired = 0;
+  w.record.killed = 0;
   restorePlayer(w);
   enterRoom(w, w.floor.start, null);
 }
@@ -233,6 +276,10 @@ export function descend(w: World): void {
   w.floor = generateFloor(rng, w.depth);
   w.listed = false;
   w.evacPlan = false;
+  // Новый уровень — новые работы: акт приёмки на него ещё не подписан.
+  w.cleanse = -1;
+  // И своя раскоммутация, если этаж её требует.
+  buildWiring(w);
   w.note = [];
   w.noteSlot = -1;
   w.blanks = Math.max(w.blanks, TUNING.blank.refillTo);
@@ -316,9 +363,15 @@ export function enterRoom(w: World, index: number, fromDir: Dir | null): void {
 
   w.metronome = TUNING.post.inspector.metronomeInterval;
   w.beat = 0;
+  // Титр заседания принадлежит помещению, а не забегу: вышел — и он
+  // гаснет вместе с дверью за спиной.
+  w.fx.seatTitle = 0;
   // Отсчёт перестройки начинается заново в каждом помещении.
   w.rebuildIn = 0;
   w.rebuilds = 0;
+  // Фазы начальников считаются заново: вход в помещение — не смена фазы.
+  w.arena = -1;
+  w.arenaGap = 0;
 
   const spot = fromDir === null ? roomCenter(w.map) : entryPosition(w.map, fromDir);
   placePlayer(w, spot.x, spot.y);
@@ -332,8 +385,25 @@ export function enterRoom(w: World, index: number, fromDir: Dir | null): void {
   placeWalled(w, room, spot.x, spot.y);
   placeForm(w, room, spot.x, spot.y);
   placeVerdict(w, room);
+  placeHung(w, room, spot.x, spot.y);
+  placeBoard(w, room, spot.x, spot.y);
   placeSections(w, room);
   if (!room.cleared) staffRoom(w, room, spot.x, spot.y);
+  // Помещение, до которого волна уже дошла: штат в нём набирается, как
+  // обычно, и тут же снимается с должности. Иначе очищённый этаж стоял
+  // бы пустым, а он не пустой — в нём сидят люди.
+  if (cleansedRoom(w, index)) {
+    for (const [e] of [...w.staffC]) {
+      retire(w, e);
+      room.savedHere = true;
+    }
+    if (landHung(w, room)) room.savedHere = true;
+  }
+  // Дело кладётся ПОСЛЕ того, как людей сняли с должности: иначе в
+  // помещение, куда волна только что дошла, оно легло бы лишь со
+  // второго захода.
+  placeSavedCase(w, room, spot.x, spot.y);
+  setupTrial(w);
   if (w.staffC.size === 0 && !room.cleared) {
     room.cleared = true;
     w.map.doorsLocked = false;
@@ -400,10 +470,14 @@ export function rebuildRoom(w: World): void {
   const pick = pool[rng.int(Math.max(1, pool.length))];
   if (pick === undefined) return;
 
-  // Мебель переезжает: старую снимаем целиком, вместе с рельсами.
+  // Мебель переезжает: старую снимаем целиком, вместе с рельсами. Всю,
+  // кроме той, что субъект держит телекинезом: что у него в руках, то
+  // перестройке уже не принадлежит. Без этого испытание на удержание
+  // было бы непроходимым — предмет отбирала бы сама комната.
   const player = w.playerC.get(w.player);
-  if (player !== undefined) player.held = -1;
+  const held = player?.held ?? -1;
   for (const [e] of [...w.propC]) {
+    if (e === held) continue;
     w.propC.delete(e);
     w.railC.delete(e);
     destroyEntity(w, e);
@@ -537,7 +611,7 @@ function toAnyFreeCell(w: World, t: { x: number; y: number }, radius: number): b
  * от порядка обхода: вернувшись, застанешь ту же перестановку.
  */
 function placeRails(w: World, room: RoomNode): void {
-  if (floorAt(w.depth).distortion !== 'shuffle') return;
+  if (distortionNow(w, floorAt(w.depth)) !== 'shuffle') return;
   const cfg = TUNING.rail;
   const rng = makeRng((w.seed + room.index * cfg.seedStride) >>> 0);
 
@@ -563,7 +637,7 @@ function placeRails(w: World, room: RoomNode): void {
  * интерфейс перестал врать, игрок не должен.
  */
 function placeEvacPlan(w: World, room: RoomNode, entryX: number, entryY: number): void {
-  if (floorAt(w.depth).distortion !== 'shuffle') return;
+  if (distortionNow(w, floorAt(w.depth)) !== 'shuffle') return;
   if (w.evacPlan || room.index !== evacRoom(w)) return;
   const cfg = TUNING.stash;
   const rng = makeRng((w.seed + room.index * cfg.seedStride + 7) >>> 0);
@@ -610,14 +684,97 @@ function placeWalled(w: World, room: RoomNode, entryX: number, entryY: number): 
 }
 
 /**
+ * ЛИЧНОЕ ДЕЛО СПАСЁННОГО. Лежит в очищённом помещении — там, где людей
+ * сняли с должности, а не вынесли.
+ *
+ * Берётся даром: за чужое дело не платят, его подбирают. И только оно
+ * даёт право на третий исход — подшить вместо своего можно лишь то,
+ * что у тебя на руках.
+ */
+function placeSavedCase(w: World, room: RoomNode, entryX: number, entryY: number): void {
+  if (!cleansedRoom(w, room.index) || !room.savedHere) return;
+  if (w.savedCases.some((c) => c.id === `room:${w.depth}:${room.index}`)) return;
+  const cfg = TUNING.stash;
+  const rng = makeRng((w.seed + room.index * cfg.seedStride + 11) >>> 0);
+  const spot = findSpawnSpot(w.map, rng, entryX, entryY, cfg.clearance, cfg.cellRadius);
+  spawnStash(
+    w,
+    'saved',
+    `room:${w.depth}:${room.index}`,
+    `ЛИЧНОЕ ДЕЛО · УЧАСТОК ${roomNumber(room)}`,
+    spot.x,
+    spot.y,
+  );
+}
+
+/**
+ * КОММУТАТОР. Щит с гнёздами и шнурами в середине этажа.
+ *
+ * Стоит он в приёмной — там, куда субъект всё равно дойдёт, и где
+ * переключать раскоммутацию уже поздно настолько, чтобы это было
+ * решением, а не починкой.
+ */
+function placeBoard(w: World, room: RoomNode, entryX: number, entryY: number): void {
+  if (!rerouting(w) || w.patched || room.index !== w.floor.end) return;
+  const cfg = TUNING.reroute;
+  const rng = makeRng((w.seed + Math.abs(w.depth) * cfg.seedStride + 1) >>> 0);
+  const spot = findSpawnSpot(w.map, rng, entryX, entryY, TUNING.stash.clearance, cfg.radius);
+  spawnStash(w, 'board', '', 'КОММУТАТОР', spot.x, spot.y);
+}
+
+/**
+ * ПОДВЕШЕННЫЕ. Их тем больше, чем глубже.
+ *
+ * Считаются от посевной этажа, а не раскладываются по ходу: вернувшись
+ * в помещение, застанешь того же подвешенного на том же месте. В
+ * вестибюле он один на весь этаж, в натурной части они почти в каждом
+ * помещении — и это единственная шкала, по которой видно глубину, не
+ * заглядывая в номер уровня.
+ */
+function placeHung(w: World, room: RoomNode, entryX: number, entryY: number): void {
+  const cfg = TUNING.hung;
+  const want = Math.max(0, Math.round(cfg.base + cfg.perDepth * (Math.abs(w.depth) - 1)));
+  if (want <= 0) return;
+  const spec = FIXTURES_BY_ID.get(FIXTURE_HUNG);
+  if (spec === undefined) return;
+
+  const rng = makeRng((w.seed + Math.abs(w.depth) * cfg.seedStride) >>> 0);
+  // Коридоры годятся: в проходе он читается даже лучше, чем в зале.
+  // Не годится только вход — там здание ещё притворяется.
+  const pool = w.floor.rooms.filter((r) => r.kind !== 'start').map((r) => r.index);
+  // Выбор помещений делается целиком и всегда, даже если нас в них нет:
+  // иначе набор зависел бы от порядка обхода этажа. Перетасовка, а не
+  // попытки наугад: иначе на глубине, где их много, половина попыток
+  // уходила бы в уже занятые помещения и подвешенных недоставало.
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = rng.int(i + 1);
+    const a = pool[i];
+    const b = pool[j];
+    if (a === undefined || b === undefined) continue;
+    pool[i] = b;
+    pool[j] = a;
+  }
+  if (!pool.slice(0, want).includes(room.index)) return;
+  const spot = findSpawnSpot(w.map, rng, entryX, entryY, TUNING.fixture.clearance, spec.radius);
+  if (!onOpenFloor(w.map, spot.x, spot.y, spec.radius)) return;
+  spawnFixture(w, spec, spot.x, spot.y);
+}
+
+/**
  * ФИНАЛ. Три исхода в приёмной центрального архива.
  *
  * Боя здесь нет: уровень без ставок, и кончается он не зачисткой, а
  * решением. Стойки стоят в ряд, подписаны и ничего не стоят — платить
  * за собственное дело не надо, его надо выбрать.
  */
-function placeVerdict(w: World, room: RoomNode): void {
+export function placeVerdict(w: World, room: RoomNode): void {
   if (floorAt(w.depth).verdict !== true || room.index !== w.floor.end) return;
+  // Центральный архив лежит ЗА Комиссией: пока она заседает, решать
+  // нечего. Стойки выставляются по снятой печати, то есть после неё.
+  if (!w.seals.includes(w.depth)) return;
+  for (const [, stash] of w.stashC) {
+    if (stash.kind === 'verdict') return;
+  }
   const centre = roomCenter(w.map);
   const gap = TUNING.stash.deskGap;
   ENDINGS.forEach((ending, i) => {

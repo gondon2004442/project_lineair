@@ -57,6 +57,9 @@ export function fixtureSystem(w: World): void {
 function topple(w: World, e: number, nx: number, ny: number): void {
   const fixture = w.fixtureC.get(e);
   if (fixture === undefined || fixture.toppled) return;
+  // Подвешенного не роняют: он висит не на подставке. Его опускает
+  // приёмка, и больше ничто.
+  if (fixture.hung) return;
   fixture.toppled = true;
   fixture.spillX = nx;
   fixture.spillY = ny;
@@ -72,7 +75,14 @@ function topple(w: World, e: number, nx: number, ny: number): void {
 export function spillAt(w: World, kind: string, x: number, y: number, dirX: number, dirY: number): void {
   const e = createEntity(w);
   w.transform.set(e, { x, y, px: x, py: y });
-  w.fixtureC.set(e, { kind, title: 'РАССЫПАННОЕ', toppled: true, spillX: dirX, spillY: dirY });
+  w.fixtureC.set(e, {
+    kind,
+    title: 'РАССЫПАННОЕ',
+    toppled: true,
+    hung: false,
+    spillX: dirX,
+    spillY: dirY,
+  });
   const spec = FIXTURES_BY_ID.get(kind);
   w.drawC.set(e, {
     shape: 'square',

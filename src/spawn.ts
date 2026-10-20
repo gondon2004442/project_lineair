@@ -6,13 +6,14 @@ import {
   POST_COURIER,
   POST_INSPECTOR,
   POST_INTERN,
-  POST_REGISTRAR, POST_ARCHIVIST, POST_KEEPER, POST_COMMISSION } from './data/posts';
+  POST_REGISTRAR, POST_ARCHIVIST, POST_KEEPER, POST_COMMISSION, POST_PERSONNEL } from './data/posts';
 import { PROPS_BY_ID } from './data/props';
 import { WEAPON_FORMS } from './data/weaponForms';
 import { createEntity, type Entity, type Faction, type Shape, type StashKind, type World } from './ecs';
 import { PALETTE } from './palette';
 import type { CounterSpec } from './data/counters';
-import type { FixtureSpec } from './data/fixtures';
+import { FIXTURE_HUNG, type FixtureSpec } from './data/fixtures';
+import { floorPalette } from './data/palettes';
 import { TUNING } from './tuning';
 import { penaltyOf } from './weapon';
 
@@ -36,6 +37,8 @@ export function postNumbers(post: string): PostNumbers {
       return TUNING.post.archivist;
     case POST_KEEPER:
       return TUNING.post.keeper;
+    case POST_PERSONNEL:
+      return TUNING.post.personnel;
     case POST_COMMISSION:
       return TUNING.post.commission;
     case POST_COURIER:
@@ -76,6 +79,9 @@ export function spawnPlayer(w: World, x: number, y: number): Entity {
     reloadTimer: 0,
     charge: 0,
     ring: 0,
+    fallTimer: 0,
+    safeX: x,
+    safeY: y,
     queued: 0,
     queueTimer: 0,
     energy: TUNING.telekinesis.energyMax,
@@ -128,6 +134,7 @@ export function spawnStaff(w: World, post: string, priority: number, x: number, 
     plateFlash: 0,
     control,
     frozen: 0,
+    retired: false,
     pinned: 0,
   });
   w.drawC.set(e, {
@@ -207,6 +214,13 @@ function attachBehaviour(w: World, e: Entity, post: string, x: number, y: number
     case POST_KEEPER:
       w.keeperC.set(e, { douseTimer: TUNING.keeper.douseEvery, target: -1, touchTimer: 0 });
       break;
+    case POST_PERSONNEL:
+      w.personnelC.set(e, {
+        stage: 1,
+        issueTimer: TUNING.personnel.firstDelay,
+        appointed: false,
+      });
+      break;
     case POST_COMMISSION: {
       // Место в комиссии: по нему же решают, кто сейчас председатель.
       const seat = w.commissionC.size;
@@ -281,18 +295,30 @@ export function propNumbers(kind: string): PropNumbers {
  * светлый, кресло тёмное. Три ступени — три разных предмета на глаз,
  * даже если смотреть на кадр без цвета.
  */
-const PROP_SHADE: Record<string, number> = {
-  cabinet: PALETTE.furniture,
-  rubble: PALETTE.concrete500,
-  desk: PALETTE.furniture,
-  typewriter: PALETTE.concrete500,
-  cardbox: PALETTE.concrete700,
-  faxstand: PALETTE.concrete500,
-  tank: PALETTE.furniture,
+/**
+ * Чем красить укрытие. Ключи — роли в палитре этажа, а не цвета: мебель
+ * бойлерной и мебель холла это одна и та же мебель, просто на разных
+ * этажах она сделана из разного.
+ */
+const PROP_SHADE: Record<string, 'furniture' | 'detail' | 'accent'> = {
+  cabinet: 'furniture',
+  rubble: 'detail',
+  desk: 'furniture',
+  typewriter: 'detail',
+  cardbox: 'accent',
+  faxstand: 'detail',
+  tank: 'furniture',
 };
 
-function propShade(kind: string): number {
-  return PROP_SHADE[kind] ?? PALETTE.concrete700;
+/**
+ * Цвет берётся в момент появления, а не при отрисовке: сущности участка
+ * стираются при переходе, поэтому на новом этаже мебель и так родится
+ * заново — и родится уже в его цвете.
+ */
+function propShade(w: World, kind: string): number {
+  const th = floorPalette(w.depth);
+  const role = PROP_SHADE[kind] ?? 'furniture';
+  return role === 'detail' ? th.detail : role === 'accent' ? th.accent : th.furniture;
 }
 
 export function spawnProp(w: World, kind: string, x: number, y: number): Entity {
@@ -313,7 +339,7 @@ export function spawnProp(w: World, kind: string, x: number, y: number): Entity 
   w.drawC.set(e, {
     shape: 'square',
     size: numbers.radius,
-    color: propShade(kind),
+    color: propShade(w, kind),
     hollow: spec !== undefined && spec.hollow,
     desk: false,
   });
@@ -381,11 +407,24 @@ export function spawnFixture(w: World, spec: FixtureSpec, x: number, y: number):
   const e = createEntity(w);
   w.transform.set(e, { x, y, px: x, py: y });
   w.body.set(e, { vx: 0, vy: 0, radius: spec.radius });
-  w.fixtureC.set(e, { kind: spec.id, title: spec.title, toppled: false, spillX: 1, spillY: 0 });
+  w.fixtureC.set(e, {
+    kind: spec.id,
+    title: spec.title,
+    toppled: false,
+    // Подвешенный появляется поднятым: это его состояние, а не событие.
+    hung: spec.id === FIXTURE_HUNG,
+    spillX: 1,
+    spillY: 0,
+  });
   w.drawC.set(e, {
     shape: 'square',
     size: spec.radius,
-    color: PALETTE[spec.color as keyof typeof PALETTE],
+    // Оборудование тоже красит этаж: кулер в бойлерной не из того же
+    // материала, что кулер в холле.
+    color:
+      spec.color === 'furniture'
+        ? floorPalette(w.depth).furniture
+        : PALETTE[spec.color as keyof typeof PALETTE],
     hollow: false,
     desk: false,
   });
@@ -435,6 +474,9 @@ export function spawnBullet(
   /** Кто стреляет. Нужен только затем, чтобы проверка била вдвое. */
   owner?: Entity,
 ): Entity {
+  // Субъект назначен на должность: по штатному не стреляют. Проверка
+  // стоит здесь, в одной точке, а не в шести системах должностей.
+  if (faction === 'enemy' && w.appointed > 0) return -1;
   const e = createEntity(w);
   const shooter = owner === undefined ? undefined : w.staffC.get(owner);
   const damage = shooter?.control === true ? spec.damage * TUNING.record.controlDamage : spec.damage;

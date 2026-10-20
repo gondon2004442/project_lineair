@@ -21,6 +21,7 @@ import {
   Group,
   Mesh,
   MeshBasicMaterial,
+  MeshStandardMaterial,
   PlaneGeometry,
   RectAreaLight,
   SpotLight,
@@ -33,6 +34,10 @@ import {
 import type { World } from '../ecs';
 import { TILE_DOOR, TILE_GATE, TILE_WALL, TILE_WEAK, type TileMap } from '../room';
 import { roomNumber } from '../floor';
+import { signLie } from '../render';
+import { floorAt } from '../data/floors';
+import { voidEdges } from '../systems/edge';
+import { distortionNow } from '../systems/cleanse';
 import { currentRoom } from '../world';
 import { DECOR_BY_ID } from '../data/decor';
 import { TEMPLATES_BY_ID } from '../data/roomTemplates';
@@ -100,6 +105,9 @@ export function buildDressed(w: World, m: Materials): RoomView {
   const kit = new Kit(2);
   const rng = makeRng(((w.seed ^ 0x5eed) + (room?.index ?? 0) * 7919) >>> 0);
   const ctx: Ctx = { kit, m, L, rng, group, owned, ticks };
+  const slabSide = new MeshStandardMaterial({ color: 0x232a31, roughness: 0.95 });
+  const vein = new MeshStandardMaterial({ color: 0xb8923a, metalness: 0.85, roughness: 0.3, emissive: 0x6a4d12, emissiveIntensity: 0.7 });
+  owned.push(slabSide, vein);
   // Ручка «высота стен» масштабирует тему, а не заменяет её.
   const H = t.height * (v.wallHeight / 3.4);
   const SOUTH = Math.max(0.25, v.southWallHeight);
@@ -111,6 +119,8 @@ export function buildDressed(w: World, m: Materials): RoomView {
   };
   const isBorder = (cx: number, cy: number): boolean => cx < 1 || cy < 1 || cx >= W - 1 || cy >= D - 1;
   const solid = (cx: number, cy: number): boolean => tile(cx, cy) === TILE_WALL;
+  // Натурная часть: стен нет, есть края. Непроходимое — пустота под плитой.
+  const edges = voidEdges(w);
 
   // --- Пол ------------------------------------------------------------------------
   const floorB = new GeoBuilder(4);
@@ -118,7 +128,7 @@ export function buildDressed(w: World, m: Materials): RoomView {
     for (let cx = 0; cx < W; cx++) {
       const tt = tile(cx, cy);
       // Под мебелью пол тоже есть: блок не всегда занят до края.
-      if ((tt === TILE_WALL && isBorder(cx, cy)) || tt === TILE_GATE) continue;
+      if ((tt === TILE_WALL && (isBorder(cx, cy) || edges)) || tt === TILE_GATE) continue;
       floorB.quad([cx, 0, cy], [1, 0, 0], [0, 0, 1], [0, 1, 0]);
     }
   }
@@ -145,7 +155,7 @@ export function buildDressed(w: World, m: Materials): RoomView {
   };
 
   // Дальняя стена: пролёты между проёмами, окна в пролётах.
-  for (const [a, b] of runs(W, (x) => solid(x, 0))) {
+  for (const [a, b] of edges ? [] : runs(W, (x) => solid(x, 0))) {
     const u0 = Math.max(a, 1) + 0.9;
     const u1 = Math.min(b, W - 1) - 0.9;
     const here: number[] = [];
@@ -172,14 +182,14 @@ export function buildDressed(w: World, m: Materials): RoomView {
     }
   }
   // Ближняя: низкий срез.
-  for (const [a, b] of runs(W, (x) => solid(x, D - 1))) {
+  for (const [a, b] of edges ? [] : runs(W, (x) => solid(x, D - 1))) {
     kit.box(t.wall, a, 0, D - 1, b, SOUTH, D);
     kit.box(t.cut, a, SOUTH, D - 1, b, SOUTH + 0.02, D);
   }
   // Боковые.
   for (const [side, x0, x1, face] of [['w', 0, 1, 1], ['e', W - 1, W, W - 1]] as const) {
     const col = side === 'w' ? 0 : W - 1;
-    for (const [a, b] of runs(D - 1, (z) => z >= 1 && solid(col, z))) {
+    for (const [a, b] of edges ? [] : runs(D - 1, (z) => z >= 1 && solid(col, z))) {
       kit.box(t.wall, x0, 0, a, x1, H, b);
       kit.box(t.cut, x0, H, a, x1, H + 0.02, b);
       const s = side === 'w' ? 1 : -1;
@@ -242,6 +252,10 @@ export function buildDressed(w: World, m: Materials): RoomView {
   for (const d of doorRuns) buildDoor(d.side, d.a, d.b);
 
   function buildDoor(side: 0 | 1 | 2 | 3, a: number, b: number): void {
+    if (edges) {
+      bridge(side, a, b);
+      return;
+    }
     const south = side === 2;
     const h = south ? SOUTH : H;
     const jt = 0.09;
@@ -290,6 +304,64 @@ export function buildDressed(w: World, m: Materials): RoomView {
     sign(side, a, b);
   }
 
+  /**
+   * Мост вместо проёма: плита уходит из помещения в пустоту, без стен и
+   * наличников. Заперто — поперёк та же служебная полоса.
+   */
+  function bridge(side: 0 | 1 | 2 | 3, a: number, b: number): void {
+    const len = 4;
+    const r = side === 0
+      ? { x0: a, z0: -len, x1: b, z1: 0 }
+      : side === 2
+        ? { x0: a, z0: D, x1: b, z1: D + len }
+        : side === 3
+          ? { x0: -len, z0: a, x1: 0, z1: b }
+          : { x0: W, z0: a, x1: W + len, z1: b };
+    floorB.quad([r.x0, 0, r.z0], [r.x1 - r.x0, 0, 0], [0, 0, r.z1 - r.z0], [0, 1, 0]);
+    const along = side === 0 || side === 2;
+    const deep = 0.7;
+    if (along) {
+      for (const x of [r.x0, r.x1]) {
+        kit.box(slabSide, x - 0.01, -deep, r.z0, x + 0.01, 0, r.z1);
+        kit.box(vein, x - 0.025, -0.035, r.z0, x + 0.025, 0.004, r.z1);
+      }
+      const end = side === 0 ? r.z0 : r.z1;
+      kit.box(slabSide, r.x0, -deep, end - 0.01, r.x1, 0, end + 0.01);
+      kit.box(vein, r.x0, -0.035, end - 0.025, r.x1, 0.004, end + 0.025);
+    } else {
+      for (const z of [r.z0, r.z1]) {
+        kit.box(slabSide, r.x0, -deep, z - 0.01, r.x1, 0, z + 0.01);
+        kit.box(vein, r.x0, -0.035, z - 0.025, r.x1, 0.004, z + 0.025);
+      }
+      const end = side === 3 ? r.x0 : r.x1;
+      kit.box(slabSide, end - 0.01, -deep, r.z0, end + 0.01, 0, r.z1);
+      kit.box(vein, end - 0.025, -0.035, r.z0, end + 0.025, 0.004, r.z1);
+    }
+    if (map.doorsLocked) {
+      const th = 0.12;
+      if (along) {
+        const zc = side === 0 ? 0.5 : D - 0.5;
+        kit.box(m.hazard, a + 0.05, 0, zc - th, b - 0.05, 1.0, zc + th);
+      } else {
+        const xc = side === 3 ? 0.5 : W - 0.5;
+        kit.box(m.hazard, xc - th, 0, a + 0.05, xc + th, 1.0, b - 0.05);
+      }
+    }
+    // Табличка на стойке у моста: держаться ей здесь больше не за что.
+    const sx = side === 1 ? W - 0.6 : side === 3 ? 0.6 : b + 0.35;
+    const sz = side === 0 ? 0.6 : side === 2 ? D - 0.6 : b + 0.35;
+    kit.box(m.darkMetal, sx - 0.03, 0, sz - 0.03, sx + 0.03, 1.7, sz + 0.03);
+    const text = signText(side);
+    if (text !== null) {
+      const d = 0.05;
+      const wText = text.length * 4 * d - d;
+      const pw = wText + 0.16;
+      const ph = 5 * d + 0.16;
+      kit.box(m.paper, sx - pw / 2, 1.7, sz + 0.03, sx + pw / 2, 1.7 + ph, sz + 0.07);
+      textAt(text, sx - wText / 2, 1.7 + ph - 0.08, sz + 0.07, d, 'z', m.darkMetal);
+    }
+  }
+
   /** Коридор за дверью: пол и стены на пару метров, дальше темнота. */
   function stub(x0: number, z0: number, x1: number, z1: number, axis: 'x' | 'z'): void {
     floorB.quad([x0, 0, z0], [x1 - x0, 0, 0], [0, 0, z1 - z0], [0, 1, 0]);
@@ -308,11 +380,21 @@ export function buildDressed(w: World, m: Materials): RoomView {
   }
 
   /** Табличка с номером соседнего участка — у проёма, на лицевой стороне. */
-  function sign(side: 0 | 1 | 2 | 3, _a: number, b: number): void {
-    if (room === undefined) return;
+  /**
+   * Что написано на табличке. На первом этаже часть указателей врёт —
+   * устойчиво, тем же расчётом, что в плоском виде. Приёмка снимает и это.
+   */
+  function signText(side: 0 | 1 | 2 | 3): string | null {
+    if (room === undefined) return null;
     const next = w.floor.rooms[room.neighbors[side]];
-    if (next === undefined) return;
-    const text = roomNumber(next);
+    if (next === undefined) return null;
+    const lying = distortionNow(w, floorAt(w.depth)) === 'signs';
+    return roomNumber(lying ? signLie(w, room.index, side, next) : next);
+  }
+
+  function sign(side: 0 | 1 | 2 | 3, _a: number, b: number): void {
+    const text = signText(side);
+    if (text === null) return;
     const d = 0.05;
     const wText = text.length * 4 * d - d;
     const pw = wText + 0.16;
@@ -379,7 +461,7 @@ export function buildDressed(w: World, m: Materials): RoomView {
   }
 
   // --- Блоки планировки ---------------------------------------------------------------------
-  const blocks = components(map, (cx, cy) => tile(cx, cy) === TILE_WALL && !isBorder(cx, cy));
+  const blocks = edges ? [] : components(map, (cx, cy) => tile(cx, cy) === TILE_WALL && !isBorder(cx, cy));
   blocks.forEach((r, i) => furnish(r, i));
 
   function furnish(r: Rect, i: number): void {
@@ -410,8 +492,14 @@ export function buildDressed(w: World, m: Materials): RoomView {
       switchboard(ctx, r);
       return;
     }
-    if (t.id === 'files') {
-      greyCabinets(ctx, r);
+    if (t.id === 'comms') {
+      // Связь и кадры: машина делопроизводства — коммутаторы, телексы,
+      // картотеки личных дел.
+      if (template === 'copy') copier(ctx, r);
+      else if (template === 'office') (i % 2 === 0 ? switchboard : cardCatalog)(ctx, r);
+      else if (template === 'cabinets') (i % 2 === 0 ? cardCatalog : greyCabinets)(ctx, r);
+      else if (i % 3 === 0) switchboard(ctx, r);
+      else greyCabinets(ctx, r);
       return;
     }
     if (t.id === 'office') {
@@ -503,7 +591,7 @@ export function buildDressed(w: World, m: Materials): RoomView {
 
   /** Шкаф со стеклянными дверцами: целая клетка, стекло бьётся по прочности. */
   function glassCase(cx: number, cz: number, hp: number): void {
-    const body = t.id === 'files' ? S.greyCab : S.oak;
+    const body = t.id === 'comms' ? S.greyCab : S.oak;
     const top = 1.75;
     kit.box(body, cx + 0.04, 0, cz + 0.06, cx + 0.96, top, cz + 0.94);
     kit.box(m.darkMetal, cx + 0.06, 0, cz + 0.08, cx + 0.94, 0.08, cz + 0.92);
@@ -527,6 +615,109 @@ export function buildDressed(w: World, m: Materials): RoomView {
   // --- Отделка по теме ------------------------------------------------------------------------
   if (t.id === 'boiler') boilerWalls();
   if (t.id === 'office') officeWalls();
+  if (t.id === 'comms') commsWalls();
+  if (edges) slabEdges();
+
+  /**
+   * Связь и кадры: короба с кабелем под потолком и пневмопочта. Латунные
+   * трубы идут по стенам вниз к приёмным станциям — по ним в здании ходит
+   * бумага.
+   */
+  function commsWalls(): void {
+    const y = H - 0.45;
+    // Лоток с кабелем вдоль дальней стены и по бокам.
+    kit.box(m.darkMetal, 1, y - 0.04, 1.02, W - 1, y, 1.42);
+    kit.box(m.darkMetal, 1, y - 0.04, 1.38, W - 1, y + 0.12, 1.42);
+    for (let k = 0; k < 4; k++) {
+      kit.tube(k % 2 === 0 ? m.darkMetal : S.insulation, new Vector3(1, y + 0.03 + (k % 2) * 0.03, 1.1 + k * 0.07), new Vector3(W - 1, y + 0.03 + (k % 2) * 0.03, 1.1 + k * 0.07), 0.022);
+    }
+    for (let x = 2; x < W - 1; x += 3) kit.box(m.darkMetal, x - 0.02, y, 1.02, x + 0.02, H, 1.06);
+    for (const xw of [1.02, W - 1.42]) kit.box(m.darkMetal, xw, y - 0.04, 1.4, xw + 0.4, y, D - 1.2);
+    // Пневмопочта: труба с потолка вниз до станции.
+    for (let x = 3.5; x < W - 2.5; x += 6.5) {
+      if (tile(Math.floor(x), 0) !== TILE_WALL || tile(Math.floor(x) + 1, 0) !== TILE_WALL) continue;
+      kit.tube(L.brass, new Vector3(x, H, 1.12), new Vector3(x, 1.55, 1.12), 0.07);
+      kit.box(m.metal, x - 0.22, 0.95, 1.02, x + 0.22, 1.55, 1.34);
+      kit.box(L.brass, x - 0.16, 1.15, 1.34, x + 0.16, 1.4, 1.36);
+      kit.box(m.darkMetal, x - 0.18, 0.95, 1.34, x + 0.18, 1.0, 1.42);
+      // Капсула, оставленная в лотке.
+      kit.cyl(L.brass, x + 0.05, 1.03, 1.38, 0.045, 0.2, Math.PI / 2);
+    }
+  }
+
+  /**
+   * Сколы плит. Толщина у каждой клетки своя — снизу плита рваная, а по
+   * верхней кромке, обращённой к пустоте, идёт золотая прожилка.
+   */
+  function slabEdges(): void {
+    const open = (cx: number, cz: number): boolean => {
+      const tt = tile(cx, cz);
+      return tt !== -1 && tt !== TILE_WALL;
+    };
+    for (let cz = 0; cz < D; cz++) {
+      for (let cx = 0; cx < W; cx++) {
+        if (!open(cx, cz) || tile(cx, cz) === TILE_GATE) continue;
+        const door = tile(cx, cz) === TILE_DOOR;
+        const deep = 0.45 + hash01(cx * 31 + cz * 17) * 1.1;
+        for (const [dx, dz] of [[0, -1], [1, 0], [0, 1], [-1, 0]] as const) {
+          const nx = cx + dx;
+          const nz = cz + dz;
+          if (open(nx, nz) || tile(nx, nz) === TILE_GATE) continue;
+          // Проём на краю продолжает мост — там не скол.
+          if (door && tile(nx, nz) === -1) continue;
+          if (dz !== 0) {
+            const z = dz < 0 ? cz : cz + 1;
+            kit.box(slabSide, cx, -deep, z - 0.01, cx + 1, 0, z + 0.01);
+            kit.box(vein, cx, -0.035, z - 0.025, cx + 1, 0.004, z + 0.025);
+          } else {
+            const x = dx < 0 ? cx : cx + 1;
+            kit.box(slabSide, x - 0.01, -deep, cz, x + 0.01, 0, cz + 1);
+            kit.box(vein, x - 0.025, -0.035, cz, x + 0.025, 0.004, cz + 1);
+          }
+        }
+        // Изнанка: плита не доска, снизу у неё висят куски арматуры и бетона.
+        if (hash01(cx * 7 + cz * 13) < 0.18) {
+          const hx = cx + 0.2 + hash01(cx + cz * 3) * 0.6;
+          const hz = cz + 0.2 + hash01(cx * 5 + cz) * 0.6;
+          kit.box(slabSide, hx - 0.2, -deep - 0.5, hz - 0.2, hx + 0.2, -deep + 0.05, hz + 0.2);
+        }
+      }
+    }
+    // Обломки здания в пустоте: висят ниже и вокруг, медленно дышат.
+    const drift = new Group();
+    const geo = new BoxGeometry(1, 1, 1);
+    owned.push(geo);
+    const mats = [0x2a3138, 0x5d666e, 0x9aa2a8, 0xc8cdd0].map((c) => {
+      const mat = new MeshStandardMaterial({ color: c, roughness: 0.9 });
+      owned.push(mat);
+      return mat;
+    });
+    const bits: { mesh: Mesh; y: number; ph: number; spin: number }[] = [];
+    for (let k = 0; k < 46; k++) {
+      const x = -6 + rng.float() * (W + 12);
+      const z = -5 + rng.float() * (D + 10);
+      const cx = Math.floor(x);
+      const cz = Math.floor(z);
+      if (open(cx, cz) && rng.float() < 0.8) continue;
+      const depth = 1.5 + rng.float() * 10;
+      const mat = mats[Math.min(mats.length - 1, Math.floor(depth / 3))] ?? mats[0]!;
+      const mesh = new Mesh(geo, mat);
+      const sz = 0.3 + rng.float() * 1.6;
+      mesh.scale.set(sz * (0.6 + rng.float()), sz * (0.3 + rng.float() * 0.5), sz * (0.6 + rng.float()));
+      mesh.position.set(x, -depth, z);
+      mesh.rotation.set(rng.float() * 0.6, rng.float() * Math.PI, rng.float() * 0.6);
+      mesh.castShadow = depth < 4;
+      drift.add(mesh);
+      bits.push({ mesh, y: -depth, ph: rng.float() * 6.28, spin: (rng.float() - 0.5) * 0.08 });
+    }
+    group.add(drift);
+    ticks.push((time) => {
+      for (const b of bits) {
+        b.mesh.position.y = b.y + Math.sin(time * 0.35 + b.ph) * 0.18;
+        b.mesh.rotation.y += b.spin * 0.016;
+      }
+    });
+  }
 
   function boilerWalls(): void {
     // Магистрали вдоль дальней стены и по бокам — на кронштейнах.
@@ -778,9 +969,13 @@ export function buildDressed(w: World, m: Materials): RoomView {
     owned.push(shadeGeo);
     const panel = new Mesh(shadeGeo, t.id === 'void' ? L.plastic : m.darkMetal);
     panel.position.set(cx, H - 0.25, cz);
+    // Над пустотой светильнику не на чем висеть: остаётся только столб света.
+    panel.visible = !edges;
     group.add(panel);
-    kit.sphere(kit.flat(t.id === 'void' ? L.led : S.cageLamp), cx, H - 0.36, cz, 0.12, 0.08, 0.12);
-    kit.cyl(m.darkMetal, cx, H - 0.15, cz, 0.008, 0.6);
+    if (!edges) {
+      kit.sphere(kit.flat(t.id === 'void' ? L.led : S.cageLamp), cx, H - 0.36, cz, 0.12, 0.08, 0.12);
+      kit.cyl(m.darkMetal, cx, H - 0.15, cz, 0.008, 0.6);
+    }
     return { x: cx, z: cz, flicker, darkLit, beam, pool, panel };
   }
 
@@ -987,3 +1182,8 @@ function flickerAlpha(time: number, seed: number): number {
   return value < cfg.lampFlickerDrop ? cfg.lampFlickerLow : 1;
 }
 
+
+function hash01(n: number): number {
+  const v = Math.sin(n * 12.9898 + 78.233) * 43758.5453;
+  return v - Math.floor(v);
+}

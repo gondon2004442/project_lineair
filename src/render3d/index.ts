@@ -23,6 +23,7 @@ import {
   MeshStandardMaterial,
   NormalBlending,
   PCFShadowMap,
+  PlaneGeometry,
   PerspectiveCamera,
   Plane,
   PMREMGenerator,
@@ -49,6 +50,8 @@ import { PALETTE } from '../palette';
 import { countDrawCalls, profiler } from '../profiler';
 import { makeRng } from '../rng';
 import { floorAt } from '../data/floors';
+import { voidEdges } from '../systems/edge';
+import { distortionNow } from '../systems/cleanse';
 import { statAt } from '../weapon';
 import { STEP, TUNING } from '../tuning';
 import { Actors } from './actors';
@@ -200,6 +203,18 @@ export async function createRenderer3D(host: HTMLElement): Promise<Renderer> {
   // Обломки: физика кадра поверх симуляции.
   const debris = new Debris(new MeshStandardMaterial({ color: 0xffffff, roughness: 0.85, side: 2 }));
   scene.add(debris.group);
+
+  // Фронт очищения: светлая стена, медленно идущая через помещение. За
+  // ней акт приёмки уже подписан, перед ней ещё заседание.
+  const frontMat = new MeshBasicMaterial({ color: 0xf4f6f8, transparent: true, opacity: 0, depthWrite: false, blending: AdditiveBlending, side: 2 });
+  const front = new Mesh(new PlaneGeometry(1, 1), frontMat);
+  front.rotation.y = Math.PI / 2;
+  front.visible = false;
+  front.renderOrder = 6;
+  const frontEdge = new Mesh(new PlaneGeometry(1, 1), new MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, depthWrite: false, blending: AdditiveBlending, side: 2 }));
+  frontEdge.rotation.x = -Math.PI / 2;
+  front.add(frontEdge);
+  scene.add(front);
   actors.debris = debris;
   /** Карта прошлого кадра: по разнице видно, что разбили и что выросло. */
   let prevTiles: Uint8Array | null = null;
@@ -207,7 +222,7 @@ export async function createRenderer3D(host: HTMLElement): Promise<Renderer> {
   let prevPlace = '';
   let prevBlank = 0;
 
-  const aoHidden: Object3D[] = [keyBeam, dust, decal.mesh, glow.mesh, puff.mesh];
+  const aoHidden: Object3D[] = [keyBeam, dust, decal.mesh, glow.mesh, puff.mesh, front];
   const aoBase = aoHidden.length;
   const post = createPost(gl, scene, camera, aoHidden);
   const reflection = new Reflection(gl, m);
@@ -315,6 +330,7 @@ export async function createRenderer3D(host: HTMLElement): Promise<Renderer> {
     const map = w.map;
     if (tiles.length !== map.tiles.length) return;
     const shard = room?.shard ?? { kind: 'glass' as const, color: 0xffffff };
+    const edges = voidEdges(w);
     for (let i = 0; i < map.tiles.length; i++) {
       const cx = (i % map.cols) + 0.5;
       const cz = Math.floor(i / map.cols) + 0.5;
@@ -325,6 +341,13 @@ export async function createRenderer3D(host: HTMLElement): Promise<Renderer> {
       } else if (was === TILE_WEAK && now !== TILE_WEAK) {
         debris.burst(shard.kind, 28, cx, 1.0, cz, 3.2, 0.16, shard.color);
         debris.burst('metal', 4, cx, 1.5, cz, 2.2, 0.06, 0x8a8f96);
+      } else if (edges && was !== TILE_WALL && now === TILE_WALL) {
+        // Плита ушла из-под ног: осыпается в пустоту кусками.
+        debris.burst('chunk', 9, cx, -0.1, cz, 1.2, 0.24, 0x1e242a);
+        debris.burst('chip', 10, cx, 0.0, cz, 1.6, 0.07, 0xb8923a);
+      } else if (edges && was === TILE_WALL && now !== TILE_WALL) {
+        // Плита встала на место: пыль по кромке.
+        debris.burst('chip', 6, cx, 0.05, cz, 1.4, 0.05, 0x8a9299);
       } else if (was !== TILE_WALL && now === TILE_WALL) {
         debris.burst('chip', 14, cx, 0.2, cz, 3.0, 0.07, PALETTE.concrete500);
       } else if (was === TILE_WALL && now !== TILE_WALL) {
@@ -351,6 +374,9 @@ export async function createRenderer3D(host: HTMLElement): Promise<Renderer> {
     app: { canvas: gl.domElement, ticker },
     events: actors.events,
     showHitboxes: TUNING.debug.hitboxes,
+    get hiss() {
+      return hissNow;
+    },
 
     screenToWorld(sx, sy) {
       const rect = gl.domElement.getBoundingClientRect();
@@ -374,7 +400,7 @@ export async function createRenderer3D(host: HTMLElement): Promise<Renderer> {
         actors.clear();
       }
       const signed = w.seals.includes(w.depth);
-      const keyNow = [w.mapToken, w.room, w.scene, w.depth, signed, v.wallHeight, v.innerWallHeight, v.southWallHeight, v.doorHeight].join('|');
+      const keyNow = [w.mapToken, w.room, w.scene, w.depth, signed, w.cleanse >= 0, v.wallHeight, v.innerWallHeight, v.southWallHeight, v.doorHeight].join('|');
       const place = [w.room, w.scene, w.depth, w === lastWorldForPlace ? 1 : 0].join('|');
       lastWorldForPlace = w;
       if (keyNow !== roomKey) {
@@ -388,7 +414,7 @@ export async function createRenderer3D(host: HTMLElement): Promise<Renderer> {
         rebuildRoom(w);
         fit();
         const v3 = TUNING.view3d;
-        debris.world = { map: w.map, height: heightsFor(w.map, v3.wallHeight, 1.0, Math.max(0.25, v3.southWallHeight)) };
+        debris.world = { map: w.map, height: heightsFor(w.map, v3.wallHeight, 1.0, Math.max(0.25, v3.southWallHeight), voidEdges(w)) };
       }
       prevPlace = place;
       prevTiles = Uint8Array.from(w.map.tiles);
@@ -397,11 +423,14 @@ export async function createRenderer3D(host: HTMLElement): Promise<Renderer> {
 
       // Красное состояние ведётся к цели ровно, как в плоском виде.
       const want = Math.max(0, Math.min(1, w.fx.hiss)) * TUNING.hiss.amount;
-      const rate = TUNING.hiss.fadeIn <= 0 ? 1 : frame / TUNING.hiss.fadeIn;
+      // Вход и выход с разной скоростью: допуск приостанавливают сразу,
+      // а снимают приостановку по процедуре.
+      const span = want > hissNow ? TUNING.hiss.fadeIn : TUNING.hiss.fadeOut;
+      const rate = span <= 0 ? 1 : frame / span;
       hissNow += Math.max(-rate, Math.min(rate, want - hissNow));
       if (Math.abs(want - hissNow) < 0.001) hissNow = want;
       const hissOn = hissNow > 0;
-      const dark = floorAt(w.depth).distortion === 'dark' && w.scene === 'run';
+      const dark = distortionNow(w, floorAt(w.depth)) === 'dark' && w.scene === 'run';
 
       // Камера: тряска раз в шаг симуляции и лёгкое ведение за прицелом.
       if (w.tick !== shakeTick) {
@@ -532,6 +561,29 @@ export async function createRenderer3D(host: HTMLElement): Promise<Renderer> {
           (lamp.pool.material as MeshBasicMaterial).opacity = 0.09 * k;
           if (k > 0) use(lamp.x, v.wallHeight + 0.8, lamp.z, 0xe4ecf4, v.lampIntensity * k, 14);
         });
+      }
+      // Фронт очищения: стена света и полоса по полу, свет идёт вместе с ней.
+      front.visible = false;
+      const here = w.floor.rooms[w.room];
+      if (here !== undefined && w.cleanse >= 0 && w.scene === 'run') {
+        const cfg = TUNING.cleanse;
+        const since = w.cleanse - here.cleanseDelay;
+        if (since >= 0 && since <= cfg.roomDelay) {
+          const k = since / Math.max(1e-6, cfg.roomDelay);
+          const at = k * w.map.cols;
+          const depthD = w.map.rows;
+          const tall = v.wallHeight * 1.1;
+          const fade = Math.sin(Math.PI * Math.min(1, k * 1.15));
+          front.visible = true;
+          front.position.set(at, tall / 2, depthD / 2);
+          front.scale.set(depthD, tall, 1);
+          frontMat.opacity = 0.55 * fade;
+          frontEdge.position.set(-cfg.frontWidth * U * 0.5, -tall / 2 + 0.01, 0);
+          frontEdge.scale.set(cfg.frontWidth * U, 1, 1);
+          (frontEdge.material as MeshBasicMaterial).opacity = 0.8 * fade;
+          use(at, 1.4, depthD * 0.3, 0xf4f6f8, 40 * fade, depthD * 0.9);
+          use(at, 1.4, depthD * 0.75, 0xf4f6f8, 40 * fade, depthD * 0.9);
+        }
       }
       for (; slot < pool.length; slot++) {
         const l = pool[slot];

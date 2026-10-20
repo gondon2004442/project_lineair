@@ -9,13 +9,26 @@ import { makeRng, type Rng } from '../rng';
 import { DIRS, opposite, standingInDoor } from '../room';
 import { TUNING } from '../tuning';
 import { enterRoom } from '../world';
+import { onDuty } from './cleanse';
+import { linkOf } from './reroute';
+import { trialClear } from './trial';
 import { formStat, infiniteReserve, penaltyOf, reserveMax, statAt } from '../weapon';
 
 export function roomSystem(w: World): void {
   const room = w.floor.rooms[w.room];
   if (room === undefined) return;
 
-  if (!room.cleared && w.staffC.size === 0) {
+  // Снятые с должности ставок не занимают: двери держит штат, а не люди.
+  // Аттестация держит двери сама: пока она не сдана, помещение не
+  // считается пройденным, даже если в нём нет ни одной ставки.
+  if (!trialClear(w)) {
+    if (!w.map.doorsLocked) {
+      w.map.doorsLocked = true;
+      w.mapToken += 1;
+    }
+    return;
+  }
+  if (!room.cleared && onDuty(w) === 0) {
     room.cleared = true;
     // Участок, пройденный без единого попадания, идёт в выслугу.
     if (w.record.roomClean) {
@@ -36,14 +49,18 @@ export function roomSystem(w: World): void {
     }
   }
 
-  if (w.map.doorsLocked || w.status === 'dead') return;
+  // Назначенный из помещения не выходит: оформленным отлучаться не
+  // положено. Это и есть цена того, что по нему перестали стрелять.
+  if (w.map.doorsLocked || w.status === 'dead' || w.appointed > 0) return;
 
   const t = w.transform.get(w.player);
   if (t === undefined) return;
   for (const dir of DIRS) {
     const next = room.neighbors[dir];
     if (next < 0 || !standingInDoor(w.map, dir, t.x, t.y)) continue;
-    enterRoom(w, next, opposite(dir));
+    // Куда ведёт проём, решает раскоммутация этажа, а не схема: на
+    // уровне связи они расходятся, и это всё искажение целиком.
+    enterRoom(w, linkOf(w, room.index, dir), opposite(dir));
     return;
   }
 }

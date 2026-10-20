@@ -11,7 +11,6 @@ import {
 } from './data/roomTemplates';
 import {
   MINI_BOSS_POSTS,
-  STAFFING_EMPTY,
   STAFFING_HEAD,
   STAFFING_LOBBY,
   STAFFING_ORDINARY,
@@ -47,6 +46,24 @@ export interface RoomNode {
   corridor: boolean;
   cleared: boolean;
   visited: boolean;
+  /**
+   * Через сколько секунд после начала волны очищение дойдёт сюда.
+   * Считается по графу от приёмной: волна идёт помещение за помещением,
+   * а не вспыхивает всюду разом.
+   */
+  cleanseDelay: number;
+  /**
+   * Подвешенные этого помещения уже опущены и посчитаны. Нужно оттого,
+   * что оборудование ставится заново при каждом входе, а спасённый
+   * считается один раз: он один и тот же человек.
+   */
+  landed: boolean;
+  /**
+   * В этом помещении кого-то сняли с должности или опустили на пол.
+   * По нему и ложится личное дело спасённого: дело остаётся там, где
+   * человек остался, а не там, где висел подвешенный.
+   */
+  savedHere: boolean;
   /**
    * Выдача за этот участок уже брошена. Нужна оттого, что участок можно
    * зачистить дважды: освобождение замурованного запирает двери заново и
@@ -361,18 +378,11 @@ function finish(drafts: Draft[], rng: Rng, scheme: FloorScheme): Floor {
     kind: d.kind,
     corridor: d.corridor,
     neighbors: d.neighbors,
-    staffing:
-      d.corridor && building.staffless !== true
-        ? STAFFING_PASSAGE
-        : staffingFor(d.kind, rng, template),
+    staffing: d.corridor ? STAFFING_PASSAGE : staffingFor(d.kind, rng, template),
     miniBoss: d.corridor ? '' : miniBossFor(d.kind, rng),
     // Бросок делается всегда, даже там, где штата нет: иначе поток
     // случайности зависел бы от уровня и этаж собирался бы иначе.
-    courier:
-      !d.corridor &&
-      d.kind !== 'start' &&
-      rng.float() < TUNING.floor.courierChance &&
-      building.staffless !== true,
+    courier: !d.corridor && d.kind !== 'start' && rng.float() < TUNING.floor.courierChance,
     safe:
       !d.corridor &&
       d.kind !== 'start' &&
@@ -381,6 +391,9 @@ function finish(drafts: Draft[], rng: Rng, scheme: FloorScheme): Floor {
     desk: false,
     cleared: d.kind === 'start',
     rewarded: false,
+    cleanseDelay: 0,
+    landed: false,
+    savedHere: false,
     visited: false,
     };
   });
@@ -414,7 +427,9 @@ function finish(drafts: Draft[], rng: Rng, scheme: FloorScheme): Floor {
  */
 function chooseTemplate(rng: Rng, kind: RoomKind, depth: number): string {
   if (kind === 'start') return TEMPLATE_START;
-  if (kind === 'end') return TEMPLATE_END;
+  // Приёмную решает сам этаж: кабинет уместен в офисе, но не в
+  // бойлерной, где отделки нет вовсе.
+  if (kind === 'end') return building.endTemplate === undefined ? TEMPLATE_END : building.endTemplate;
 
   const want = depth < TUNING.floor.difficultyMid ? 1 : depth < TUNING.floor.difficultyDeep ? 2 : 3;
   // Пул уровня: архив собирается из картотек и копировальных, участок —
@@ -444,8 +459,6 @@ function chooseTemplate(rng: Rng, kind: RoomKind, depth: number): string {
  */
 function staffingFor(kind: RoomKind, rng: Rng, templateId: string): string {
   if (kind === 'start') return STAFFING_LOBBY;
-  // Уровень без ставок: ни одно помещение на нём не укомплектовано.
-  if (building.staffless === true) return STAFFING_EMPTY;
   // Кто сидит в конце этажа, решает сам этаж: на первом уровне
   // заведующий, в архиве — архивариус.
   if (kind === 'end') return building.headStaffing === '' ? STAFFING_HEAD : building.headStaffing;
@@ -460,7 +473,7 @@ function staffingFor(kind: RoomKind, rng: Rng, templateId: string): string {
  * сборке этажа, поэтому он детерминирован от seed вместе со всем остальным.
  */
 function miniBossFor(kind: RoomKind, rng: Rng): string {
-  if (kind === 'start' || kind === 'end' || building.staffless === true) return '';
+  if (kind === 'start' || kind === 'end') return '';
   if (rng.float() >= TUNING.floor.miniBossChance) return '';
   const post = MINI_BOSS_POSTS[rng.int(MINI_BOSS_POSTS.length)];
   return post === undefined ? '' : post.post;
