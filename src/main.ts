@@ -32,6 +32,7 @@ import { shownRoom } from './hud';
 import { signLie } from './render';
 import { linkOf, patchedLinks } from './systems/reroute';
 import { demoteFactor } from './systems/postPersonnel';
+import { bossPhase } from './systems/arena';
 import { createWorld, descend, enterLobby, enterRoom, startRun } from './world';
 import type { World } from './ecs';
 
@@ -181,6 +182,9 @@ async function boot(): Promise<void> {
       patchedLinks,
       // Перевод на нижестоящую ставку: стенд сверяет множитель урона.
       demoteFactor,
+      // Сигнатура фаз: стенд сверяет, что перестройку запускает именно
+      // её изменение.
+      bossPhase,
       // Ложь указателей нужна стенду: на экране это табличка, а числом —
       // номер помещения, который она называет.
       signLie,

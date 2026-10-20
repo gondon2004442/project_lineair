@@ -29,6 +29,7 @@ import { edgeSystem } from './systems/edge';
 import { propPushSystem, propSystem } from './systems/props';
 import { railSystem } from './systems/rails';
 import { rebuildSystem } from './systems/rebuild';
+import { arenaSystem } from './systems/arena';
 import { telekinesisSystem } from './systems/telekinesis';
 import { ticketSystem } from './systems/tickets';
 import { fixtureSystem } from './systems/fixtures';
@@ -134,6 +135,9 @@ export function step(w: World): void {
     // Перестройка в самом конце шага: она меняет карту под всеми, и
     // пусть это случается между шагами, а не посреди разбора движения.
     rebuildSystem(w, STEP);
+    // Арена: перестройка по смене фазы начальника. Идёт сразу за
+    // перестройкой натурной части — она же её и выполняет.
+    arenaSystem(w, STEP);
     // Лифт после статуса: шахту пробивает он, а шагнуть в неё можно уже
     // на следующем шаге. И то и другое — шаг в проём, после которого
     // мир собирается заново.

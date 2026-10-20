@@ -118,6 +118,8 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     wiring: [],
     patched: false,
     appointed: 0,
+    arena: -1,
+    arenaGap: 0,
     rebuildIn: 0,
     rebuilds: 0,
     sections: [],
@@ -349,6 +351,9 @@ export function enterRoom(w: World, index: number, fromDir: Dir | null): void {
   // Отсчёт перестройки начинается заново в каждом помещении.
   w.rebuildIn = 0;
   w.rebuilds = 0;
+  // Фазы начальников считаются заново: вход в помещение — не смена фазы.
+  w.arena = -1;
+  w.arenaGap = 0;
 
   const spot = fromDir === null ? roomCenter(w.map) : entryPosition(w.map, fromDir);
   placePlayer(w, spot.x, spot.y);
