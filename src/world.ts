@@ -2,6 +2,7 @@
 import { destroyEntity, type World, componentStores } from './ecs';
 import { cleansedRoom, distortionNow, landHung, retire } from './systems/cleanse';
 import { buildWiring, rerouting } from './systems/reroute';
+import { setupTrial } from './systems/trial';
 import { POST_COURIER, POST_ARCHIVIST, POST_KEEPER } from './data/posts';
 import { MINI_BOSS_POSTS, STAFFING_BY_ID, type StaffPost } from './data/staffing';
 import { DEEPEST, floorAt } from './data/floors';
@@ -89,6 +90,13 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     roster: [],
     build: [],
     tool: { id: '', cooldown: 0, charges: -1 },
+    tool2: { id: '', cooldown: 0, charges: -1 },
+    grants: [],
+    trials: [],
+    trialDone: 0,
+    trialTimer: 0,
+    trialBeat: 0,
+    trialNote: 0,
     blanks: TUNING.blank.refillTo,
     passes: TUNING.stash.passesStart,
     reward: { chance: TUNING.reward.base, dry: 0, lastItem: '', lastOrder: '', lastWeight: 1 },
@@ -147,6 +155,7 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     keeperC: new Map(),
     personnelC: new Map(),
     orderC: new Map(),
+    targetC: new Map(),
     commissionC: new Map(),
     courierC: new Map(),
     propC: new Map(),
@@ -202,6 +211,12 @@ export function startRun(w: World): void {
   // наряду. Колесо Картографа короче не из-за числа, а из-за того, что
   // остальные формы ему ещё не выписаны.
   w.freed = [];
+  w.tool2 = { id: '', cooldown: 0, charges: -1 };
+  w.grants = [];
+  w.trials = [];
+  w.trialDone = 0;
+  w.trialTimer = 0;
+  w.trialBeat = 0;
   const subject = subjectAt(w.subject);
   w.forms = WEAPON_FORMS.map((f) => subject.forms.includes(f.id));
   // Табельная точная одиночная есть у всякого: без неё забег начинался
@@ -378,6 +393,7 @@ export function enterRoom(w: World, index: number, fromDir: Dir | null): void {
     for (const [e] of [...w.staffC]) retire(w, e);
     landHung(w, room);
   }
+  setupTrial(w);
   if (w.staffC.size === 0 && !room.cleared) {
     room.cleared = true;
     w.map.doorsLocked = false;
@@ -444,10 +460,14 @@ export function rebuildRoom(w: World): void {
   const pick = pool[rng.int(Math.max(1, pool.length))];
   if (pick === undefined) return;
 
-  // Мебель переезжает: старую снимаем целиком, вместе с рельсами.
+  // Мебель переезжает: старую снимаем целиком, вместе с рельсами. Всю,
+  // кроме той, что субъект держит телекинезом: что у него в руках, то
+  // перестройке уже не принадлежит. Без этого испытание на удержание
+  // было бы непроходимым — предмет отбирала бы сама комната.
   const player = w.playerC.get(w.player);
-  if (player !== undefined) player.held = -1;
+  const held = player?.held ?? -1;
   for (const [e] of [...w.propC]) {
+    if (e === held) continue;
     w.propC.delete(e);
     w.railC.delete(e);
     destroyEntity(w, e);

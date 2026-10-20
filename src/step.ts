@@ -30,6 +30,7 @@ import { propPushSystem, propSystem } from './systems/props';
 import { railSystem } from './systems/rails';
 import { rebuildSystem } from './systems/rebuild';
 import { arenaSystem } from './systems/arena';
+import { trialSystem } from './systems/trial';
 import { telekinesisSystem } from './systems/telekinesis';
 import { ticketSystem } from './systems/tickets';
 import { fixtureSystem } from './systems/fixtures';
@@ -138,6 +139,9 @@ export function step(w: World): void {
     // Арена: перестройка по смене фазы начальника. Идёт сразу за
     // перестройкой натурной части — она же её и выполняет.
     arenaSystem(w, STEP);
+    // Аттестация: её проверки читают уже сложившийся шаг — и падение, и
+    // перестройку, и то, что держит телекинез.
+    trialSystem(w, STEP);
     // Лифт после статуса: шахту пробивает он, а шагнуть в неё можно уже
     // на следующем шаге. И то и другое — шаг в проём, после которого
     // мир собирается заново.

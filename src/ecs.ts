@@ -275,6 +275,12 @@ export interface OrderC {
   form: number;
 }
 
+/** Мишень аттестации: её водит по кругу комиссия. */
+export interface TargetC {
+  angle: number;
+  phase: number;
+}
+
 export interface KeeperC {
   /** Обратный отсчёт до следующей погашенной секции. */
   douseTimer: number;
@@ -581,6 +587,31 @@ export interface World {
    * участками и обнуляется только с новым забегом.
    */
   tool: ToolState;
+  /**
+   * Второй слот инвентаря. Пустой id — слота нет: он выдаётся
+   * аттестацией в натурной части, и до неё инвентарь у субъекта один.
+   * Отдельной клавиши у него нет и не надо: по E применяется тот из
+   * двух, который готов.
+   */
+  tool2: ToolState;
+  /**
+   * Полномочия, выданные аттестацией. Читаются statAt как правки путей
+   * — тем же порядком, что приложения и наряд.
+   */
+  grants: string[];
+  /** Сданные аттестации: их полномочия уже выданы. */
+  trials: string[];
+  /** Текущий прогресс испытания и его служебный отсчёт. */
+  trialDone: number;
+  trialTimer: number;
+  /**
+   * Отсчёт до следующей перестройки плит в испытании. Аттестацию ведёт
+   * комиссия, а не искажение: перестройка искажения идёт только пока в
+   * помещении есть кому стрелять, а в испытании стрелять не в кого.
+   */
+  trialBeat: number;
+  /** Сколько ещё держать условие испытания на экране. */
+  trialNote: number;
   /** Сколько бланков на руках. Ресурс субъекта, а не сущность. */
   blanks: number;
   /** Допуски: ими вскрывают шкафы и получают по описи со стола выдачи. */
@@ -751,6 +782,7 @@ export interface World {
   keeperC: Map<Entity, KeeperC>;
   personnelC: Map<Entity, PersonnelC>;
   orderC: Map<Entity, OrderC>;
+  targetC: Map<Entity, TargetC>;
   commissionC: Map<Entity, CommissionC>;
   courierC: Map<Entity, CourierC>;
   propC: Map<Entity, PropC>;
@@ -804,6 +836,7 @@ export function componentStores(w: World): Map<Entity, unknown>[] {
     w.keeperC,
     w.personnelC,
     w.orderC,
+    w.targetC,
     w.commissionC,
     w.courierC,
     w.propC,

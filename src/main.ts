@@ -33,6 +33,7 @@ import { signLie } from './render';
 import { linkOf, patchedLinks } from './systems/reroute';
 import { demoteFactor } from './systems/postPersonnel';
 import { bossPhase } from './systems/arena';
+import { activeTrial, trialOf } from './systems/trial';
 import { createWorld, descend, enterLobby, enterRoom, startRun } from './world';
 import type { World } from './ecs';
 
@@ -185,6 +186,10 @@ async function boot(): Promise<void> {
       // Сигнатура фаз: стенд сверяет, что перестройку запускает именно
       // её изменение.
       bossPhase,
+      // Аттестация: стенду нужно знать, какому помещению какое
+      // испытание досталось и сдано ли оно.
+      trialOf,
+      activeTrial,
       // Ложь указателей нужна стенду: на экране это табличка, а числом —
       // номер помещения, который она называет.
       signLie,

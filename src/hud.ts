@@ -2,6 +2,7 @@
 import { TEMPLATES_BY_ID } from './data/roomTemplates';
 import { cleansed, cleansedRoom, distortionNow } from './systems/cleanse';
 import { patchedLinks } from './systems/reroute';
+import { activeTrial } from './systems/trial';
 import { issuedDirectives, type Directive } from './data/directives';
 import { floorAt } from './data/floors';
 import { ENDINGS, ENDINGS_BY_ID } from './data/endings';
@@ -118,6 +119,7 @@ export function createHud(
       row('ВАКАНСИЙ', vacancyLine(w)),
       staffCountRow(w),
       orderRow(w),
+      trialRow(w),
       row('Q БЛАНК · ДОПУСК · ТАЛОН', suppliesLine(w)),
       toolRow(w),
       promptRow(w),
@@ -138,7 +140,12 @@ export function createHud(
 
     // Титр заседания перебивает всё: допуск приостановлен, и это первое,
     // что субъект должен прочитать в комнате.
-    if (w.fx.seatTitle > 0 && w.status === 'playing') {
+    const trial = activeTrial(w);
+    if (w.trialNote > 0 && trial !== undefined && w.status === 'playing') {
+      banner.hidden = false;
+      banner.innerHTML =
+        `<b>${trial.title}</b><span>${trial.report[0] ?? ''} · ${trial.grantTitle}</span>`;
+    } else if (w.fx.seatTitle > 0 && w.status === 'playing') {
       banner.hidden = false;
       banner.innerHTML =
         '<b>ВНЕОЧЕРЕДНОЕ ЗАСЕДАНИЕ</b><span>ДОПУСК ПРИОСТАНОВЛЕН · ПОМЕЩЕНИЕ ЗАКРЫТО</span>';
@@ -604,6 +611,22 @@ function energyRow(w: World): string {
 function inForce(w: World): Directive[] {
   return issuedDirectives(w.build).filter(
     (d) => d.requiresTrait === undefined || hasTrait(w, d.requiresTrait),
+  );
+}
+
+/**
+ * Аттестация: что требуется и сколько уже сделано. Условие держится
+ * титром первые секунды, дальше остаётся счёт — читать его надо на
+ * ходу, а не вчитываться.
+ */
+function trialRow(w: World): string {
+  const trial = activeTrial(w);
+  if (trial === undefined) return '';
+  const need = Math.max(1, Math.round(trial.need));
+  const done = Math.max(0, Math.min(need, Math.round(w.trialDone)));
+  return row(
+    `${trial.code} · ${trial.title}`,
+    `<span class="${done >= need ? 'ok' : 'warn'}">${gauge(done, need)} ${done}/${need}</span>`,
   );
 }
 

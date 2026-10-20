@@ -11,6 +11,7 @@ import { TUNING } from '../tuning';
 import { enterRoom } from '../world';
 import { onDuty } from './cleanse';
 import { linkOf } from './reroute';
+import { trialClear } from './trial';
 import { formStat, infiniteReserve, penaltyOf, reserveMax, statAt } from '../weapon';
 
 export function roomSystem(w: World): void {
@@ -18,6 +19,15 @@ export function roomSystem(w: World): void {
   if (room === undefined) return;
 
   // Снятые с должности ставок не занимают: двери держит штат, а не люди.
+  // Аттестация держит двери сама: пока она не сдана, помещение не
+  // считается пройденным, даже если в нём нет ни одной ставки.
+  if (!trialClear(w)) {
+    if (!w.map.doorsLocked) {
+      w.map.doorsLocked = true;
+      w.mapToken += 1;
+    }
+    return;
+  }
   if (!room.cleared && onDuty(w) === 0) {
     room.cleared = true;
     // Участок, пройденный без единого попадания, идёт в выслугу.
