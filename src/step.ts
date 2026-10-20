@@ -24,6 +24,7 @@ import { feedbackSystem, liftSystem, lifecycleSystem, statusSystem } from './sys
 import { hissSystem } from './systems/hiss';
 import { cleanseSystem } from './systems/cleanse';
 import { physicsSystem } from './systems/physics';
+import { edgeSystem } from './systems/edge';
 import { propPushSystem, propSystem } from './systems/props';
 import { railSystem } from './systems/rails';
 import { rebuildSystem } from './systems/rebuild';
@@ -103,6 +104,9 @@ export function step(w: World): void {
   // Оборудование разбирается ПОСЛЕ физики: она уже поставила субъекта
   // туда, куда он дошёл, и только теперь видно, во что он влетел.
   fixtureSystem(w);
+  // Край — сразу после физики: она уже поставила субъекта туда, куда он
+  // дошёл, и только теперь видно, что под ним ничего нет.
+  edgeSystem(w, STEP);
   profiler.end('СИМ: ФИЗИКА');
 
   profiler.begin('СИМ: ПУЛИ');

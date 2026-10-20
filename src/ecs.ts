@@ -75,6 +75,15 @@ export interface PlayerC {
   dashCooldown: number;
   /** Пока > 0 — разгон срезан: субъект разворачивается на месте. */
   turnLock: number;
+  /**
+   * Срыв в пустоту: сколько ещё лететь. Пока больше нуля, субъект не
+   * управляется и его нет в помещении — он возвращается на ту плиту, с
+   * которой ушёл.
+   */
+  fallTimer: number;
+  /** Последняя точка на плите: туда и вернут. */
+  safeX: number;
+  safeY: number;
   dashX: number;
   dashY: number;
 }

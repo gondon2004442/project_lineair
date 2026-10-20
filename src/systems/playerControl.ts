@@ -95,6 +95,15 @@ export function playerControlSystem(w: World, dt: number): void {
     return;
   }
 
+  // Сорвавшийся не управляется: он летит. Возврат и цену считает
+  // система края.
+  if (p.fallTimer > 0) {
+    w.input.dashQueued = false;
+    w.input.formStep = 0;
+    w.input.firePressed = false;
+    return;
+  }
+
   const toAimX = w.input.aimX - t.x;
   const toAimY = w.input.aimY - t.y;
   const aimLen = Math.hypot(toAimX, toAimY);

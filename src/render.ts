@@ -22,6 +22,7 @@ import { roomNumber, type RoomNode } from './floor';
 import { currentRoom } from './world';
 import { floorAt } from './data/floors';
 import { floorPalette, type FloorPalette } from './data/palettes';
+import { voidEdges } from './systems/edge';
 import { litAt } from './systems/postKeeper';
 import { statAt } from './weapon';
 import { DECOR_BY_ID } from './data/decor';
@@ -178,7 +179,7 @@ export async function createRenderer(host: HTMLElement): Promise<Renderer> {
       if (w.mapToken !== drawnToken) {
         drawnToken = w.mapToken;
         markLayer.clear();
-        drawRoom(roomLayer, markLayer, w.map, warmSector(w), floorPalette(w.depth));
+        drawRoom(roomLayer, markLayer, w.map, warmSector(w), floorPalette(w.depth), voidEdges(w));
         drawDoorSigns(roomLayer, w);
         drawLift(roomLayer, w);
         drawDecor(decorLayer, w);
@@ -370,6 +371,8 @@ function drawRoom(
   map: TileMap,
   warm: boolean,
   th: FloorPalette,
+  /** Этаж без стен: непроходимое здесь не бетон, а пустота. */
+  voidRoom: boolean,
 ): void {
   g.clear();
   const size = map.size;
@@ -380,7 +383,8 @@ function drawRoom(
       const tile = map.tiles[cy * map.cols + cx];
 
       if (tile === TILE_WALL) {
-        drawPanelledWall(g, map, cx, cy, x, y, size, warm, th);
+        if (voidRoom) drawVoid(g, map, cx, cy, x, y, size, th);
+        else drawPanelledWall(g, map, cx, cy, x, y, size, warm, th);
         continue;
       }
       if (tile === TILE_WEAK) {
@@ -1016,6 +1020,40 @@ function lights(w: World, alpha: number): { x: number; y: number; r: number }[] 
 }
 
 /**
+ * ПУСТОТА. Там, где на других этажах бетон, здесь нет ничего.
+ *
+ * Рисуется она светлой заливкой без панелей и обшивки: отделывать
+ * пустоту нечем. Плита рядом с ней получает золотую прожилку по
+ * сколу — единственное, чем здание обозначает край.
+ */
+function drawVoid(
+  g: Graphics,
+  map: TileMap,
+  cx: number,
+  cy: number,
+  x: number,
+  y: number,
+  size: number,
+  th: FloorPalette,
+): void {
+  g.rect(x, y, size, size).fill(th.wall);
+
+  const vein = TUNING.render.veinWidth;
+  for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]] as const) {
+    const nx = cx + dx;
+    const ny = cy + dy;
+    if (nx < 0 || ny < 0 || nx >= map.cols || ny >= map.rows) continue;
+    // Прожилка ложится на грань, обращённую к плите, и только на неё.
+    if (map.tiles[ny * map.cols + nx] === TILE_WALL) continue;
+    const horizontal = dx === 0;
+    const face = horizontal
+      ? { x, y: dy < 0 ? y : y + size - vein, w: size, h: vein }
+      : { x: dx < 0 ? x : x + size - vein, y, w: vein, h: size };
+    g.rect(face.x, face.y, face.w, face.h).fill(th.accent);
+  }
+}
+
+/**
  * ФРОНТ ОЧИЩЕНИЯ. Тонкая светлая кромка, идущая по помещению.
  *
  * За ней палитра этажа, перед ней ещё заседание. Медленно и сознательно:
@@ -1232,6 +1270,15 @@ function drawPlayer(g: Graphics, w: World, alpha: number, skin: number): void {
   const y = lerp(t.py, t.y, alpha);
   const half = draw.size * TUNING.render.playerSizeFactor;
   const pose = playerPose(w, x, y);
+  // Срыв в пустоту: тело уходит вниз и уменьшается. Больше ничего не
+  // нужно — падение длится секунду, и читать его надо мгновенно.
+  if (player.fallTimer > 0) {
+    const left = Math.max(0, Math.min(1, player.fallTimer / Math.max(1e-6, TUNING.fall.time)));
+    const k = 1 - (1 - left) * TUNING.fall.shrink;
+    const size = half * k;
+    g.rect(x - size, y - size, size * 2, size * 2).fill({ color: skin, alpha: left });
+    return;
+  }
   const cx = x + pose.dx;
   const cy = y + pose.dy;
 

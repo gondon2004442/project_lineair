@@ -3,6 +3,7 @@ import type { World } from '../ecs';
 import { isSolidCell } from '../room';
 import type { TileMap } from '../room';
 import { TUNING } from '../tuning';
+import { voidEdges } from './edge';
 
 const SKIN = 0.01;
 
@@ -18,6 +19,11 @@ interface Motion {
 }
 
 export function physicsSystem(w: World, dt: number): void {
+  // На этаже без стен субъект проходит кромку насквозь: его там не
+  // держит ничто, и дальше им занимается система края. Штат держит —
+  // он на этом уровне оформлен.
+  const subjectFalls = voidEdges(w);
+
   for (const e of w.alive) {
     const t = w.transform.get(e);
     const b = w.body.get(e);
@@ -45,10 +51,11 @@ export function physicsSystem(w: World, dt: number): void {
     const reach = Math.max(Math.abs(b.vx), Math.abs(b.vy)) * dt * pace;
     const parts = Math.max(1, Math.ceil(reach / (w.map.size * TUNING.sim.maxMoveFraction)));
     const slice = (dt * pace) / parts;
+    const solid = !(subjectFalls && e === w.player);
     for (let i = 0; i < parts; i++) {
       // Скорость читается заново: столкновение могло её обнулить.
-      moveX(w.map, t, b, b.vx * slice);
-      moveY(w.map, t, b, b.vy * slice);
+      moveX(w.map, t, b, b.vx * slice, solid);
+      moveY(w.map, t, b, b.vy * slice, solid);
     }
   }
 }
@@ -57,8 +64,9 @@ export function physicsSystem(w: World, dt: number): void {
  * Разбор идёт и при нулевой скорости: тело могло оказаться в стене
  * не своим ходом, например после расталкивания.
  */
-function moveX(map: TileMap, t: Point, b: Motion, dx: number): void {
+function moveX(map: TileMap, t: Point, b: Motion, dx: number, solid: boolean): void {
   t.x += dx;
+  if (!solid) return;
   const r = b.radius;
   const top = Math.floor((t.y - r) / map.size);
   const bottom = Math.floor((t.y + r - SKIN) / map.size);
@@ -83,8 +91,9 @@ function moveX(map: TileMap, t: Point, b: Motion, dx: number): void {
   }
 }
 
-function moveY(map: TileMap, t: Point, b: Motion, dy: number): void {
+function moveY(map: TileMap, t: Point, b: Motion, dy: number, solid: boolean): void {
   t.y += dy;
+  if (!solid) return;
   const r = b.radius;
   const left = Math.floor((t.x - r) / map.size);
   const right = Math.floor((t.x + r - SKIN) / map.size);
