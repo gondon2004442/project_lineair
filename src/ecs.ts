@@ -452,6 +452,18 @@ export interface FixtureC {
   spillY: number;
 }
 
+/**
+ * Толчок: скорость, которую тело получило от удара, а не выбрало само.
+ *
+ * Отдельно от Body, потому что поведение должностей каждый шаг ведёт
+ * Body.vx/vy к своей цели и съело бы отброс за пару шагов. Толчок
+ * складывается с ходом при разборе движения и гаснет сам.
+ */
+export interface KickC {
+  vx: number;
+  vy: number;
+}
+
 /** Талон на полу: служебная мелочь, оставшаяся от ставки. */
 export interface TicketC {
   /** Сколько талонов засчитает этот листок. */
@@ -802,6 +814,7 @@ export interface World {
   fixtureC: Map<Entity, FixtureC>;
   bulletC: Map<Entity, BulletC>;
   drawC: Map<Entity, DrawC>;
+  kickC: Map<Entity, KickC>;
 }
 
 export function createEntity(w: World): Entity {
@@ -856,6 +869,7 @@ export function componentStores(w: World): Map<Entity, unknown>[] {
     w.fixtureC,
     w.bulletC,
     w.drawC,
+    w.kickC,
   ] as Map<Entity, unknown>[];
 }
 
