@@ -31,6 +31,7 @@ import { SUBJECTS, SUBJECT_START, subjectAt } from './data/subjects';
 import { shownRoom } from './hud';
 import { signLie } from './render';
 import { linkOf, patchedLinks } from './systems/reroute';
+import { demoteFactor } from './systems/postPersonnel';
 import { createWorld, descend, enterLobby, enterRoom, startRun } from './world';
 import type { World } from './ecs';
 
@@ -178,6 +179,8 @@ async function boot(): Promise<void> {
       // помещение, в которое она на самом деле ведёт.
       linkOf,
       patchedLinks,
+      // Перевод на нижестоящую ставку: стенд сверяет множитель урона.
+      demoteFactor,
       // Ложь указателей нужна стенду: на экране это табличка, а числом —
       // номер помещения, который она называет.
       signLie,

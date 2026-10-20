@@ -1766,6 +1766,20 @@ function drawEntities(
       }
     }
 
+    // Лист распоряжения: бумага поверх боя, с жирной чертой поперёк.
+    // Служебный слой, а не мир: по нему принимают решение, и в красном
+    // состоянии он обязан остаться читаемым.
+    const order = w.orderC.get(e);
+    if (order !== undefined) {
+      const m = draw.size;
+      svc.rect(x - m, y - m * 1.3, m * 2, m * 2.6).fill(PALETTE.paper);
+      svc.rect(x - m, y - m * 1.3, m * 2, m * 2.6).stroke({ width: 1, color: PALETTE.concrete900 });
+      svc.rect(x - m * 0.7, y - m * 0.5, m * 1.4, 2).fill(PALETTE.concrete900);
+      svc.rect(x - m * 0.7, y + m * 0.1, m * 1.4, 2).fill(PALETTE.concrete900);
+      svc.rect(x - m * 0.7, y + m * 0.7, m * 0.8, 2).fill(PALETTE.concrete900);
+      continue;
+    }
+
     const staff = staffHere;
     if (staff === undefined) continue;
 

@@ -4,6 +4,7 @@ import { TUNING } from '../tuning';
 import { damageFactorAgainst } from '../weapon';
 import { archivistOpen } from './postArchivist';
 import { commissionOpen } from './postCommission';
+import { personnelOpen } from './postPersonnel';
 import { keeperOpen } from './postKeeper';
 
 export function applyDamage(w: World, target: Entity, amount: number): boolean {
@@ -23,6 +24,9 @@ export function applyDamage(w: World, target: Entity, amount: number): boolean {
   // пока молчит.
   if (!keeperOpen(w, target)) return false;
   if (!commissionOpen(w, target)) return false;
+  // Начальник отдела кадров — пока ни одно его распоряжение не
+  // действует. Окно открывает игрок, снося листы.
+  if (!personnelOpen(w, target)) return false;
 
   // Распоряжение против должности: множитель знает только эта точка,
   // потому что только здесь известно, в кого прилетело.

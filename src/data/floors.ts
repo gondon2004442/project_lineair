@@ -98,7 +98,7 @@ export const FLOORS: FloorSpec[] = [
     // помещениями. Этаж связи искажает именно связь.
     distortion: 'reroute',
     headStaffing: 'head_personnel',
-    sealHolder: 'auditor',
+    sealHolder: 'personnel',
   },
   {
     depth: -4,

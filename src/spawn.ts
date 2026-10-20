@@ -6,7 +6,7 @@ import {
   POST_COURIER,
   POST_INSPECTOR,
   POST_INTERN,
-  POST_REGISTRAR, POST_ARCHIVIST, POST_KEEPER, POST_COMMISSION } from './data/posts';
+  POST_REGISTRAR, POST_ARCHIVIST, POST_KEEPER, POST_COMMISSION, POST_PERSONNEL } from './data/posts';
 import { PROPS_BY_ID } from './data/props';
 import { WEAPON_FORMS } from './data/weaponForms';
 import { createEntity, type Entity, type Faction, type Shape, type StashKind, type World } from './ecs';
@@ -37,6 +37,8 @@ export function postNumbers(post: string): PostNumbers {
       return TUNING.post.archivist;
     case POST_KEEPER:
       return TUNING.post.keeper;
+    case POST_PERSONNEL:
+      return TUNING.post.personnel;
     case POST_COMMISSION:
       return TUNING.post.commission;
     case POST_COURIER:
@@ -211,6 +213,13 @@ function attachBehaviour(w: World, e: Entity, post: string, x: number, y: number
       break;
     case POST_KEEPER:
       w.keeperC.set(e, { douseTimer: TUNING.keeper.douseEvery, target: -1, touchTimer: 0 });
+      break;
+    case POST_PERSONNEL:
+      w.personnelC.set(e, {
+        stage: 1,
+        issueTimer: TUNING.personnel.firstDelay,
+        appointed: false,
+      });
       break;
     case POST_COMMISSION: {
       // Место в комиссии: по нему же решают, кто сейчас председатель.
@@ -465,6 +474,9 @@ export function spawnBullet(
   /** Кто стреляет. Нужен только затем, чтобы проверка била вдвое. */
   owner?: Entity,
 ): Entity {
+  // Субъект назначен на должность: по штатному не стреляют. Проверка
+  // стоит здесь, в одной точке, а не в шести системах должностей.
+  if (faction === 'enemy' && w.appointed > 0) return -1;
   const e = createEntity(w);
   const shooter = owner === undefined ? undefined : w.staffC.get(owner);
   const damage = shooter?.control === true ? spec.damage * TUNING.record.controlDamage : spec.damage;

@@ -250,6 +250,31 @@ export interface LightSection {
  * Смотритель узла. Не стреляет вовсе: он гасит свет и бьёт в упор. Весь
  * бой — гонка за освещением.
  */
+/**
+ * НАЧАЛЬНИК ОТДЕЛА КАДРОВ. Он почти не атакует — он правит субъекта.
+ *
+ * Каждое его распоряжение это физический лист, висящий в комнате. Пока
+ * лист цел, распоряжение действует. Открыт начальник ровно тогда, когда
+ * ни одно его распоряжение не действует, — и это решение игрока: снести
+ * все листы ради короткого окна или терпеть и бить между делом.
+ */
+export interface PersonnelC {
+  /** Какая из трёх фаз идёт. */
+  stage: 1 | 2 | 3;
+  /** Обратный отсчёт до следующего распоряжения. */
+  issueTimer: number;
+  /** Назначение субъекта на должность выдано: второй раз не выдают. */
+  appointed: boolean;
+}
+
+/** Лист распоряжения: что именно он отнимает, пока цел. */
+export interface OrderC {
+  /** Ключ действия: form | dash | tool | demote. */
+  kind: string;
+  /** Какую форму отстранили, если это распоряжение о форме. */
+  form: number;
+}
+
 export interface KeeperC {
   /** Обратный отсчёт до следующей погашенной секции. */
   douseTimer: number;
@@ -655,6 +680,12 @@ export interface World {
   /** Коммутатор уже переключали: он переключается один раз за этаж. */
   patched: boolean;
   /**
+   * Субъект назначен на должность: секунды до конца назначения. Пока
+   * оно действует, по нему не стреляют — но и талоны за ставки не
+   * падают, а выйти из помещения он не может, как и всякий штатный.
+   */
+  appointed: number;
+  /**
    * План эвакуации найден: схема этажа снова показывает тот участок, в
    * котором субъект стоит. До того она врёт на один — это искажение
    * архива, а не поломка.
@@ -710,6 +741,8 @@ export interface World {
   chiefC: Map<Entity, ChiefC>;
   archivistC: Map<Entity, ArchivistC>;
   keeperC: Map<Entity, KeeperC>;
+  personnelC: Map<Entity, PersonnelC>;
+  orderC: Map<Entity, OrderC>;
   commissionC: Map<Entity, CommissionC>;
   courierC: Map<Entity, CourierC>;
   propC: Map<Entity, PropC>;
@@ -761,6 +794,8 @@ export function componentStores(w: World): Map<Entity, unknown>[] {
     w.chiefC,
     w.archivistC,
     w.keeperC,
+    w.personnelC,
+    w.orderC,
     w.commissionC,
     w.courierC,
     w.propC,

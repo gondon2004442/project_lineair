@@ -26,6 +26,11 @@ export interface PropSpec {
   railed?: boolean;
   /** Даёт облако при ударе. */
   cloud?: boolean;
+  /**
+   * Можно ли взять телекинезом. Ложь — лист распоряжения: его держит
+   * не стол, а аномалия, и унести его субъект не может. Сбить может.
+   */
+  grabbable?: boolean;
 }
 
 export const PROPS: PropSpec[] = [
@@ -47,6 +52,16 @@ export const PROPS: PropSpec[] = [
     blocksSight: true,
   },
   { id: 'tank', title: 'ОГНЕТУШИТЕЛЬ', hollow: false, scatter: 0, cloud: true },
+  // Лист распоряжения. Висит в воздухе, пока действует; прочности мало,
+  // но стоит он в стороне от боя — чтобы его сбить, надо перестать
+  // стрелять по начальнику.
+  {
+    id: 'order',
+    title: 'РАСПОРЯЖЕНИЕ',
+    hollow: true,
+    scatter: 0,
+    grabbable: false,
+  },
 ];
 
 export const PROPS_BY_ID = new Map(PROPS.map((p) => [p.id, p]));
@@ -56,3 +71,4 @@ export const PROP_CABINET = 'cabinet';
 export const PROP_RUBBLE = 'rubble';
 export const PROP_FAXSTAND = 'faxstand';
 export const PROP_CARDBOX = 'cardbox';
+export const PROP_ORDER = 'order';

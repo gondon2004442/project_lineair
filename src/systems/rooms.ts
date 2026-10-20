@@ -39,7 +39,9 @@ export function roomSystem(w: World): void {
     }
   }
 
-  if (w.map.doorsLocked || w.status === 'dead') return;
+  // Назначенный из помещения не выходит: оформленным отлучаться не
+  // положено. Это и есть цена того, что по нему перестали стрелять.
+  if (w.map.doorsLocked || w.status === 'dead' || w.appointed > 0) return;
 
   const t = w.transform.get(w.player);
   if (t === undefined) return;

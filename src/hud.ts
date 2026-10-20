@@ -117,6 +117,7 @@ export function createHud(
       energyRow(w),
       row('ВАКАНСИЙ', vacancyLine(w)),
       staffCountRow(w),
+      orderRow(w),
       row('Q БЛАНК · ДОПУСК · ТАЛОН', suppliesLine(w)),
       toolRow(w),
       promptRow(w),
@@ -604,6 +605,26 @@ function inForce(w: World): Directive[] {
   return issuedDirectives(w.build).filter(
     (d) => d.requiresTrait === undefined || hasTrait(w, d.requiresTrait),
   );
+}
+
+/**
+ * Распоряжения отдела кадров: что именно сейчас отнято. Строка есть,
+ * только пока листы висят, — и исчезает ровно тогда, когда начальник
+ * открывается.
+ */
+function orderRow(w: World): string {
+  if (w.appointed > 0) {
+    return row('НАЗНАЧЕНИЕ', '<span class="warn">ВЫ В ШТАТЕ · ВЫХОД ЗАКРЫТ</span>');
+  }
+  if (w.orderC.size === 0) return '';
+  const названия: Record<string, string> = {
+    form: 'ФОРМА ОТСТРАНЕНА',
+    dash: 'РЫВОК ЗАПРЕЩЁН',
+    tool: 'ИНВЕНТАРЬ ИЗЪЯТ',
+    demote: 'СТАВКА НИЖЕ',
+  };
+  const список = [...new Set([...w.orderC.values()].map((o) => названия[o.kind] ?? o.kind))];
+  return row('РАСПОРЯЖЕНИЯ', `<span class="warn">${список.join(' · ')}</span>`);
 }
 
 /**

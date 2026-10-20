@@ -93,3 +93,4 @@ export const POST_COURIER = 'courier';
 export const POST_ARCHIVIST = 'archivist';
 export const POST_KEEPER = 'keeper';
 export const POST_COMMISSION = 'commission';
+export const POST_PERSONNEL = 'personnel';

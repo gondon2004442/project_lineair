@@ -17,6 +17,7 @@ import { DIRS, entryPosition } from '../room';
 import { TUNING, getTuning } from '../tuning';
 import { ammoMax } from '../weapon';
 import { scatterTickets } from './tickets';
+import { orderActive } from './postPersonnel';
 
 /** Реестр эффектов. Ключ тот же, что в TUNING.tool. */
 const EFFECTS: Record<string, (w: World) => boolean> = {
@@ -49,6 +50,8 @@ export function toolCooldown(w: World, effect: string): number {
 }
 
 export function toolSystem(w: World, dt: number): void {
+  // Изъятие инвентаря: слот недоступен, пока лист цел.
+  if (orderActive(w, 'tool')) w.input.toolQueued = false;
   const slot = w.tool;
   if (slot.cooldown > 0) slot.cooldown = Math.max(0, slot.cooldown - dt);
 

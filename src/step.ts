@@ -11,6 +11,7 @@ import { chiefSystem } from './systems/postChief';
 import { archivistSystem } from './systems/postArchivist';
 import { keeperSystem } from './systems/postKeeper';
 import { commissionSystem } from './systems/postCommission';
+import { personnelSystem } from './systems/postPersonnel';
 import { courierSystem } from './systems/postCourier';
 import { registrarSystem } from './systems/postRegistrar';
 import {
@@ -83,6 +84,7 @@ export function step(w: World): void {
   archivistSystem(w, STEP);
   keeperSystem(w, STEP);
   commissionSystem(w, STEP);
+  personnelSystem(w, STEP);
   courierSystem(w, STEP);
   separationSystem(w, STEP);
   playerBodySystem(w, STEP);
