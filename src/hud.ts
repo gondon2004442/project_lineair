@@ -716,7 +716,23 @@ function dossierBody(w: World): string {
     return `<div class="dossier-item"><div class="dossier-code">${d.number} · ${d.title}</div>${lines}</div>`;
   });
 
-  return head + subject + verdictBlock(w) + note + blocks.join('') + orders.join('');
+  return head + subject + savedBlock(w) + verdictBlock(w) + note + blocks.join('') + orders.join('');
+}
+
+/**
+ * Дела спасённых на руках. Они и есть выбор в финале: подшить вместо
+ * своего можно только то, что подобрал.
+ */
+function savedBlock(w: World): string {
+  if (w.savedCases.length === 0) return '';
+  const lines = w.savedCases
+    .map((c) => `<div class="dossier-line">${c.title}</div>`)
+    .join('');
+  return (
+    '<div class="dossier-item"><div class="dossier-code">ДЕЛА СПАСЁННЫХ</div>' +
+    lines +
+    '</div>'
+  );
 }
 
 /** Принятое решение: что именно сделали с делом. */

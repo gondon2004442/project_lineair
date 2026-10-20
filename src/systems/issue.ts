@@ -62,6 +62,10 @@ export function issueCost(
   // то, чтобы интерфейс перестал врать, игрок не должен.
   if (stash.kind === 'case' || stash.kind === 'evac') return 'free';
 
+  // Личное дело спасённого подбирают, а не оформляют: за чужое дело не
+  // платят.
+  if (stash.kind === 'saved') return 'free';
+
   // Коммутатор не оформляют: к нему подходят и переключают. Платить за
   // то, чтобы здание перестало путать двери, субъект не должен.
   if (stash.kind === 'board') return w.patched ? '' : 'free';
@@ -71,7 +75,10 @@ export function issueCost(
   if (stash.kind === 'verdict') {
     const ending = ENDINGS_BY_ID.get(stash.item);
     if (ending === undefined) return '';
-    if (ending.needsFreed === true && w.freed.length === 0) return '';
+    // Третий исход требует чужого дела на руках: освобождённого
+    // замурованного или подобранного личного дела спасённого. Чем
+    // больше оставил в живых, тем больше выбор, кого выпустить.
+    if (ending.needsFreed === true && w.freed.length + w.savedCases.length === 0) return '';
     return 'free';
   }
 
@@ -286,7 +293,7 @@ export function grantForm(w: World, id: string): void {
 function decide(w: World, id: string): void {
   const ending = ENDINGS_BY_ID.get(id);
   if (ending === undefined || w.verdict !== '') return;
-  if (ending.needsFreed === true && w.freed.length === 0) return;
+  if (ending.needsFreed === true && w.freed.length + w.savedCases.length === 0) return;
   w.verdict = id;
   w.status = 'cleared';
   w.runEnded = 'cleared';
@@ -296,6 +303,10 @@ function decide(w: World, id: string): void {
   // что кто-то остался вместо него.
   if (id === 'swap') {
     for (const freed of w.freed) w.precedents.push(`instead:${freed}`);
+    // Подшивается первое дело из подобранных: оно и выходит вместо
+    // субъекта. Прецедент остаётся в архиве, как и всякий другой.
+    const first = w.savedCases[0];
+    if (first !== undefined) w.precedents.push(`instead:${first.id}`);
   }
   w.sounds.push('stamp');
 }
@@ -354,6 +365,14 @@ export function issueSystem(w: World): void {
 
   if (stash.kind === 'board') {
     patchBoard(w);
+    return;
+  }
+
+  if (stash.kind === 'saved') {
+    if (!w.savedCases.some((c) => c.id === stash.item)) {
+      w.savedCases.push({ id: stash.item, title: stash.title });
+    }
+    w.sounds.push('stamp');
     return;
   }
 

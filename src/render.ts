@@ -2273,6 +2273,12 @@ function drawStash(
         g.rect(x - m, y - m * 0.5, m * 1.4, 2).fill(PALETTE.concrete100);
         g.rect(x - m * 0.4, y + m * 0.4, m * 1.4, 2).fill(PALETTE.concrete100);
       }
+    } else if (kind === 'saved') {
+      // Личное дело: папка с уголком. Бумага, а не ящик.
+      const m = half * 0.6;
+      g.rect(x - m, y - m, m * 2, m * 2).fill(PALETTE.paper);
+      g.rect(x - m, y - m, m * 2, m * 0.5).fill(PALETTE.concrete500);
+      g.rect(x - m * 0.6, y, m * 1.2, 2).fill(PALETTE.concrete900);
     } else if (kind === 'board') {
       // Щит с гнёздами: три пары точек и шнур между ними. Читается как
       // коммутатор, а не как ящик с выдачей.

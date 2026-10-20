@@ -144,6 +144,7 @@ export function cleanseSystem(w: World, dt: number): void {
   for (const [e, staff] of w.staffC) {
     if (staff.retired) continue;
     retire(w, e);
+    room.savedHere = true;
     any = true;
   }
   // Центральный архив открывается, как только приёмка дошла до него:
@@ -153,6 +154,9 @@ export function cleanseSystem(w: World, dt: number): void {
 
   // Подвешенные опускаются на пол. Приёмка закрывает и их дела тоже —
   // по ним решение не принимали, а теперь приняли.
-  if (landHung(w, room)) any = true;
+  if (landHung(w, room)) {
+    room.savedHere = true;
+    any = true;
+  }
   if (any) w.sounds.push('stamp');
 }

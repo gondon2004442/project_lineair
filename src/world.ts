@@ -6,7 +6,7 @@ import { setupTrial } from './systems/trial';
 import { POST_COURIER, POST_ARCHIVIST, POST_KEEPER } from './data/posts';
 import { MINI_BOSS_POSTS, STAFFING_BY_ID, type StaffPost } from './data/staffing';
 import { DEEPEST, floorAt } from './data/floors';
-import { generateFloor, roomDoors, type RoomNode } from './floor';
+import { generateFloor, roomDoors, type RoomNode, roomNumber } from './floor';
 import type { InputSnapshot } from './input';
 import { pickItem } from './paperwork';
 import { makeRng, type Rng } from './rng';
@@ -93,6 +93,7 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     tool2: { id: '', cooldown: 0, charges: -1 },
     grants: [],
     trials: [],
+    savedCases: [],
     trialDone: 0,
     trialTimer: 0,
     trialBeat: 0,
@@ -214,6 +215,7 @@ export function startRun(w: World): void {
   w.tool2 = { id: '', cooldown: 0, charges: -1 };
   w.grants = [];
   w.trials = [];
+  w.savedCases = [];
   w.trialDone = 0;
   w.trialTimer = 0;
   w.trialBeat = 0;
@@ -390,9 +392,16 @@ export function enterRoom(w: World, index: number, fromDir: Dir | null): void {
   // обычно, и тут же снимается с должности. Иначе очищённый этаж стоял
   // бы пустым, а он не пустой — в нём сидят люди.
   if (cleansedRoom(w, index)) {
-    for (const [e] of [...w.staffC]) retire(w, e);
-    landHung(w, room);
+    for (const [e] of [...w.staffC]) {
+      retire(w, e);
+      room.savedHere = true;
+    }
+    if (landHung(w, room)) room.savedHere = true;
   }
+  // Дело кладётся ПОСЛЕ того, как людей сняли с должности: иначе в
+  // помещение, куда волна только что дошла, оно легло бы лишь со
+  // второго захода.
+  placeSavedCase(w, room, spot.x, spot.y);
   setupTrial(w);
   if (w.staffC.size === 0 && !room.cleared) {
     room.cleared = true;
@@ -671,6 +680,30 @@ function placeWalled(w: World, room: RoomNode, entryX: number, entryY: number): 
   if (!wanted || where !== room.index) return;
   const spot = findSpawnSpot(w.map, rng, entryX, entryY, TUNING.stash.clearance, cfg.radius);
   spawnStash(w, 'walled', spec.id, `ЗАМУРОВАННЫЙ · ${spec.title}`, spot.x, spot.y);
+}
+
+/**
+ * ЛИЧНОЕ ДЕЛО СПАСЁННОГО. Лежит в очищённом помещении — там, где людей
+ * сняли с должности, а не вынесли.
+ *
+ * Берётся даром: за чужое дело не платят, его подбирают. И только оно
+ * даёт право на третий исход — подшить вместо своего можно лишь то,
+ * что у тебя на руках.
+ */
+function placeSavedCase(w: World, room: RoomNode, entryX: number, entryY: number): void {
+  if (!cleansedRoom(w, room.index) || !room.savedHere) return;
+  if (w.savedCases.some((c) => c.id === `room:${w.depth}:${room.index}`)) return;
+  const cfg = TUNING.stash;
+  const rng = makeRng((w.seed + room.index * cfg.seedStride + 11) >>> 0);
+  const spot = findSpawnSpot(w.map, rng, entryX, entryY, cfg.clearance, cfg.cellRadius);
+  spawnStash(
+    w,
+    'saved',
+    `room:${w.depth}:${room.index}`,
+    `ЛИЧНОЕ ДЕЛО · УЧАСТОК ${roomNumber(room)}`,
+    spot.x,
+    spot.y,
+  );
 }
 
 /**
