@@ -5,6 +5,7 @@ import { cellCenter, damageWall, isSolidPoint, tileAtPoint, TILE_WEAK } from '..
 import { spawnProp } from '../spawn';
 import { TUNING } from '../tuning';
 import { applyDamage } from './damage';
+import { stopsBullet } from './edge';
 import { PROPS_BY_ID } from '../data/props';
 
 export function bulletSystem(w: World, dt: number): void {
@@ -17,7 +18,7 @@ export function bulletSystem(w: World, dt: number): void {
       destroyEntity(w, e);
       continue;
     }
-    if (isSolidPoint(w.map, t.x, t.y)) {
+    if (stopsBullet(w, t.x, t.y)) {
       // Перегородка не просто гасит снаряд, она от него крошится.
       if (tileAtPoint(w.map, t.x, t.y) === TILE_WEAK) {
         w.sounds.push('glass');

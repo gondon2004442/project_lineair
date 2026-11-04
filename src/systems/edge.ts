@@ -27,6 +27,16 @@ export function holdsSubject(w: World, x: number, y: number): boolean {
   return isSolidPoint(w.map, x, y);
 }
 
+/**
+ * Гасит ли точка снаряд. На натурной части — нет: там не стены, а дыры,
+ * и снаряд идёт над ними. Иначе выходило, что пуля вязнет в воздухе над
+ * пропастью, а мишень за провалом не сбить вовсе.
+ */
+export function stopsBullet(w: World, x: number, y: number): boolean {
+  if (voidEdges(w)) return false;
+  return isSolidPoint(w.map, x, y);
+}
+
 export function edgeSystem(w: World, dt: number): void {
   const p = w.playerC.get(w.player);
   const t = w.transform.get(w.player);
