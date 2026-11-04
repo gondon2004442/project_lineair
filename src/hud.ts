@@ -342,7 +342,11 @@ function liftRow(w: World): string {
   // Без печати лифт стоит: распоряжение о спуске нечем подписать.
   if (!w.seals.includes(w.depth)) {
     const holder = POSTS_BY_ID.get(floorAt(w.depth).sealHolder)?.title ?? 'ДЕРЖАТЕЛЬ ПЕЧАТИ';
-    return row('ЛИФТ', `<span class="warn">СПУСК НЕ ПОДПИСАН · ПЕЧАТЬ У: ${holder}</span>`);
+    // Печать может уже лежать на полу: тогда и сказать надо другое —
+    // не «у кого она», а «подбери».
+    const лежит = [...w.stashC.values()].some((s) => s.kind === 'seal' && !s.opened);
+    const текст = лежит ? 'ПЕЧАТЬ НА ПОЛУ · ПОДОБРАТЬ' : `ПЕЧАТЬ У: ${holder}`;
+    return row('ЛИФТ', `<span class="warn">СПУСК НЕ ПОДПИСАН · ${текст}</span>`);
   }
   const next = floorAt(w.depth - 1);
   return row('ЛИФТ', `<span class="ok">${next.code} · ${next.title} — ШАГНИ В ШАХТУ</span>`);

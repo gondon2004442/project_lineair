@@ -9,6 +9,7 @@
  */
 import { ENDINGS_BY_ID } from '../data/endings';
 import { patchBoard } from './reroute';
+import { startCleanse } from './cleanse';
 import { POST_INSPECTOR } from '../data/posts';
 import { SUBJECTS_BY_ID } from '../data/subjects';
 import { WEAPON_FORMS } from '../data/weaponForms';
@@ -61,6 +62,10 @@ export function issueCost(
   // эвакуации тоже даром: это починка схемы, а не добыча, и платить за
   // то, чтобы интерфейс перестал врать, игрок не должен.
   if (stash.kind === 'case' || stash.kind === 'evac') return 'free';
+
+  // Печать подбирают, а не оформляют: она уже снята с начальника, и
+  // платить за собственную подпись не за что.
+  if (stash.kind === 'seal') return 'free';
 
   // Личное дело спасённого подбирают, а не оформляют: за чужое дело не
   // платят.
@@ -365,6 +370,17 @@ export function issueSystem(w: World): void {
 
   if (stash.kind === 'board') {
     patchBoard(w);
+    return;
+  }
+
+  if (stash.kind === 'seal') {
+    const depth = Number(stash.item);
+    if (!w.seals.includes(depth)) w.seals.push(depth);
+    // Печать в деле — значит подписан акт приёмки. Дальше этаж сдаётся
+    // сам, и волна идёт от этого самого места.
+    const t = w.transform.get(target);
+    startCleanse(w, t?.x, t?.y);
+    w.sounds.push('stamp');
     return;
   }
 

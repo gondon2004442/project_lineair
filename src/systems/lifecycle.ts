@@ -4,7 +4,7 @@ import { floorAt } from '../data/floors';
 import { isGatePoint, liftOpen, openLift } from '../room';
 import { descend, deeperExists } from '../world';
 import { dropTickets } from './tickets';
-import { cleansed, cleansedRoom, startCleanse } from './cleanse';
+import { cleansed, cleansedRoom } from './cleanse';
 import { WEAPON_FORMS } from '../data/weaponForms';
 import { spawnStash } from '../spawn';
 import { TUNING } from '../tuning';
@@ -144,11 +144,17 @@ function takeSeal(w: World, e: Entity): void {
     if ((w.health.get(other)?.hp ?? 0) > 0) return;
   }
   if (w.seals.includes(w.depth)) return;
-  w.seals.push(w.depth);
+  // Печать не переходит в дело сама: она падает на пол там, где стоял
+  // начальник, и её надо подобрать руками — пусть субъект дойдёт до
+  // неё по уже чистой комнате. Это и есть кадр победы, а не строка в
+  // оверлее.
+  const t = w.transform.get(e);
+  if (t === undefined) return;
+  for (const [, stash] of w.stashC) {
+    if (stash.kind === 'seal') return;
+  }
+  spawnStash(w, 'seal', String(w.depth), `ПЕЧАТЬ УРОВНЯ ${floorAt(w.depth).code}`, t.x, t.y);
   w.sounds.push('stamp');
-  // Печать забрана — значит подписан акт приёмки. Дальше этаж сдаётся
-  // сам: волна идёт по графу от приёмной.
-  startCleanse(w);
 }
 
 /** Подписан ли спуск с этого уровня: печать в деле. */

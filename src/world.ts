@@ -113,6 +113,8 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     depth: -1,
     seals: [],
     cleanse: -1,
+    cleanseX: 0,
+    cleanseY: 0,
     subject: SUBJECT_START,
     freed: [],
     unlocked: [SUBJECT_START],

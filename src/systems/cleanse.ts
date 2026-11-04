@@ -24,6 +24,18 @@ export function cleansed(w: World): boolean {
   return w.cleanse >= 0;
 }
 
+/**
+ * Насколько волна прошла текущее помещение: 0 — только вошла, 1 —
+ * прошла целиком. Отрицательное — её здесь ещё нет.
+ */
+export function cleanseProgress(w: World): number {
+  const room = w.floor.rooms[w.room];
+  if (room === undefined || !cleansed(w)) return -1;
+  const since = w.cleanse - room.cleanseDelay;
+  if (since < 0) return -1;
+  return Math.min(1, since / Math.max(1e-6, TUNING.cleanse.roomDelay));
+}
+
 /** Дошла ли волна до этого помещения. */
 export function cleansedRoom(w: World, index: number): boolean {
   const room = w.floor.rooms[index];
@@ -44,8 +56,13 @@ export function distortionNow(w: World, spec: { distortion: string }): string {
  * Запустить волну. Задержки раздаются по графу от приёмной заливкой —
  * тем же порядком, которым собиралась связность этажа.
  */
-export function startCleanse(w: World): void {
+export function startCleanse(w: World, x?: number, y?: number): void {
   if (cleansed(w)) return;
+  // Волна расходится от места, где печать взяли, — то есть от тела
+  // начальника. Без точки (случай стенда или отладки) берём середину.
+  const centre = { x: (w.map.cols / 2) * w.map.size, y: (w.map.rows / 2) * w.map.size };
+  w.cleanseX = x ?? centre.x;
+  w.cleanseY = y ?? centre.y;
   const cfg = TUNING.cleanse;
   for (const room of w.floor.rooms) room.cleanseDelay = Infinity;
   const first = w.floor.rooms[w.floor.end];

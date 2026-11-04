@@ -4,7 +4,7 @@
  * чтобы визуал не съедал случайность симуляции.
  */
 import { Application, BlurFilter, Container, Graphics } from 'pixi.js';
-import { distortionNow } from './systems/cleanse';
+import { cleansed, distortionNow } from './systems/cleanse';
 import type { World } from './ecs';
 import { createAberration, createDust, createHiss, drawSmoke, type WarpSource } from './fx';
 import { PALETTE } from './palette';
@@ -1060,20 +1060,88 @@ function drawVoid(
  * это награда за начальника, её надо дать посмотреть, а не проскочить.
  */
 function drawFront(g: Graphics, w: World): void {
-  const room = w.floor.rooms[w.room];
-  if (room === undefined || w.cleanse < 0) return;
   const cfg = TUNING.cleanse;
+  const room = w.floor.rooms[w.room];
+  if (room === undefined || !cleansed(w)) return;
   const since = w.cleanse - room.cleanseDelay;
   if (since < 0 || since > cfg.roomDelay) return;
 
+  // Фронт расходится от места, где взяли печать: волна идёт от тела
+  // начальника наружу, а не едет по комнате слева направо. Рисуется он
+  // не циркулем, а по рядам плитки — дуга здесь складывается из
+  // прямоугольников, как и всё прочее в здании, и заодно обрезается
+  // стенами: за помещение волна не выходит.
   const width = w.map.cols * w.map.size;
   const height = w.map.rows * w.map.size;
-  const at = (since / Math.max(1e-6, cfg.roomDelay)) * width;
-  g.rect(at - cfg.frontWidth, 0, cfg.frontWidth, height).fill({
+  const tile = w.map.size;
+  const reach = Math.hypot(width, height);
+  const outer = (since / Math.max(1e-6, cfg.roomDelay)) * reach;
+  const inner = Math.max(0, outer - cfg.frontWidth);
+
+  const rows: { y: number; near: number; far: number }[] = [];
+  for (let y = 0; y < height; y += tile) {
+    const dy = y + tile / 2 - w.cleanseY;
+    const far = outer * outer - dy * dy;
+    if (far <= 0) continue;
+    const near = inner * inner - dy * dy;
+    rows.push({ y, near: near > 0 ? Math.sqrt(near) : 0, far: Math.sqrt(far) });
+  }
+  // Шлейф.
+  for (const r of rows) {
+    frontFill(g, w.cleanseX - r.far, w.cleanseX - r.near, r.y, tile, width);
+    frontFill(g, w.cleanseX + r.near, w.cleanseX + r.far, r.y, tile, width);
+  }
+  // Кромка: лесенка из коротких черт, сшитая по рядам, чтобы линия не
+  // рассыпалась там, где дуга идёт полого.
+  frontEdge(g, rows, -1, w.cleanseX, tile, width);
+  frontEdge(g, rows, 1, w.cleanseX, tile, width);
+}
+
+/** Полоса шлейфа в одном ряду плитки, обрезанная стенами. */
+function frontFill(
+  g: Graphics,
+  from: number,
+  to: number,
+  y: number,
+  tile: number,
+  width: number,
+): void {
+  const a = Math.max(0, Math.min(width, Math.min(from, to)));
+  const b = Math.max(0, Math.min(width, Math.max(from, to)));
+  if (b - a <= 0) return;
+  g.rect(a, y, b - a, tile).fill({
     color: PALETTE.concrete100,
     alpha: TUNING.render.frontAlpha,
   });
-  g.rect(at - 2, 0, 2, height).fill(PALETTE.concrete100);
+}
+
+/** Кромка одной стороны фронта: вертикальные черты плюс перемычки. */
+function frontEdge(
+  g: Graphics,
+  rows: { y: number; far: number }[],
+  side: number,
+  originX: number,
+  tile: number,
+  width: number,
+): void {
+  const thick = TUNING.render.frontEdge;
+  const at = (r: { far: number }): number => originX + side * r.far - (side > 0 ? thick : 0);
+  const bar = (x: number, y: number, w2: number, h: number): void => {
+    const a = Math.max(0, Math.min(width, x));
+    const b = Math.max(0, Math.min(width, x + w2));
+    if (b - a <= 0) return;
+    g.rect(a, y, b - a, h).fill(PALETTE.concrete100);
+  };
+  for (let k = 0; k < rows.length; k++) {
+    const r = rows[k];
+    if (r === undefined) continue;
+    bar(at(r), r.y, thick, tile);
+    const next = rows[k + 1];
+    if (next === undefined || next.y !== r.y + tile) continue;
+    const a = Math.min(at(r), at(next));
+    const b = Math.max(at(r), at(next)) + thick;
+    bar(a, r.y + tile - thick / 2, b - a, thick);
+  }
 }
 
 /**
@@ -2273,6 +2341,12 @@ function drawStash(
         g.rect(x - m, y - m * 0.5, m * 1.4, 2).fill(PALETTE.concrete100);
         g.rect(x - m * 0.4, y + m * 0.4, m * 1.4, 2).fill(PALETTE.concrete100);
       }
+    } else if (kind === 'seal') {
+      // Печать: круг с перекладиной. Единственная добыча, за которой
+      // идут по уже чистой комнате.
+      const m = half * 0.6;
+      g.circle(x, y, m).stroke({ width: 2, color: PALETTE.yellow });
+      g.rect(x - m * 0.7, y - 1, m * 1.4, 2).fill(PALETTE.yellow);
     } else if (kind === 'saved') {
       // Личное дело: папка с уголком. Бумага, а не ящик.
       const m = half * 0.6;

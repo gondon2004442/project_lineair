@@ -10,6 +10,7 @@
  * перестройкой. Как цель превращается в кадр, решает рендер.
  */
 import { floorAt } from '../data/floors';
+import { cleanseProgress } from './cleanse';
 import type { World } from '../ecs';
 import { TUNING } from '../tuning';
 
@@ -31,6 +32,13 @@ export function seated(w: World): boolean {
   for (const [e, staff] of w.staffC) {
     if (staff.post !== holder || staff.retired) continue;
     if ((w.health.get(e)?.hp ?? 0) > 0) return true;
+  }
+  // Начальник мёртв, но печать ещё на полу: приостановка держится,
+  // пока акт приёмки не подписан. Иначе красное гасло бы дважды —
+  // сначала со смертью, потом волной, — и кадр победы распадался бы на
+  // два разных события.
+  for (const [, stash] of w.stashC) {
+    if (stash.kind === 'seal' && !stash.opened) return true;
   }
   return false;
 }
@@ -59,7 +67,13 @@ export function hissSystem(w: World, dt: number): void {
 
   let want = 0;
   if (w.scene === 'run' && w.status === 'playing') {
-    if (seated(w)) {
+    // Отстранение: состояние падает не плавно, а волной приёмки — той
+    // же, что сдаёт этаж. Пока фронт идёт по помещению, красное уходит
+    // вместе с ним, и к концу прохода его не остаётся.
+    const wave = cleanseProgress(w);
+    if (wave >= 0 && wave < 1) {
+      want = cfg.seat * (1 - wave);
+    } else if (seated(w)) {
       want = phaseBreak(w) ? cfg.phaseKick : cfg.seat;
     } else if (w.record.controlHere > 0) {
       // Внеплановая проверка: красное частично. Игрок видит по кадру,
@@ -70,9 +84,16 @@ export function hissSystem(w: World, dt: number): void {
 
   // Титр выдаётся на входе в заседание и только на нём: проверка — не
   // заседание, у неё своя громкость.
-  if (want >= cfg.seat && w.fx.hiss < cfg.seat) {
+  if (want >= cfg.seat && w.fx.hiss < cfg.seat && seated(w)) {
     w.fx.seatTitle = cfg.titleTime;
     w.sounds.push('stamp');
+    // Пауза, прежде чем начальник начнёт. Она нужна не ему, а субъекту:
+    // прочитать комнату, пока та схлопывается в красный. Сделана тем же
+    // отсчётом, которым работает приостановка, — его уважают все
+    // системы должностей, и учить их ещё одному флагу не пришлось.
+    for (const [, staff] of w.staffC) {
+      staff.frozen = Math.max(staff.frozen, cfg.seatDelay);
+    }
   }
   w.fx.hiss = want;
 }
