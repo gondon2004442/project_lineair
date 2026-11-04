@@ -383,7 +383,7 @@ function drawRoom(
       const tile = map.tiles[cy * map.cols + cx];
 
       if (tile === TILE_WALL) {
-        if (voidRoom) drawVoid(g, map, cx, cy, x, y, size, th);
+        if (voidRoom) drawVoid(g, svc, map, cx, cy, x, y, size, th);
         else drawPanelledWall(g, map, cx, cy, x, y, size, warm, th);
         continue;
       }
@@ -1024,10 +1024,14 @@ function lights(w: World, alpha: number): { x: number; y: number; r: number }[] 
  *
  * Рисуется она светлой заливкой без панелей и обшивки: отделывать
  * пустоту нечем. Плита рядом с ней получает золотую прожилку по
- * сколу — единственное, чем здание обозначает край.
+ * сколу — единственное, чем здание обозначает край, и поэтому прожилка
+ * уходит в слой разметки, как и рамка проёма: край перестанет быть
+ * виден ровно тогда, когда помещение станет красным, а заседание
+ * Комиссии идёт именно в красном.
  */
 function drawVoid(
   g: Graphics,
+  svc: Graphics,
   map: TileMap,
   cx: number,
   cy: number,
@@ -1049,7 +1053,7 @@ function drawVoid(
     const face = horizontal
       ? { x, y: dy < 0 ? y : y + size - vein, w: size, h: vein }
       : { x: dx < 0 ? x : x + size - vein, y, w: vein, h: size };
-    g.rect(face.x, face.y, face.w, face.h).fill(th.accent);
+    svc.rect(face.x, face.y, face.w, face.h).fill(th.accent);
   }
 }
 
