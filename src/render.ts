@@ -1720,7 +1720,11 @@ function drawEntities(
     // Добыча рисуется своим: её не ломают и не таскают, к ней подходят.
     const stash = w.stashC.get(e);
     if (stash !== undefined) {
-      drawStash(g, x, y, draw.size, stash.kind, stash.opened, e === reachStash, stash.item);
+      // Печать рисуется по служебному слою — там же, где таблички и
+      // штампы. Её одну подбирают прямо в заседании, и на красном фоне
+      // красный ящик было бы не найти: процедурное остаётся жёлтым.
+      const layer = stash.kind === 'seal' ? svc : g;
+      drawStash(layer, x, y, draw.size, stash.kind, stash.opened, e === reachStash, stash.item);
       continue;
     }
 
