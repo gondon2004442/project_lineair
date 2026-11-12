@@ -25,6 +25,18 @@ import { counterInReach, counterOffer } from './systems/counter';
 import { deskPrice, issueOffer, safeContents } from './systems/issue';
 import { DECOR, DECOR_BY_ID, DECOR_TOO_LIGHT } from './data/decor';
 import { TEMPLATES_BY_ID } from './data/roomTemplates';
+// Реестры нужны стенду сходимости данных: должность, которой нет в
+// списке, молча получает чужой силуэт и латинский заголовок — так
+// однажды и вышло с кадровиком.
+import { POSTS } from './data/posts';
+import { FLOORS } from './data/floors';
+import { PROPS } from './data/props';
+import { FIXTURES } from './data/fixtures';
+import { COUNTERS } from './data/counters';
+import { STAFFING } from './data/staffing';
+import { ENDINGS } from './data/endings';
+import { TRIALS } from './data/trials';
+import { WEAPON_FORMS } from './data/weaponForms';
 import { isSolidPoint, liftOpen } from './room';
 import { floorAt } from './data/floors';
 import { SUBJECTS, SUBJECT_START, subjectAt } from './data/subjects';
@@ -235,6 +247,15 @@ async function boot(): Promise<void> {
       decorById: DECOR_BY_ID,
       decorTooLight: DECOR_TOO_LIGHT,
       templates: TEMPLATES_BY_ID,
+      posts: POSTS,
+      floors: FLOORS,
+      props: PROPS,
+      fixtures: FIXTURES,
+      counters: COUNTERS,
+      staffing: STAFFING,
+      endings: ENDINGS,
+      trials: TRIALS,
+      forms: WEAPON_FORMS,
       tuning: TUNING,
     },
   });
