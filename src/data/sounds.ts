@@ -24,6 +24,10 @@ export interface SoundRecipe {
 }
 
 export const SOUNDS: Record<string, SoundRecipe> = {
+  // --- Шаги: только в объёмном виде, их считает кадр, а не симуляция ---
+  step: { source: 'noise', freq: 0, duration: 0.05, gain: 0.07, cutoff: 1900, attack: 0.05 },
+  step_soft: { source: 'noise', freq: 0, duration: 0.07, gain: 0.045, cutoff: 650, attack: 0.1 },
+
   // --- Бланк: короткий сухой росчерк и отмена ---
   blank: { source: 'tone', freq: 420, freqEnd: 60, duration: 0.34, gain: 0.5, wave: 'triangle', attack: 0.02 },
 

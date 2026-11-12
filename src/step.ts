@@ -27,6 +27,7 @@ import { cleanseSystem } from './systems/cleanse';
 import { physicsSystem } from './systems/physics';
 import { edgeSystem } from './systems/edge';
 import { propPushSystem, propSystem } from './systems/props';
+import { propCollisionSystem } from './systems/impulse';
 import { railSystem } from './systems/rails';
 import { rebuildSystem } from './systems/rebuild';
 import { arenaSystem } from './systems/arena';
@@ -99,6 +100,8 @@ export function step(w: World): void {
   railSystem(w, STEP);
   propSystem(w, STEP);
   propPushSystem(w, STEP);
+  // Предметы между собой — после того, как каждый получил свой ход.
+  propCollisionSystem(w);
   profiler.end('СИМ: ТЕЛЕКИНЕЗ');
 
   profiler.begin('СИМ: ФИЗИКА');

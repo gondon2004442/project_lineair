@@ -170,6 +170,7 @@ export function createWorld(seed: number, input: InputSnapshot): World {
     fixtureC: new Map(),
     bulletC: new Map(),
     drawC: new Map(),
+    kickC: new Map(),
   };
 
   w.player = spawnPlayer(w, 0, 0);
