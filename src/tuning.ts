@@ -1768,6 +1768,15 @@ export const TUNING = {
     sunkenSquat: 0.8,
     internShoulder: 0.62,
     internShoulderOut: 0.42,
+    /**
+     * Кадровик: узкий корпус и лист поперёк него, шире плеч. Лист
+     * торчит в обе стороны, поэтому должность читается и в чёрном
+     * пятне, как воротник инспектора.
+     */
+    sheetWidth: 0.55,
+    sheetSpan: 1.35,
+    sheetThick: 0.22,
+    sheetLift: 0.1,
     /** Регистратор: боковые руки-картотеки выше корпуса. */
     registrarArmOut: 0.5,
     registrarArmTall: 1.3,

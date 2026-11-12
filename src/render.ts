@@ -2067,6 +2067,20 @@ function drawSilhouette(
       }
       break;
     }
+    case 'sheet': {
+      // Кадровик: узкий корпус, а поперёк него лист — шире плеч и
+      // выше пояса. Руки не нужны: лист и есть его работа.
+      const wide = half * TUNING.render.sheetWidth;
+      block(g, x - wide, y - half, wide * 2, half * 2, color);
+      const head = half * TUNING.render.bulkHead;
+      block(g, x - head, y - half - head, head * 2, head * 2, color);
+      headShadow(g, x, y, half);
+      const span = half * TUNING.render.sheetSpan;
+      const thick = half * TUNING.render.sheetThick;
+      const lift = half * TUNING.render.sheetLift;
+      g.rect(x - span, y - thick - lift, span * 2, thick * 2).fill(PALETTE.paper);
+      break;
+    }
     case 'counter': {
       // Архивариус: он не силуэт, а конторка. Широкая, низкая, со
       // столешницей поверх — и ни одной руки: этот ничего не делает

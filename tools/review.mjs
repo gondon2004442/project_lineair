@@ -272,16 +272,26 @@ const out = await page.evaluate(() => {
   {
     const w = мир(4242, -5);
     L.enterRoom(w, w.floor.end, null);
-    let худший = 0;
+    const времена = [];
     const t0 = performance.now();
     for (let i = 0; i < 1800; i++) {
       const a = performance.now();
       L.step(w);
-      худший = Math.max(худший, performance.now() - a);
+      времена.push(performance.now() - a);
     }
     const всего = performance.now() - t0;
-    заметки.push(`1800 шагов за ${всего.toFixed(0)} мс, худший ${худший.toFixed(2)} мс`);
-    if (худший > 5) беды.push(`худший шаг ${худший.toFixed(2)} мс`);
+    // По худшему шагу судить нельзя: раз в несколько прогонов в него
+    // попадает сборка мусора, и стенд начинает врать. Смотрим на сумму
+    // и на 99-й процентиль, а худший оставляем в заметке как есть.
+    времена.sort((a, b) => a - b);
+    const p99 = времена[Math.floor(времена.length * 0.99)];
+    const худший = времена[времена.length - 1];
+    заметки.push(
+      `1800 шагов за ${всего.toFixed(0)} мс, 99-й процентиль ${p99.toFixed(2)} мс, ` +
+        `худший ${худший.toFixed(2)} мс`,
+    );
+    if (p99 > 2) беды.push(`99-й процентиль шага ${p99.toFixed(2)} мс`);
+    if (всего > 600) беды.push(`1800 шагов за ${всего.toFixed(0)} мс`);
   }
 
   return { беды, заметки };
