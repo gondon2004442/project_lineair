@@ -27,7 +27,7 @@ const ПОСЕВНЫЕ =
 
 const { browser, page, errors } = await открытьИгру(`${АДРЕС}/?seed=4242`);
 
-const out = await page.evaluate((посевные) => {
+const out = await page.evaluate(({ посевные, след }) => {
   const прогон = (посевная) => {
     const L = window.lineair, T = L.tuning;
     const w = L.createWorld(посевная, L.world().input);
@@ -38,7 +38,7 @@ const out = await page.evaluate((посевные) => {
     h.max = 1e4;
     h.hp = 1e4;
 
-    const журнал = [], беды = [];
+    const журнал = [], беды = [], попытки = [];
     const tile = w.map.size;
     const midX = (T.room.wall + Math.floor(T.room.cols / 2)) * tile;
     const midY = (T.room.wall + Math.floor(T.room.rows / 2)) * tile;
@@ -143,7 +143,19 @@ const out = await page.evaluate((посевные) => {
           if (стоим > 15) { вбок = 20; стоим = 0; }
           // Уперлись надолго: впереди шкаф. Его расстреливают, а не
           // обходят — так и играют.
-          if (упор > 60) {
+          // Уперлись надолго: впереди мебель. Сначала убираем её
+          // телекинезом — стойку с факсами пуля не берёт вовсе, её
+          // только и можно, что отнести в сторону. Не помогло —
+          // расстреливаем: так и играют.
+          if (упор > 40 && упор <= 70) {
+            w.input.grabHeld = true;
+            w.input.aimX = t.x - mx * tile * 6;
+            w.input.aimY = t.y - my * tile * 6;
+          } else if (упор === 71) {
+            // Отпустили — бросок уходит назад, проход освобождается.
+            w.input.grabHeld = false;
+          } else if (упор > 80) {
+            w.input.grabHeld = false;
             w.input.aimX = t.x + mx * tile * 2;
             w.input.aimY = t.y + my * tile * 2;
             w.input.fireHeld = true;
@@ -155,6 +167,7 @@ const out = await page.evaluate((посевные) => {
           стоим = 0;
           упор = Math.max(0, упор - 2);
           неСтрелять();
+          w.input.grabHeld = false;
         }
         px = t.x;
         py = t.y;
@@ -169,14 +182,22 @@ const out = await page.evaluate((посевные) => {
       for (const сМебелью of [true, false]) {
         const маршрут = вехи(tx, ty, сМебелью);
         if (маршрут === null) continue;
-        let ок = true;
+        // Веху можно и пропустить: важно дойти до цели, а не отметиться
+        // в каждой клетке. Подряд три несданные вехи — значит упёрлись
+        // всерьёз, и маршрут пора менять.
+        let подряд = 0;
         for (const веха of маршрут) {
-          const n = рулить(веха.x, веха.y, Math.max(90, Math.round(предел / 6)));
-          if (n < 0) { ок = false; break; }
+          const n = рулить(веха.x, веха.y, Math.max(60, Math.round(предел / 8)));
+          if (n < 0) {
+            подряд += 1;
+            if (подряд >= 3) break;
+            continue;
+          }
+          подряд = 0;
           всего += n;
         }
-        if (ок) return всего;
-        // Не прошли по этому маршруту — пробуем следующий, сквозь мебель.
+        const t = где();
+        if (Math.hypot(tx - t.x, ty - t.y) < tile * 0.8) return всего;
       }
       const n = рулить(tx, ty, предел);
       return n < 0 ? -1 : всего + n;
@@ -187,13 +208,47 @@ const out = await page.evaluate((посевные) => {
       const было = w.room;
       const g = дверь(dir);
       const внутрь = ВНУТРЬ[dir];
-      const n = идти(g.x + внутрь[0] * tile * 2, g.y + внутрь[1] * tile * 2, предел ?? 1200);
+      // Подход к проёму: точка в двух клетках внутрь может быть занята
+      // шкафом — тогда к двери не подойти вовсе, хотя сама она открыта.
+      // Пробуем подходы дальше от двери и вдоль стены в обе стороны:
+      // проём шириной в две клетки, и вторая часто свободна.
+      const вбок = [внутрь[1], внутрь[0]];
+      let n = -1;
+      for (const даль of [2, 3, 4]) {
+        for (const сдвиг of [0, 1, -1]) {
+          const x = g.x + внутрь[0] * tile * даль + вбок[0] * tile * сдвиг;
+          const y = g.y + внутрь[1] * tile * даль + вбок[1] * tile * сдвиг;
+          if (вехи(x, y, true) === null) continue;
+          n = идти(x, y, предел ?? 1200);
+          if (n >= 0) break;
+        }
+        if (n >= 0) break;
+      }
+      if (n < 0) n = идти(g.x + внутрь[0] * tile * 2, g.y + внутрь[1] * tile * 2, предел ?? 1200);
+      // Встаём на ось проёма: подход мог оказаться на соседнем ряду, а
+      // там, где у двери пол, рядом с ней бетон — и напор в стену
+      // ничего не даёт.
+      рулить(g.x + внутрь[0] * tile * 0.7, g.y + внутрь[1] * tile * 0.7, 240);
       w.input.moveX = -внутрь[0];
       w.input.moveY = -внутрь[1];
       for (let i = 0; i < 160 && w.room === было; i++) L.step(w);
       w.input.moveX = 0;
       w.input.moveY = 0;
       for (let i = 0; i < 40; i++) L.step(w);
+      // Не вышли — отходим на середину помещения. Игра детерминирована:
+      // вторая попытка из той же точки провалится ровно так же, а из
+      // другой точки дорога к проёму может сложиться иначе.
+      if (w.room === было) {
+        const centre = { x: (w.map.cols / 2) * tile, y: (w.map.rows / 2) * tile };
+        идти(centre.x, centre.y, 600);
+      }
+      if (след) {
+        const t = где();
+        попытки.push(
+          `${было}-дверь${dir}:${n < 0 ? 'не дошёл' : n}→${w.room}` +
+            `@${Math.floor(t.x / tile)}:${Math.floor(t.y / tile)}`,
+        );
+      }
       return { прошёл: w.room !== было, шагов: n < 0 ? 0 : n, дошёлДоДвери: n >= 0 };
     };
 
@@ -344,7 +399,8 @@ const out = await page.evaluate((посевные) => {
       const этажГлубина = w.depth;
       снятьШтат(1200);
       let шагов = 0, прошёл = 0, застрял = 0;
-      for (let k = 0; k < 20 && w.room !== w.floor.end; k++) {
+      const побывал = new Set([w.room]);
+      for (let k = 0; k < 40 && w.room !== w.floor.end; k++) {
         const маршрут = путь(w.room, w.floor.end);
         if (маршрут === null || маршрут.length === 0) {
           беды.push(`${строка.этаж}: до приёмной нет пути`);
@@ -363,6 +419,28 @@ const out = await page.evaluate((посевные) => {
         const ход = вДверь(маршрут[0], 1200);
         if (!ход.дошёлДоДвери) застрял += 1;
         else шагов += ход.шагов;
+        // Не вышли в нужный проём — пробуем остальные. Игрок в такой
+        // ситуации тоже не упирается в одну дверь: он идёт в любую, а
+        // дорогу считает заново уже из нового участка.
+        if (w.room === было) {
+          // Сначала в те проёмы, за которыми ещё не были: ходить по
+          // кругу между двумя участками — не поиск, а топтание.
+          const стороны = [0, 1, 2, 3]
+            .filter((d) => d !== маршрут[0] && w.floor.rooms[было].neighbors[d] >= 0)
+            .sort((a, b) => {
+              const A = побывал.has(L.linkOf(w, было, a)) ? 1 : 0;
+              const B = побывал.has(L.linkOf(w, было, b)) ? 1 : 0;
+              return A - B;
+            });
+          for (const dir of стороны) {
+            if (w.room !== было) break;
+            шагов += вДверь(dir, 1200).шагов;
+          }
+        }
+        побывал.add(w.room);
+        if (след) {
+          строка.след = `${строка.след ?? ''} ${было}→${w.room}`.trim();
+        }
         if (w.room === было) {
           застрял += 1;
           if (застрял > 3) {
@@ -456,6 +534,7 @@ const out = await page.evaluate((посевные) => {
       посевная,
       журнал,
       беды,
+      попытки: след ? попытки.slice(0, 40) : undefined,
       итог: {
         статус: w.status,
         решение: w.verdict === '' ? '—' : w.verdict,
@@ -464,7 +543,7 @@ const out = await page.evaluate((посевные) => {
     };
   };
   return посевные.map(прогон);
-}, ПОСЕВНЫЕ);
+}, { посевные: ПОСЕВНЫЕ, след: process.env.LINEAIR_TRACE === '1' });
 
 let бед = 0;
 for (const r of out) {
@@ -472,6 +551,7 @@ for (const r of out) {
     `=== посевная ${r.посевная}: ${r.итог.статус}, решение ${r.итог.решение}, дел ${r.итог.дел}`,
   );
   for (const строка of r.журнал) console.log('   ' + JSON.stringify(строка));
+  if (r.попытки !== undefined) for (const п of r.попытки) console.log('      ' + п);
   console.log('   беды: ' + (r.беды.length === 0 ? 'нет' : JSON.stringify(r.беды)));
   бед += r.беды.length;
 }
