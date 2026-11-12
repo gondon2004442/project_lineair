@@ -81,7 +81,7 @@ export function personnelSystem(w: World, dt: number): void {
     }
 
     // Табличка горит, пока он открыт: молчащие распоряжения и есть окно.
-    if (w.orderC.size === 0) staff.plateFlash = Math.max(staff.plateFlash, 0.2);
+    if (w.orderC.size === 0) staff.plateFlash = Math.max(staff.plateFlash, cfg.openFlash);
 
     if (alive && pt !== undefined) {
       // Держится поодаль: он не дерётся, он оформляет.

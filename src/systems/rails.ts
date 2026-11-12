@@ -14,6 +14,7 @@
  */
 import { floorAt } from '../data/floors';
 import { distortionNow } from './cleanse';
+import { TILE_WALL, TILE_WEAK } from '../room';
 import type { World } from '../ecs';
 import { TUNING } from '../tuning';
 
@@ -69,7 +70,7 @@ function free(w: World, x: number, y: number, radius: number): boolean {
     const cy = Math.floor((y + dy * radius) / size);
     if (cx < 0 || cy < 0 || cx >= map.cols || cy >= map.rows) return false;
     const tile = map.tiles[cy * map.cols + cx];
-    if (tile === undefined || tile === 1 || tile === 3) return false;
+    if (tile === undefined || tile === TILE_WALL || tile === TILE_WEAK) return false;
   }
   return true;
 }
